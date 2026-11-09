@@ -32,6 +32,13 @@ abstract class _PlayerPanelController with Store {
   bool showVolume = false;
   @observable
   bool showPlaySpeed = false;
+
+  /// Double-tap seek overlays (PiliPlus view.dart mountSeekBackwardButton /
+  /// mountSeekForwardButton, rewritten as MobX observables).
+  @observable
+  bool showSeekBackwardOverlay = false;
+  @observable
+  bool showSeekForwardOverlay = false;
   @observable
   bool brightnessSeeking = false;
   @observable
@@ -49,6 +56,8 @@ abstract class _PlayerPanelController with Store {
     showBrightness = false;
     showVolume = false;
     showPlaySpeed = false;
+    showSeekBackwardOverlay = false;
+    showSeekForwardOverlay = false;
     brightnessSeeking = false;
     volumeSeeking = false;
     seekDirection = 0;

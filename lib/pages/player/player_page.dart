@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -6,25 +7,32 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/empty_state_widget.dart';
+import 'package:emoplay/models/playback_args.dart';
 import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/pages/player/player_item.dart';
 import 'package:emoplay/pages/player/controller/player_page_controller.dart';
 
 /// 播放 Tab.
 ///
-/// M1: opens local files/folders with file_picker and plays them through the
-/// kept Kazumi player stack (PlayerController + PlayerItem). Track/subtitle
-/// panels and the persistent single-instance player arrive in S2/S3
-/// (docs/SPEC.md §5).
+/// M2: plays local files handed over through the route as sealed
+/// [LocalFilePlaybackArgs] (Kazumi video-route pattern), or opened with the
+/// temporary file_picker entries below (docs/SPEC.md §5; the full library
+/// picker replaces them in M3).
 class PlayerPage extends StatefulWidget {
   const PlayerPage({
     super.key,
     required this.playerController,
     required this.playerPageController,
+    this.initialArgs,
   });
 
   final PlayerController playerController;
   final PlayerPageController playerPageController;
+
+  /// Playback context passed through the route arguments. When present the
+  /// page plays exactly this file on entry, replacing any previous playlist;
+  /// when absent the tab keeps its existing state.
+  final LocalFilePlaybackArgs? initialArgs;
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -46,9 +54,33 @@ class _PlayerPageState extends State<PlayerPage> {
   bool get _hasCurrent => _pageController.currentIndex >= 0;
 
   @override
+  void initState() {
+    super.initState();
+    final args = widget.initialArgs;
+    if (args != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_playArgs(args));
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _keyboardFocus.dispose();
     super.dispose();
+  }
+
+  /// Plays the file handed over through the route (mpv-emo openAt semantics:
+  /// [LocalFilePlaybackArgs.startAt] is deferred to file-loaded by the
+  /// playback controller). Entry through the route replaces the playlist.
+  Future<void> _playArgs(LocalFilePlaybackArgs args) async {
+    _pageController.setPlaylist(
+      [PlayerPlaylistItem(title: args.title, path: args.path)],
+      initialIndex: 0,
+    );
+    await _loadCurrent(startAt: args.startAt);
   }
 
   Future<void> _openFiles() async {
@@ -108,7 +140,7 @@ class _PlayerPageState extends State<PlayerPage> {
     await _loadCurrent();
   }
 
-  Future<void> _loadCurrent() async {
+  Future<void> _loadCurrent({double startAt = 0.0}) async {
     final item = _pageController.currentItem;
     if (item == null) {
       return;
@@ -117,7 +149,7 @@ class _PlayerPageState extends State<PlayerPage> {
     final ok = await _playerController.init(
       PlaybackInitParams(
         videoUrl: item.path,
-        offset: 0,
+        startAt: startAt,
         isLocalPlayback: true,
         httpHeaders: const {},
         episodeTitle: item.title,

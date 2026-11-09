@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
+import 'package:emoplay/pages/player/controller/pending_resume_seek.dart';
 import 'package:emoplay/pages/player/controller/player_debug_controller.dart';
 import 'package:emoplay/pages/player/controller/player_super_resolution.dart';
 import 'package:emoplay/services/shaders/shader_asset_service.dart';
@@ -89,6 +90,10 @@ abstract class _PlayerPlaybackController with Store {
   /// 历史记录传入的 offset
   int startOffset = 0;
 
+  /// Deferred resume seek (SPEC §4.4): armed on open, consumed once by the
+  /// first file-loaded signal. See [PendingResumeSeek] for the 1.x semantics.
+  final PendingResumeSeek _resumeSeek = PendingResumeSeek();
+
   /// 当前超分辨率模式
   @observable
   SuperResolutionMode superResolutionMode = SuperResolutionMode.off;
@@ -144,6 +149,7 @@ abstract class _PlayerPlaybackController with Store {
     duration = Duration.zero;
     completed = false;
     startOffset = 0;
+    _resumeSeek.clear();
   }
 
   /// 本次会话是否从距结尾 [nearEndWatchedThreshold] 以内的位置起播。
@@ -268,9 +274,12 @@ abstract class _PlayerPlaybackController with Store {
   Future<Player?> createVideoController(
     Map<String, String> httpHeaders, {
     required bool Function() canInstall,
-    int offset = 0,
+    double startAt = 0.0,
   }) async {
-    startOffset = offset;
+    // mpv-emo openAt(path, seconds): the resume position is recorded here and
+    // seeked to once the file is loaded, never passed with the load command.
+    startOffset = startAt.round();
+    _resumeSeek.arm(startAt);
     superResolutionMode = SuperResolutionMode.fromStorageValue(
       GStorage.getSetting(SettingsKeys.defaultSuperResolutionMode),
     );
@@ -445,11 +454,17 @@ abstract class _PlayerPlaybackController with Store {
         }
       }
 
+      // SPEC §4.4: no `start` on the media — the resume seek is issued after
+      // the file is loaded (a seek sent earlier is dropped by mpv), consumed
+      // exactly once by [_armResumeSeek].
       await player.open(
-        Media(videoUrl(),
-            start: Duration(seconds: offset), httpHeaders: httpHeaders),
+        Media(videoUrl(), httpHeaders: httpHeaders),
         play: autoPlay,
       );
+      if (!isCurrentPlayer(player)) {
+        return await _discardIfNotCurrent(candidate);
+      }
+      await _armResumeSeek(player);
       if (!isCurrentPlayer(player)) {
         return await _discardIfNotCurrent(candidate);
       }
@@ -467,6 +482,65 @@ abstract class _PlayerPlaybackController with Store {
       }
       await candidate.dispose();
       Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  /// Consumes the deferred resume seek on the first playback-time report.
+  ///
+  /// media_kit does not expose mpv's file-loaded event, so the closest
+  /// post-file-loaded signal is used instead: mpv makes the `playback-time`
+  /// property available only once a file is loaded and playback time exists,
+  /// and observing it delivers the first value right at that point. The
+  /// observer removes itself immediately after firing — a later file in the
+  /// playlist must start from the beginning (one-shot, mpv-emo
+  /// PlaybackController.cpp L264-268). Property values that are not available
+  /// yet read back as null and never reach the listener
+  /// (media_kit real.dart only dispatches when `readNativeString` != null).
+  Future<void> _armResumeSeek(Player player) async {
+    if (!_resumeSeek.hasPending) {
+      return;
+    }
+    final NativePlayer? platform = player.platform is NativePlayer
+        ? player.platform as NativePlayer
+        : null;
+    if (platform == null) {
+      _resumeSeek.clear();
+      return;
+    }
+    final pp = platform;
+    try {
+      await pp.observeProperty(
+        'playback-time',
+        (value) async {
+          final target = _resumeSeek.consume();
+          if (target == null) {
+            return;
+          }
+          try {
+            await pp.unobserveProperty(
+              'playback-time',
+              waitForInitialization: false,
+            );
+          } catch (_) {}
+          if (!isCurrentPlayer(player)) {
+            return;
+          }
+          try {
+            await player.seek(Duration(milliseconds: (target * 1000).round()));
+          } catch (e) {
+            EmoLogger().w(
+              'PlayerPlaybackController: resume seek failed',
+              error: e,
+            );
+          }
+        },
+        waitForInitialization: false,
+      );
+    } catch (e) {
+      EmoLogger().w(
+        'PlayerPlaybackController: failed to arm resume seek',
+        error: e,
+      );
     }
   }
 

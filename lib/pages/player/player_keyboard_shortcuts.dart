@@ -95,10 +95,7 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
       return KeyEventResult.ignored;
     }
 
-    final keyLabel = event.logicalKey.keyLabel.isNotEmpty
-        ? event.logicalKey.keyLabel
-        : event.logicalKey.debugName ?? '';
-    final actionName = _findActionName(keyLabel);
+    final actionName = _findActionName(_keyIdentity(event));
     if (actionName == null) {
       return KeyEventResult.ignored;
     }
@@ -160,6 +157,23 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
       }
     }
     return null;
+  }
+
+  /// Identity of the key including non-shift modifiers, so a bare '1' entry
+  /// matches Digit1 but not Ctrl+Digit1 — modified keys fall through to the
+  /// app shell instead (1.x keeps Ctrl+1..5 for page switching, and forwards
+  /// everything unhandled to mpv's own key layer). Shift stays implicit:
+  /// Flutter already reflects it in the label of letter keys.
+  String _keyIdentity(KeyEvent event) {
+    final modifiers = <String>[
+      if (HardwareKeyboard.instance.isControlPressed) 'ctrl',
+      if (HardwareKeyboard.instance.isAltPressed) 'alt',
+      if (HardwareKeyboard.instance.isMetaPressed) 'meta',
+    ];
+    final label = event.logicalKey.keyLabel.isNotEmpty
+        ? event.logicalKey.keyLabel
+        : event.logicalKey.debugName ?? '';
+    return [...modifiers, label].join('+');
   }
 
   void _releaseAllLongPressShortcuts() {

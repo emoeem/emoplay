@@ -145,6 +145,10 @@ const List<double> defaultPlaySpeedList = [
 /// 保存历史时进度归零，续播起点落在其中时从头播放
 const Duration nearEndWatchedThreshold = Duration(seconds: 5);
 
+/// 双击快进/快退单次步长（PiliPlus storage_pref.dart fastForBackwardDuration
+/// 默认 10s；连续双击在浮层上累加，松手 400ms 后一次性 seek）。
+const Duration doubleTapSeekStep = Duration(seconds: 10);
+
 /// 可选播放器日志等级
 /// LogLevel 0: 错误 1: 警告 2: 简略 3: 详细 4: 调试（隐藏） 5: 全部（隐藏）
 const Map<int, String> playerLogLevelMap = {

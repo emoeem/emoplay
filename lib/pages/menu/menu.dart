@@ -99,23 +99,44 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     SystemNavigator.pop();
   }
 
+  /// Page-switch shortcuts ported from 1.x `qml/Main.qml:502-506`
+  /// (Ctrl+1..5 → 首页/媒体库/播放/插件/设置). Only fires for focus inside
+  /// the tab shell: dialogs run in their own focus path and the player's
+  /// shortcut layer ignores modified keys, so Ctrl+1..5 fall through to here.
+  Map<ShortcutActivator, VoidCallback> get _tabSwitchShortcuts => {
+        for (var i = 0; i < menu.menuList.length; i++)
+          SingleActivator(
+            [
+              LogicalKeyboardKey.digit1,
+              LogicalKeyboardKey.digit2,
+              LogicalKeyboardKey.digit3,
+              LogicalKeyboardKey.digit4,
+              LogicalKeyboardKey.digit5,
+            ][i],
+            control: true,
+          ): () => _selectDestination(i),
+      };
+
   @override
   Widget build(BuildContext context) {
     return RouteVisibility(
       isCovered: _isCovered,
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) {
-            _handleSystemBack(context);
-          }
-        },
-        child: OrientationBuilder(
-          builder: (context, orientation) {
-            return orientation == Orientation.portrait
-                ? _bottomMenu(context, _selectedIndex)
-                : _sideMenu(context, _selectedIndex);
+      child: CallbackShortcuts(
+        bindings: _tabSwitchShortcuts,
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) {
+              _handleSystemBack(context);
+            }
           },
+          child: OrientationBuilder(
+            builder: (context, orientation) {
+              return orientation == Orientation.portrait
+                  ? _bottomMenu(context, _selectedIndex)
+                  : _sideMenu(context, _selectedIndex);
+            },
+          ),
         ),
       ),
     );

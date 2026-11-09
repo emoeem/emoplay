@@ -171,6 +171,50 @@ mixin _$PlayerPanelController on _PlayerPanelController, Store {
     });
   }
 
+  late final _$showSeekBackwardOverlayAtom = Atom(
+    name: '_PlayerPanelController.showSeekBackwardOverlay',
+    context: context,
+  );
+
+  @override
+  bool get showSeekBackwardOverlay {
+    _$showSeekBackwardOverlayAtom.reportRead();
+    return super.showSeekBackwardOverlay;
+  }
+
+  @override
+  set showSeekBackwardOverlay(bool value) {
+    _$showSeekBackwardOverlayAtom.reportWrite(
+      value,
+      super.showSeekBackwardOverlay,
+      () {
+        super.showSeekBackwardOverlay = value;
+      },
+    );
+  }
+
+  late final _$showSeekForwardOverlayAtom = Atom(
+    name: '_PlayerPanelController.showSeekForwardOverlay',
+    context: context,
+  );
+
+  @override
+  bool get showSeekForwardOverlay {
+    _$showSeekForwardOverlayAtom.reportRead();
+    return super.showSeekForwardOverlay;
+  }
+
+  @override
+  set showSeekForwardOverlay(bool value) {
+    _$showSeekForwardOverlayAtom.reportWrite(
+      value,
+      super.showSeekForwardOverlay,
+      () {
+        super.showSeekForwardOverlay = value;
+      },
+    );
+  }
+
   late final _$brightnessSeekingAtom = Atom(
     name: '_PlayerPanelController.brightnessSeeking',
     context: context,
@@ -254,6 +298,8 @@ seekCancelPending: ${seekCancelPending},
 showBrightness: ${showBrightness},
 showVolume: ${showVolume},
 showPlaySpeed: ${showPlaySpeed},
+showSeekBackwardOverlay: ${showSeekBackwardOverlay},
+showSeekForwardOverlay: ${showSeekForwardOverlay},
 brightnessSeeking: ${brightnessSeeking},
 volumeSeeking: ${volumeSeeking},
 canHidePlayerPanel: ${canHidePlayerPanel}

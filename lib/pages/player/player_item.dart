@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:emoplay/pages/player/player_item_panel.dart';
 import 'package:emoplay/pages/player/player_keyboard_shortcuts.dart';
 import 'package:emoplay/pages/player/controller/player_super_resolution.dart';
+import 'package:emoplay/pages/player/player_adjustment_hud.dart';
 import 'package:emoplay/pages/player/player_panel_hold.dart';
 import 'package:emoplay/pages/player/player_pointer_interaction.dart';
 import 'package:emoplay/pages/player/player_gesture_detector.dart';
+import 'package:emoplay/pages/player/player_seek_indicator.dart';
 import 'package:emoplay/pages/player/player_screenshot_feedback_overlay.dart';
 import 'package:emoplay/pages/player/player_screenshot_sheet.dart';
 import 'package:emoplay/pages/player/controller/player_screenshot_controller.dart';
@@ -99,6 +101,11 @@ class _PlayerItemState extends State<PlayerItem>
   PlayerPanelHold? _progressBarDragHold;
   PointerDeviceKind? _lastTapPointerKind;
   PointerDeviceKind? _lastDoubleTapPointerKind;
+  double _lastDoubleTapDx = 0;
+
+  /// True while a long press has switched to the temporary speed and the
+  /// matching end/cancel must restore it (PiliPlus setLongPressStatus).
+  bool _longPressSpeedEngaged = false;
 
   late final AnimationController _panelVisibilityController;
   late final AnimationController _screenshotFeedbackController;
@@ -340,6 +347,16 @@ class _PlayerItemState extends State<PlayerItem>
         onRepeat: handleShortcutForwardRepeat,
         onRelease: handleShortcutForwardUp,
       ),
+      // PiliPlus player_focus.dart holds ArrowUp/ArrowDown to keep changing
+      // the volume; the repeat rate is the system key-repeat rate.
+      'volumeup': PlayerLongPressShortcutActions(
+        onRepeat: () => handleShortcutVolumeChange('up'),
+        onRelease: () {},
+      ),
+      'volumedown': PlayerLongPressShortcutActions(
+        onRepeat: () => handleShortcutVolumeChange('down'),
+        onRelease: () {},
+      ),
     };
   }
 
@@ -427,6 +444,14 @@ class _PlayerItemState extends State<PlayerItem>
     if (!playerPageController.isPip) handleFullscreen();
   }
 
+  /// ESC 优先级链（1.x qml/Main.qml:93 handleEscape）：对话框 → 播放器面板
+  /// → 全屏 → 应用。M2 分层落地：
+  /// - 对话框：Flutter 的 ModalRoute 自带 ESC 关闭；对话框打开时本快捷键层
+  ///   被 `route.isCurrent` 守卫跳过，事件交还给对话框。
+  /// - 播放器面板：音轨/播放列表面板未接线（SPEC §5 后续阶段），接入后应
+  ///   在全屏之前先关面板（1.x PlayerPage.closeTopPanel）。
+  /// - 全屏：退出窗口全屏。
+  /// - 应用兜底：Kazumi 行为（桌面暂停并隐藏窗口）。
   void handleShortcutExitFullscreen() {
     if (playerPageController.isFullscreen) {
       unawaited(playerPageController.setFullscreen(false));
@@ -455,7 +480,7 @@ class _PlayerItemState extends State<PlayerItem>
     playerController.playOrPause();
   }
 
-  void _handleDoubleTap(PointerDeviceKind? pointerKind) {
+  void _handleDoubleTap(PointerDeviceKind? pointerKind, double dx) {
     if (shouldToggleFullscreenOnDoubleTap(
       isDesktop: isDesktop(),
       isPip: playerPageController.isPip,
@@ -464,7 +489,38 @@ class _PlayerItemState extends State<PlayerItem>
       handleFullscreen();
       return;
     }
-    playerController.playOrPause();
+    // PiliPlus onDoubleTapDownMobile: touch double-taps are zoned — the left
+    // quarter mounts the backward seek overlay, the right quarter the forward
+    // one, the middle half toggles playback.
+    final width = MediaQuery.sizeOf(context).width;
+    switch (playerDoubleTapZoneFor(dx, width)) {
+      case PlayerDoubleTapZone.backward:
+        playerController.panel.showSeekBackwardOverlay = true;
+        playerController.panel.showSeekForwardOverlay = false;
+      case PlayerDoubleTapZone.forward:
+        playerController.panel.showSeekBackwardOverlay = false;
+        playerController.panel.showSeekForwardOverlay = true;
+      case PlayerDoubleTapZone.center:
+        _handleDoubleTapCenter();
+    }
+  }
+
+  /// PiliPlus onDoubleTapCenter: restart from the beginning once completed,
+  /// otherwise toggle playback.
+  void _handleDoubleTapCenter() {
+    if (playerController.playback.completed) {
+      unawaited(playerController.playback.restartFromBeginning());
+    } else {
+      playerController.playOrPause();
+    }
+  }
+
+  /// Applies the accumulated double-tap seek exactly once when the overlay's
+  /// idle timer fires (PiliPlus onForward/onBackward).
+  Future<void> _handleSeekOverlaySubmitted(Duration duration) async {
+    playerController.panel.showSeekBackwardOverlay = false;
+    playerController.panel.showSeekForwardOverlay = false;
+    await _seekWithPlayerTimer(() => playerController.seekBy(duration));
   }
 
   void _handleMouseScroller() {
@@ -866,6 +922,17 @@ class _PlayerItemState extends State<PlayerItem>
     }
   }
 
+  void _finishLongPressSpeed() {
+    if (!_longPressSpeedEngaged) {
+      return;
+    }
+    setState(() {
+      _longPressSpeedEngaged = false;
+      playerController.panel.showPlaySpeed = false;
+    });
+    setPlaybackSpeed(lastPlayerSpeed);
+  }
+
   bool get _canHidePlayerPanel =>
       playerController.panel.canHidePlayerPanel && _playerPanelHolds.isEmpty;
 
@@ -1218,6 +1285,7 @@ class _PlayerItemState extends State<PlayerItem>
                           ? null
                           : (details) {
                               _lastDoubleTapPointerKind = details.kind;
+                              _lastDoubleTapDx = details.localPosition.dx;
                             },
                       onDoubleTap: (playerController.panel.lockPanel)
                           ? null
@@ -1225,33 +1293,68 @@ class _PlayerItemState extends State<PlayerItem>
                               _handleDoubleTap(
                                 _lastDoubleTapPointerKind ??
                                     _lastTapPointerKind,
+                                _lastDoubleTapDx,
                               );
                               _lastDoubleTapPointerKind = null;
                               _lastTapPointerKind = null;
                             },
                       onLongPressStart: (_) {
-                        if (playerController.panel.lockPanel) {
+                        // PiliPlus setLongPressStatus: the temporary speed
+                        // only engages while playing, and the matching
+                        // end/cancel restores the previous speed.
+                        if (playerController.panel.lockPanel ||
+                            !playerController.playback.playerPlaying) {
                           return;
                         }
                         setState(() {
+                          _longPressSpeedEngaged = true;
                           playerController.panel.showPlaySpeed = true;
                         });
                         lastPlayerSpeed = playerController.playback.playerSpeed;
                         setPlaybackSpeed(longPressPlaySpeed);
                       },
                       onLongPressEnd: (_) {
-                        if (playerController.panel.lockPanel) {
-                          return;
-                        }
-                        setState(() {
-                          playerController.panel.showPlaySpeed = false;
-                        });
-                        setPlaybackSpeed(lastPlayerSpeed);
+                        _finishLongPressSpeed();
+                      },
+                      onLongPressCancel: () {
+                        _finishLongPressSpeed();
                       },
                       child: Container(
                         color: Colors.transparent,
                         width: double.infinity,
                         height: double.infinity,
+                      ),
+                    ),
+                    // PiliPlus double-tap seek overlays sit above the gesture
+                    // layer so the extra taps accumulate on the indicator.
+                    Observer(builder: (context) {
+                      final showBackward =
+                          playerController.panel.showSeekBackwardOverlay;
+                      final showForward =
+                          playerController.panel.showSeekForwardOverlay;
+                      if (!showBackward && !showForward) {
+                        return const SizedBox.shrink();
+                      }
+                      return PlayerSeekIndicatorOverlay(
+                        showBackward: showBackward,
+                        showForward: showForward,
+                        step: doubleTapSeekStep,
+                        onSubmitted: (duration) =>
+                            _handleSeekOverlaySubmitted(duration),
+                      );
+                    }),
+                    // Long-press / shortcut speed feedback (Kazumi
+                    // PlayerSpeedHud, mounted top-center like the panel).
+                    Positioned(
+                      top: 25,
+                      left: 0,
+                      right: 0,
+                      child: Observer(
+                        builder: (context) => PlayerSpeedHud(
+                          visible: playerController.panel.showPlaySpeed,
+                          speed: playerController.playback.playerSpeed,
+                          disableAnimations: widget.disableAnimations,
+                        ),
                       ),
                     ),
                     Positioned.fill(

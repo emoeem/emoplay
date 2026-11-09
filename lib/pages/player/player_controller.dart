@@ -174,7 +174,7 @@ class PlayerController implements Disposable {
       player = await playback.createVideoController(
         params.httpHeaders,
         canInstall: () => initialization.isActive,
-        offset: params.offset,
+        startAt: params.startAt,
       );
     } catch (e) {
       if (initialization.isStale) {
