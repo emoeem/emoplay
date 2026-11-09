@@ -33,15 +33,21 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
         shell: bash
-      # Same runtime deps as pr.yaml's install step: the equalizer suite
+      # Same runtime closure as pr.yaml's install step: the equalizer suite
       # drives a real libmpv core (media_kit bundled libmpv.so.2 needs the
-      # VA/VDPAU libs), so they must exist before `flutter test`.
+      # VA/VDPAU libs plus pulse/xv/egl/gbm/drm/unwind/lcms2/archive/alsa
+      # runtime libs), so they must exist before `flutter test`. t64 names
+      # are the noble (24.04) ones — libarchive13/libasound2/libmpg123-0
+      # do not exist on ubuntu-latest.
       - name: Install native build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev libayatana-appindicator3-dev libasound2-dev \
-            libva2 libva-drm2 libva-x11-2 libva-wayland2 libvdpau1
+            libva2 libva-drm2 libva-x11-2 libva-wayland2 libvdpau1 \
+            libpulse0 libxv1 libegl1 libgbm1 libdrm2 \
+            libunwind8 liblcms2-2 libarchive13t64 libasound2t64 \
+            libdbus-1-3 libsndfile1 libmpg123-0t64 libopus0 libogg0
         shell: bash
       - name: Run Flutter tests
         run: flutter test

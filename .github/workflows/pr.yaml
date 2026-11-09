@@ -64,24 +64,46 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
         shell: bash
 
-      # Native toolchain for the Linux build, plus the VA/VDPAU runtime
-      # libs that the media_kit bundled libmpv.so.2 links against. The
-      # runtime deps must exist BEFORE `flutter test`: the equalizer suite
-      # drives a real libmpv core, and dlopen only reports the first
+      # Native toolchain for the Linux build, plus the FULL runtime closure
+      # of the media_kit bundled libmpv.so.2: its direct NEEDED sonames
+      # (readelf -d) map to libva*/libvdpau*, libpulse0, libxv1, libegl1,
+      # libgbm1, libdrm2, libunwind8, liblcms2-2, libarchive13t64,
+      # libasound2t64; the second layer (libFLAC/libvorbis/libmp3lame/
+      # libopus/libogg/libmpg123/libasyncns/libdbus) is pulled in by the
+      # distro dep graph of libpulse0 + libsndfile1, so it is never pinned
+      # by soname here (names like libflac12t64 are release-specific).
+      # The runtime deps must exist BEFORE `flutter test`: the equalizer
+      # suite drives a real libmpv core, and dlopen only reports the first
       # missing dependency at a time. Release binaries are built by
-      # release.yaml on tags.
+      # release.yaml on tags. NOTE: noble (24.04) renamed several runtime
+      # libs with the t64 suffix — libarchive13/libasound2/libmpg123-0 do
+      # NOT exist on ubuntu-latest; the t64 names below do.
       - name: Install native build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev libayatana-appindicator3-dev libasound2-dev \
-            libva2 libva-drm2 libva-x11-2 libva-wayland2 libvdpau1
+            libva2 libva-drm2 libva-x11-2 libva-wayland2 libvdpau1 \
+            libpulse0 libxv1 libegl1 libgbm1 libdrm2 \
+            libunwind8 liblcms2-2 libarchive13t64 libasound2t64 \
+            libdbus-1-3 libsndfile1 libmpg123-0t64 libopus0 libogg0
+        shell: bash
+
+      # Build BEFORE tests, then audit the bundled libmpv.so.2 closure in one
+      # shot: dlopen only reports the first missing dependency at a time, so
+      # without this audit every red run peels exactly one layer off the
+      # dependency onion. Any "not found" here fails the job with the full
+      # list of what apt is still missing.
+      - name: Build for Linux
+        run: flutter build linux --debug
+        shell: bash
+
+      - name: Audit libmpv runtime dependencies
+        run: |
+          ldd build/native_assets/linux/libmpv.so.2 \
+            | grep 'not found' && exit 1 || true
         shell: bash
 
       - name: Run tests
         run: flutter test
-        shell: bash
-
-      - name: Build for Linux
-        run: flutter build linux --debug
         shell: bash
