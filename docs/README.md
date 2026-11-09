@@ -27,12 +27,14 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | 文档 | 主题 |
 | --- | --- |
 | [RELEASE_2026-11-10_RECONCILIATION_CLOSEOUT.md](releases/RELEASE_2026-11-10_RECONCILIATION_CLOSEOUT.md) | 对账收网 R1：更新检查上线、CI 触发分支修复、画质控制器语义对齐；M1–M8 之前的变化见仓库根 [CHANGELOG.md](../CHANGELOG.md) |
+| [RELEASE_2026-11-10_TURN_GREEN_BACKFILL.md](releases/RELEASE_2026-11-10_TURN_GREEN_BACKFILL.md) | 转绿补账 R2：CI 首跑红灯定位与修复（VA/VDPAU 运行库）、健壮性边界 11 用例、settings 语义 2 用例、i18n 骨架；30 文件 326 用例全绿 |
 
 ## 工作报告（reports/，读者是维护者与接手者）
 
 | 文档 | 主题 |
 | --- | --- |
 | [WORK_REPORT_2026-11-10_RECONCILIATION_CLOSEOUT.md](reports/WORK_REPORT_2026-11-10_RECONCILIATION_CLOSEOUT.md) | R1 对账收网：26 个 C++ 测试文件 ↔ 28 个 Dart 测试文件逐一对账、门禁实测（313 用例全绿 / analyze 0 告警 / debug build 通过）、CI 零 run 根因 |
+| [WORK_REPORT_2026-11-10_TURN_GREEN_BACKFILL.md](reports/WORK_REPORT_2026-11-10_TURN_GREEN_BACKFILL.md) | R2 转绿补账：CI 首跑红灯归因链（混合 push 触发 / libva 缺失）、门禁实测（30 文件 326 用例全绿）、路线图滞后数字修正 |
 
 ## 审计（audits/）
 

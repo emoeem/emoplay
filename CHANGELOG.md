@@ -62,10 +62,27 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   测试对账：26 个 1.x C++ 测试文件逐一对账（`quality_engine_test.dart` 等补齐，
   见 `docs/reports/WORK_REPORT_2026-11-10_RECONCILIATION_CLOSEOUT.md` §3.1）。
 
+- **转绿补账（R2）**：健壮性边界测试 `test/robustness_test.dart`（损坏媒体
+  文件 / 非媒体目录 / 空库 / 权限拒绝目录，11 用例，全对真实文件系统、无
+  GUI）；`test_settings_service.cpp` 两槽位语义补齐
+  （`test/settings_service_semantics_test.dart`：扫描选项经真实 worker
+  isolate 生效于下一次扫描、保存失败以 `save()` 返回 false + toast 上报而非
+  静默丢失）；i18n 骨架（`l10n.yaml` + `lib/l10n/app_zh.arb`（zh 模板，键值
+  取自真实 UI 字符串并带出处注释）/ `app_en.arb`（结构预留）+ 生成的
+  `AppLocalizations` 类（非 synthetic-package，生成文件提交）+
+  `app_widget.dart` 装配；默认语言仍 zh-Hans-CN，页面字符串迁移为后续轮次）；
+  迁移路线图 `docs/UPGRADE_ROADMAP_2026-11-10.md`（M0–M8 ✅+提交哈希、
+  R1/R2 收尾轮次、未做项 ☐ 清单、验收标准与贯穿约定）。
+
 ### Fixed
 
 - CI 自建仓起零 run：`.github/workflows/pr.yaml` 触发分支写成 `master` 而仓库
   分支是 `main`，每次推送被静默跳过（`916c2d6` 改为 `main`）。
+- CI 首跑红灯（run 42706655830）：`ubuntu-latest` 缺 VA/VDPAU 运行库，
+  media_kit 捆绑的 `libmpv.so.2` 加载失败（`libva-drm.so.2: cannot open
+  shared object file`），两条真开 libmpv 核心的均衡器用例失败；`3379d7a`
+  将原生依赖安装步挪到 `flutter test` 之前并补装 `libva2 libva-drm2
+  libva-x11-2 libva-wayland2 libvdpau1`（`release.yaml` 同步）。
 
 ### Changed
 

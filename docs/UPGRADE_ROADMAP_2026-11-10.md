@@ -2,10 +2,10 @@
 
 | 项       | 值                                                                                     |
 | -------- | -------------------------------------------------------------------------------------- |
-| 状态     | 生效中（2026-11-10 R2 轮建立，替代 HANDOVER 中的临时路线指向）                            |
+| 状态     | 生效中（2026-11-10 R2 轮建立；R2 文档轮修正滞后数字与轮次表）                             |
 | 日期     | 2026-11-10（最后实质性更新）                                                             |
-| 适用版本 | git `3379d7a`（2.0.0-alpha+2000000，未发布；`pubspec.yaml:4`）                            |
-| 相关     | [SPEC.md](SPEC.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[HANDOVER.md](HANDOVER.md)、[R1 工作报告](reports/WORK_REPORT_2026-11-10_RECONCILIATION_CLOSEOUT.md)、[CI run 42706655830](https://github.com/emoeem/emoplay/actions/runs/42706655830) |
+| 适用版本 | git `b61dff2`（2.0.0-alpha+2000000，未发布；`pubspec.yaml:4`）                            |
+| 相关     | [SPEC.md](SPEC.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[HANDOVER.md](HANDOVER.md)、[R1 工作报告](reports/WORK_REPORT_2026-11-10_RECONCILIATION_CLOSEOUT.md)、[R2 工作报告](reports/WORK_REPORT_2026-11-10_TURN_GREEN_BACKFILL.md)、[CI run 42706655830](https://github.com/emoeem/emoplay/actions/runs/42706655830) |
 
 ## 一、当前基线（实测）
 
@@ -14,18 +14,21 @@ CI（首跑因缺 VA/VDPAU 运行库挂掉，修复已提交待推送验证）�
 
 | 门禁       | 结果                                                              | 来源                                                                 |
 | ---------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 版本       | 2.0.0-alpha+2000000，git HEAD `3379d7a`（领先 origin/main 1 提交） | `git log -1`、`git branch -vv`（2026-11-10 R2 实测）                  |
-| 静态检查   | **0 告警**（`No issues found! (ran in 2.2s)`）                    | `flutter analyze`（2026-11-10 R2 本轮实测）                          |
-| 自动化测试 | **28 文件 / 313 通过 + 1 平台条件跳过，全绿**（`+313 ~1: All tests passed!`） | `flutter test`（2026-11-10 R2 本轮实测；R1 报告 §3 同数）            |
-| Linux 构建 | debug 构建通过（`✓ Built build/linux/x64/debug/bundle/emoplay`）  | `flutter build linux --debug`（R1 实测，本轮未重跑；本轮零 Dart 改动） |
+| 版本       | 2.0.0-alpha+2000000，git HEAD `b61dff2`（领先 origin/main 2 提交） | `git log -1`、`git log origin/main..HEAD`（2026-11-10 R2 文档轮实测） |
+| 静态检查   | **0 告警**（`No issues found! (ran in 2.2s)`）                    | `flutter analyze`（2026-11-10 R2 文档轮实测）                        |
+| 自动化测试 | **30 文件 / 326 通过 + 1 平台条件跳过，全绿**（`+326 ~1: All tests passed!`） | `flutter test`（2026-11-10 R2 文档轮实测；R1 报告为 28/313+1，R2 补账 +2 文件 / +13 用例） |
+| Linux 构建 | debug 构建通过（`✓ Built build/linux/x64/debug/bundle/emoplay`）  | `flutter build linux --debug`（2026-11-10 R2 文档轮重测——`b61dff2` 改动了 Dart/pubspec/l10n，R1 的"零 Dart 改动免重跑"已失效） |
 | CI         | **run 42706655830 failure**（2m17s，analyze ✓、Run tests ✗ 于 311 通过 / 2 失败 / 1 跳过） | `gh run list` / `gh run view 42706655830`（R2 本轮实测）             |
 
 CI 红灯细节（`gh run view 42706655830 --log-failed`）：失败用例为
-`test/equalizer_test.dart` 的 `equalizerAppliesToEngine`（:216）与
-`equalizerDisableClearsChain`（:272），报错
+`test/equalizer_test.dart` 的 `equalizerAppliesToEngine`（:212）与
+`equalizerDisableClearsChain`（:271），报错
 `Failed to load dynamic library '.../libmpv.so.2': libva-drm.so.2: cannot open
 shared object file`——CI runner 缺 media_kit 捆绑 libmpv 的 VA/VDPAU 运行时
-依赖，两个真开 libmpv 核心的均衡器用例因此挂掉，与其余 311 条纯 Dart 用例无关。
+依赖，两个真开 libmpv 核心的均衡器用例因此挂掉，与其余 311 条纯 Dart 用例无关
+（本地 313 通过 = CI 311 通过 + 2 失败，用例数自洽）。该 run 由 R1 代码与文档
+混合 push 触发，标题只显示头提交 `2aaa10d`（docs）——归因链见
+[R2 工作报告 §3.1](reports/WORK_REPORT_2026-11-10_TURN_GREEN_BACKFILL.md)。
 修复 `3379d7a`（R2: ci libva deps）在 pr.yaml 把依赖安装步挪到 `flutter test`
 之前并补装 `libva2 libva-drm2 libva-x11-2 libva-wayland2 libvdpau1`，
 release.yaml 同步补同一步；**首绿待本修复推送后确认**。
@@ -58,13 +61,16 @@ R2 回填）；内容一句话取自 [CHANGELOG.md](../CHANGELOG.md) 2.0.0-alpha
 | R1 | `d1866dd` | 平移 `UpdateChecker`（lib/services/update_checker.dart + 测试 + 装配）；PORT-MAP MediaBrowser 行改判 N/A | 积压 3 |
 | R1 | `a7488d9` | 画质三控制器测试面合入 `quality_engine_test.dart`；修 MobX 镜像不随设置重读（`interpolation_controller.dart:172`、`quality_controller.dart:375`） | 积压 3 |
 | R1 文档 | `2aaa10d` | 发布说明 / 工作报告 / HANDOVER / docs 索引 / CHANGELOG R1 条目 | 积压 4 前半 |
-| R2（本轮，进行中） | `3379d7a` | CI 红灯定位与 libva/VDPAU 运行库修复（pr.yaml 装步前移 + release.yaml 同步），待推送验证 | R1 下一步建议 1 |
-| R2（本轮，进行中） | 本文件 | `UPGRADE_ROADMAP_2026-11-10.md` 建立 + docs/README 登记 + HANDOVER 路线图节回填 | 积压 4 后半 |
+| R2 | `3379d7a` | CI 红灯定位与 libva/VDPAU 运行库修复（pr.yaml 装步前移 + release.yaml 同步），待推送验证 | R1 下一步建议 1 |
+| R2 | `b61dff2` | 健壮性测试（`test/robustness_test.dart` 11 用例：损坏媒体 / 空结果 / 权限拒绝）+ `test_settings_service.cpp` 两槽位语义（`test/settings_service_semantics_test.dart` 2 用例）+ i18n 骨架（l10n.yaml / en+zh arb / 生成类 / app_widget 装配）+ 本路线图建立与 HANDOVER 回填 | 积压 6 / 8 / 4 后半 |
+| R2 文档 | 本轮 `docs:` 提交（哈希待回填） | R2 发布说明 / 工作报告 / HANDOVER 刷新 / 本文件滞后数字修正 / CHANGELOG R2 条目 | 收尾流程（OVERNIGHT-LOOP §二-4） |
 
 ## 四、未做项（☐）
 
-结论：按下述优先级推进；R1 报告「下一步建议」5 条中 2 条已消化
-（建议 1 部分消化、建议 2 本文件），其余全部在列。
+结论：按下述优先级推进；R1 报告「下一步建议」5 条中——建议 2 已消化、
+建议 4 已消化（R2 `b61dff2`：健壮性 + settings 语义）、建议 5 骨架已立
+（页面迁移另列 ☐）、建议 1 部分消化（修复 `3379d7a` 已提交待推送）、
+建议 3 未动，其余全部在列。
 
 ### 4.1 需要人工/实机的
 
@@ -73,24 +79,31 @@ R2 回填）；内容一句话取自 [CHANGELOG.md](../CHANGELOG.md) 2.0.0-alpha
 - ☐ **GUI 手感人工验收**：容器内仅验证了进程与构建产物（SPEC §9 冒烟约定：
   显示不可达时以进程存活 + 日志判定，并在报告中标注「显示待人工验收」）。
 - ☐ **iOS 构建进发布矩阵**：workflow 留注释，待签名方案（CHANGELOG「已知限制」）。
-- ☐ **推送 `3379d7a` 与本轮文档并确认 CI 首绿**（R1 报告 §5「需要人工操作的」）。
+- ☐ **推送 R2 提交（`3379d7a` / `b61dff2`）与 R2 文档并确认 CI 首绿**
+  （R1/R2 报告「需要人工操作的」）。
 
 ### 4.2 代码侧待办（按优先级）
 
-- ☐ **CI 首绿**（R1 下一步建议 1 的未消化尾巴）：`3379d7a` 推送后盯
+- ☐ **CI 首绿**（R1 下一步建议 1 的未消化尾巴）：R2 提交推送后盯
   `gh run list -R emoeem/emoplay`；`ubuntu-latest` 若仍红灯，下一个最可能失败点
-  是 Linux 构建步的 GTK/ayatana 包名差异（R1 报告 §6-1 的预判）。
+  是 Linux 构建步的 GTK/ayatana 包名差异（R1 报告 §6-1 的预判；测试步的
+  VA/VDPAU 缺失已由 `3379d7a` 处理）。
 - ☐ **打包**：linux deb（参照 Kazumi CI 的 deb 产物链）或 AppImage，进
   release.yaml（R1 下一步建议 3；OVERNIGHT-LOOP §四-5）。
-- ☐ **健壮性轮**：损坏媒体文件 / 无 ffmpeg 降级 / 空库 / 超长路径 / 拒绝权限
-  目录用例，顺带补 `test_settings_service` 的语义断言（R1 下一步建议 4；
-  OVERNIGHT-LOOP §四-6）。
 - ☐ **性能**：大库扫描 isolate 分片与取消延迟、缩略图并发上限、首帧时间
   （OVERNIGHT-LOOP §四-7）。
-- ☐ **i18n**：en arb 骨架（SPEC §1 预留；R1 下一步建议 5；OVERNIGHT-LOOP §四-8）。
-- ☐ **测试对账残余**：`test_settings_service.cpp` 无一对一 Dart 测试；
-  `test_mpv_engine.cpp` 的 `apply()` 半边需 live libmpv，无自动化覆盖
-  （R1 报告 §3.1 表 + §5）。
+- ☐ **i18n 页面迁移**：en/zh arb 骨架与生成链已立（R2 `b61dff2`，SPEC §1
+  预留），页面字符串逐页替换为 `AppLocalizations` 取用（R2 下一步建议 3）。
+- ☐ **测试对账残余**：`test_settings_service.cpp` 的
+  `restoreDefaultsKeepsMediaAndHistory` 槽位无对应（2.0 无恢复默认 UI，
+  测试侧明确不伪造）；`test_mpv_engine.cpp` 的 `apply()` 半边需 live libmpv，
+  无自动化覆盖（其余槽位已由 R2 `b61dff2` 补齐；R1 报告 §3.1 表 + §5）。
+
+已消化待办（留痕，勿重复施工）：**健壮性轮**（损坏媒体 / 空库 / 拒绝权限
+目录 11 用例 + settings 语义 2 用例，R2 `b61dff2`）；**无 ffmpeg 降级 /
+存储 JSON 损坏 / 空目录列表**此前已由 `thumbnail_service_test.dart` /
+`library_store_test.dart` / `history_store_test.dart` 等锁定
+（`robustness_test.dart` 头注释有覆盖图）。
 
 ## 五、验收标准
 
@@ -103,9 +116,9 @@ R2 回填）；内容一句话取自 [CHANGELOG.md](../CHANGELOG.md) 2.0.0-alpha
    发布 tag 走 `--release` 与 release.yaml 矩阵。
 2. **静态检查**：0 error 维持（R1 起实测 0 告警，`No issues found!`）；
    出现新告警当场清零，不积压。
-3. **自动化测试**：`flutter test` 全绿——当前底数 28 文件 / 313 通过 + 1
-   条件跳过，只增不减；Windows-only 用例按 QSKIP 契约在非 Windows 平台
-   skipped 不计失败。
+3. **自动化测试**：`flutter test` 全绿——当前底数 30 文件 / 326 通过 + 1
+   条件跳过（R2 文档轮实测），只增不减；Windows-only 用例按 QSKIP 契约
+   在非 Windows 平台 skipped 不计失败。
 4. **数据兼容**：`test/data_compat_spec7_test.dart` 必须保持绿——1.x 的
    `history.json` / `library.json` / `settings.json` 直接可读是发布承诺
    （SPEC §7）。
