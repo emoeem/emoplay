@@ -40,6 +40,12 @@ const List<_SettingsGroup> _settingsGroups = [
         path: '/settings/player',
       ),
       _SettingsCategory(
+        label: '视频与画质',
+        description: '画质档位、Anime4K、插帧与 ICC',
+        icon: Icons.auto_awesome_rounded,
+        path: '/settings/quality',
+      ),
+      _SettingsCategory(
         label: '操作设置',
         description: '播放器按键映射',
         icon: Icons.keyboard_rounded,

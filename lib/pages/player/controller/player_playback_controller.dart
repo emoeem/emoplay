@@ -470,6 +470,21 @@ abstract class _PlayerPlaybackController with Store {
         }
       }
 
+      // M6 画质引擎：把画质档位/插帧/ICC 三个控制器挂到本播放器上（1.x
+      // 引擎常驻且 boot 时 startup()；2.0 每文件一个 player，首个 player
+      // 触发一次性 startup()，见 quality_stores.dart）。挂接先于 open：
+      // playlist 事件随后触发 fileLoaded 语义的重算。失败只记日志，绝不
+      // 阻塞起播。注意 glsl-shaders 归属：一旦画质引擎挂接（含手动着色
+      // 器表），change-list clr+append 由它接管；上方的 Kazumi 超分辨率
+      // 仅在画质引擎 off 且未触碰着色器表时保持有效（1.x inert-at-off
+      // 规则）。
+      if (MediaStores.isReady) {
+        await MediaStores.instance.quality.attachPlayer(player);
+        if (!isCurrentPlayer(player)) {
+          return await _discardIfNotCurrent(candidate);
+        }
+      }
+
       // SPEC §4.4: no `start` on the media — the resume seek is issued after
       // the file is loaded (a seek sent earlier is dropped by mpv), consumed
       // exactly once by [_armResumeSeek].
@@ -706,6 +721,11 @@ abstract class _PlayerPlaybackController with Store {
       ownedPlayer?.dispose() ?? Future<void>.value(),
       _cancelDebugInfo(),
     ]);
+    // M6 画质引擎：本播放器已销毁，摘掉画质监听（设置与持久化状态保留，
+    // 下一个播放器 attach 时恢复事件流）。
+    if (MediaStores.isReady) {
+      MediaStores.instance.quality.detachPlayer();
+    }
   }
 
   Future<Uint8List?> screenshotPng() async {

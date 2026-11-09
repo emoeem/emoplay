@@ -7,6 +7,7 @@ import 'package:emoplay/pages/settings/displaymode_settings.dart';
 import 'package:emoplay/pages/settings/interface_settings.dart';
 import 'package:emoplay/pages/settings/keyboard_settings.dart';
 import 'package:emoplay/pages/settings/player_settings.dart';
+import 'package:emoplay/pages/settings/quality_settings.dart';
 import 'package:emoplay/pages/settings/renderer_settings.dart';
 import 'package:emoplay/pages/settings/settings_page.dart';
 import 'package:emoplay/pages/settings/storage_settings.dart';
@@ -58,6 +59,10 @@ final settingsModule = createModule(
           ..route(
             '/player/super',
             child: (context, state) => const SuperResolutionSettings(),
+          )
+          ..route(
+            '/quality',
+            child: (context, state) => const QualitySettingsPage(),
           )
           ..module(aboutModule);
       },

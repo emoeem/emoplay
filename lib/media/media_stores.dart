@@ -9,6 +9,7 @@ import 'package:emoplay/media/thumbnail_service.dart';
 import 'package:emoplay/mpv/compat/compat_controller.dart';
 import 'package:emoplay/mpv/compat/mpv_profile_scanner.dart';
 import 'package:emoplay/mpv/config/mpv_player_properties.dart';
+import 'package:emoplay/quality/quality_stores.dart';
 import 'package:emoplay/services/logging/logger.dart';
 import 'package:emoplay/settings/emoplay_settings.dart';
 
@@ -32,6 +33,7 @@ class MediaStores {
     required this.history,
     required this.thumbnails,
     required this.compat,
+    required this.quality,
     required this.startupMpvProperties,
   }) {
     libraryModel = LibraryModel(library, thumbnails);
@@ -60,6 +62,12 @@ class MediaStores {
   // The mpv compat layer (M5): decision persistence + config-dir scan +
   // startup option assembly (1.x CompatController, main.cpp L170-223).
   final CompatController compat;
+
+  // The quality layer (M6): profile decision table / VapourSynth
+  // interpolation / ICC controllers wired to the live engine per playback
+  // session (1.x QualityController + InterpolationController +
+  // IccController, main.cpp L255-306).
+  final QualityStores quality;
 
   // The assembled mpv property preset applied at player creation:
   // compat options -> plugin scripts appended -> player initialization
@@ -124,12 +132,28 @@ class MediaStores {
 
     final history = HistoryStore(null, '${dir.path}/history.json');
 
+    // M6 画质层：三个画质控制器 + 1.x main.cpp L255-268 的着色器目录规则
+    // （导入决策 full/selective 时用用户 mpv 目录的 shaders/，否则用应用
+    // 数据目录自己的 shaders/）+ 应用数据 vs/ 目录（插帧 .vpy 预设，不随
+    // 应用分发）。引擎挂接在首个播放器创建时发生（quality_stores.dart）。
+    final quality = QualityStores(
+      settings: settings,
+      appDataDir: dir.path,
+      shadersDir: QualityStores.resolveShadersDir(
+        importDecision: settings.importDecision,
+        sourceDir: compat.sourceDir,
+        appDataDir: dir.path,
+      ),
+      scriptsDir: '${dir.path}/vs',
+    );
+
     _instance = MediaStores._(
       settings: settings,
       library: library,
       history: history,
       thumbnails: thumbnails,
       compat: compat,
+      quality: quality,
       startupMpvProperties: startupMpvProperties,
     );
   }
