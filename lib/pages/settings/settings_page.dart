@@ -5,7 +5,7 @@ import 'package:emoplay/bean/appbar/sys_app_bar.dart';
 import 'package:emoplay/bean/settings/settings_detail_scaffold.dart';
 import 'package:emoplay/bean/settings/settings_list.dart';
 import 'package:emoplay/bean/widget/content_section.dart';
-import 'package:emoplay/pages/settings/player_settings.dart';
+import 'package:emoplay/pages/settings/general_settings.dart';
 import 'package:emoplay/utils/constants.dart';
 
 class _SettingsCategory {
@@ -29,12 +29,26 @@ class _SettingsGroup {
   final List<_SettingsCategory> categories;
 }
 
+// SPEC §6 设置分类法：11 个分类（常规/播放/视频与画质/音频/mpv 配置/
+// 着色器管理/外观/快捷键/存储与缓存/诊断/关于），组件与双面板沿用
+// Kazumi SettingsList 体系（compact 断点 600×480）。
 const List<_SettingsGroup> _settingsGroups = [
+  _SettingsGroup(
+    title: '常规',
+    categories: [
+      _SettingsCategory(
+        label: '常规',
+        description: '启动页、继续播放与库扫描',
+        icon: Icons.tune_rounded,
+        path: '/settings/general',
+      ),
+    ],
+  ),
   _SettingsGroup(
     title: '播放',
     categories: [
       _SettingsCategory(
-        label: '播放设置',
+        label: '播放',
         description: '解码、渲染与播放行为',
         icon: Icons.display_settings_rounded,
         path: '/settings/player',
@@ -46,7 +60,13 @@ const List<_SettingsGroup> _settingsGroups = [
         path: '/settings/quality',
       ),
       _SettingsCategory(
-        label: '操作设置',
+        label: '音频',
+        description: '均衡器预设与 10 段增益',
+        icon: Icons.equalizer_rounded,
+        path: '/settings/audio',
+      ),
+      _SettingsCategory(
+        label: '快捷键',
         description: '播放器按键映射',
         icon: Icons.keyboard_rounded,
         path: '/settings/keyboard',
@@ -54,36 +74,42 @@ const List<_SettingsGroup> _settingsGroups = [
     ],
   ),
   _SettingsGroup(
+    title: 'mpv',
+    categories: [
+      _SettingsCategory(
+        label: 'mpv 配置',
+        description: '导入向导、决策重置与选项审计',
+        icon: Icons.integration_instructions_outlined,
+        path: '/settings/mpv',
+      ),
+      _SettingsCategory(
+        label: '着色器管理',
+        description: '着色器目录、GLSL 勾选与缓存',
+        icon: Icons.auto_fix_high_rounded,
+        path: '/settings/shaders',
+      ),
+    ],
+  ),
+  _SettingsGroup(
     title: '应用',
     categories: [
       _SettingsCategory(
-        label: '外观设置',
+        label: '外观',
         description: '主题、配色与显示',
         icon: Icons.palette_rounded,
         path: '/settings/theme',
       ),
       _SettingsCategory(
-        label: '界面设置',
-        description: '启动、窗口行为与展示信息',
-        icon: Icons.pages_rounded,
-        path: '/settings/interface',
-      ),
-    ],
-  ),
-  _SettingsGroup(
-    title: '其他',
-    categories: [
-      _SettingsCategory(
-        label: '更新设置',
-        description: '应用更新',
-        icon: Icons.update_rounded,
-        path: '/settings/update',
-      ),
-      _SettingsCategory(
-        label: '存储与日志',
-        description: '缓存与错误日志',
+        label: '存储与缓存',
+        description: '数据目录、缓存与日志',
         icon: Icons.storage_rounded,
         path: '/settings/storage',
+      ),
+      _SettingsCategory(
+        label: '诊断',
+        description: '版本、渲染后端与目录',
+        icon: Icons.bug_report_outlined,
+        path: '/settings/diagnostics',
       ),
       _SettingsCategory(
         label: '关于',
@@ -103,7 +129,7 @@ bool _isWithinPath(String location, String path) =>
 
 String _categoryPath(String location) {
   if (location == '/settings') {
-    return '/settings/player';
+    return '/settings/general';
   }
   for (final group in _settingsGroups) {
     for (final category in group.categories) {
@@ -249,7 +275,7 @@ class SettingsIndexPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (SettingsPaneScope.of(context)?.embedded ?? false) {
-      return const PlayerSettingsPage();
+      return const GeneralSettingsPage();
     }
     return Scaffold(
       appBar: SysAppBar(

@@ -104,6 +104,23 @@ class _StorageSettingsPageState extends State<StorageSettingsPage> {
           builder: (context, snapshot) => SettingsList(
             sections: [
               SettingsSection(
+                title: const Text('数据目录'),
+                tiles: [
+                  // SPEC §6 category 9（数据目录、缓存大小、清理按钮）：所有
+                  // JSON 存储 / 插件状态 / 缩略图缓存都在应用支持目录下。
+                  FutureBuilder<Directory>(
+                    future: getApplicationSupportDirectory(),
+                    builder: (context, support) => SettingsTile(
+                      leading: Icons.folder_rounded,
+                      title: const Text('数据目录'),
+                      description: Text(support.hasData
+                          ? support.requireData.path
+                          : '解析中…'),
+                    ),
+                  ),
+                ],
+              ),
+              SettingsSection(
                 title: const Text('缓存'),
                 tiles: [
                   SettingsTile(

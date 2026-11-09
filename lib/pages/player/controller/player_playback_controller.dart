@@ -22,6 +22,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:mobx/mobx.dart';
 import 'package:emoplay/media/media_stores.dart';
 import 'package:emoplay/mpv/config/mpv_player_properties.dart';
+import 'package:emoplay/music/music_controller.dart' show kPlaybackAfBaseline;
 import 'package:emoplay/utils/device.dart';
 import 'package:emoplay/utils/media.dart';
 import 'package:emoplay/services/platform/platform_environment_service.dart';
@@ -349,7 +350,9 @@ abstract class _PlayerPlaybackController with Store {
       if (!isCurrentPlayer(player)) {
         return await _discardIfNotCurrent(candidate);
       }
-      await pp.setProperty("af", "scaletempo2=max-speed=8");
+      // 速度变速保音高基线（M7 音乐层共享常量：EQ 启用时按“基线 + 均衡器
+      // 链”合成写入，见 music_controller.dart）。
+      await pp.setProperty("af", kPlaybackAfBaseline);
       if (!isCurrentPlayer(player)) {
         return await _discardIfNotCurrent(candidate);
       }
@@ -480,6 +483,15 @@ abstract class _PlayerPlaybackController with Store {
       // 规则）。
       if (MediaStores.isReady) {
         await MediaStores.instance.quality.attachPlayer(player);
+        if (!isCurrentPlayer(player)) {
+          return await _discardIfNotCurrent(candidate);
+        }
+        // M7 音乐层：音频模式检测 / .lrc 歌词 / EQ 挂到本播放器上，随后
+        // 一次性 startup()（EQ 启用时在此挂链，先于 open）。失败只记日志，
+        // 绝不阻塞起播。
+        MediaStores.instance.diagnosticsPlayer = player;
+        await MediaStores.instance.music.attachPlayer(player);
+        await MediaStores.instance.music.startup();
         if (!isCurrentPlayer(player)) {
           return await _discardIfNotCurrent(candidate);
         }
@@ -722,9 +734,13 @@ abstract class _PlayerPlaybackController with Store {
       _cancelDebugInfo(),
     ]);
     // M6 画质引擎：本播放器已销毁，摘掉画质监听（设置与持久化状态保留，
-    // 下一个播放器 attach 时恢复事件流）。
+    // 下一个播放器 attach 时恢复事件流）。M7 音乐层同样摘挂（音频模式/
+    // 歌词/EQ 会话状态随引擎释放；EQ 持久化设置不动），诊断页也失去
+    // mpv 属性来源。
     if (MediaStores.isReady) {
       MediaStores.instance.quality.detachPlayer();
+      await MediaStores.instance.music.detachPlayer();
+      MediaStores.instance.diagnosticsPlayer = null;
     }
   }
 

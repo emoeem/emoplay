@@ -4,6 +4,7 @@ import 'package:emoplay/pages/player/player_item_panel.dart';
 import 'package:emoplay/pages/player/player_keyboard_shortcuts.dart';
 import 'package:emoplay/pages/player/controller/player_super_resolution.dart';
 import 'package:emoplay/pages/player/player_adjustment_hud.dart';
+import 'package:emoplay/pages/player/music_lyrics_page.dart';
 import 'package:emoplay/pages/player/player_panel_hold.dart';
 import 'package:emoplay/pages/player/player_pointer_interaction.dart';
 import 'package:emoplay/pages/player/player_gesture_detector.dart';
@@ -1330,6 +1331,10 @@ class _PlayerItemState extends State<PlayerItem>
                         height: double.infinity,
                       ),
                     ),
+                    // M7 音乐模式：audioMode 时覆盖视频表面的歌词页（1.x
+                    // Main.qml 的 Loader 语义——盖住视频表面与手势层，但保持
+                    // 在控制面板之下，播放控制仍在底部栏，P7 v1 范围）。
+                    Positioned.fill(child: MusicLyricsPage()),
                     // PiliPlus double-tap seek overlays sit above the gesture
                     // layer so the extra taps accumulate on the indicator.
                     Observer(builder: (context) {

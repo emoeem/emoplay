@@ -25,6 +25,13 @@ class AboutPage extends StatelessWidget {
                       title: '致谢',
                       route: '/settings/about/credits',
                     ),
+                    // 上游声明（SPEC §8）：Kazumi/PiliPlus/Anime4K/1.x 的
+                    // 版权与重授权声明，全文来自仓库根目录 NOTICE.md。
+                    AboutLinkTile.route(
+                      icon: Icons.perm_contact_cal_outlined,
+                      title: '上游声明（NOTICE）',
+                      route: '/settings/about/notice',
+                    ),
                     AboutLinkTile(
                       icon: Icons.balance_rounded,
                       title: 'GPL-3.0 许可证',
