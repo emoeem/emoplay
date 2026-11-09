@@ -1,7 +1,6 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
-#include <app_links/app_links_plugin_c_api.h>
 
 #include "flutter_window.h"
 #include "utils.h"
@@ -29,8 +28,9 @@ bool ActivateExistingWindow()
   HWND hwnd = ::FindWindow(kWindowClassName, L"EmoPlay");
   if (hwnd != NULL)
   {
-    // Forward the emoplay:// link this instance was launched with, if any.
-    SendAppLink(hwnd);
+    // NOTE: protocol URL forwarding (app_links SendAppLink) was stripped
+    // with the bangumi/deep-links layer (docs/STRIP-LIST.md); a second
+    // instance launched via emoplay:// only activates the existing window.
 
     // Check if window is hidden (e.g., minimized to tray)
     if (!::IsWindowVisible(hwnd))
