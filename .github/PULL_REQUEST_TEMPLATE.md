@@ -1,5 +1,5 @@
 <!--
-提交 PR 前，请确认您已经阅读 [贡献指引](https://github.com/Predidit/Kazumi/blob/main/static/doc/CONTRIBUTING.md)。不符合的 PR 可能会被延迟处理或直接关闭。
+提交 PR 前，请先阅读 README.md（项目定位与构建方法）与 NOTICE.md（上游声明与许可）。
 请勿随意删除此模板的任何部分。
 -->
 
@@ -29,14 +29,14 @@
 - [ ] AI 辅助开发了部分功能，但是我已检查并理解 AI 所写的代码
 - [ ] 基本上都由 AI 实现，但是我非常了解 AI 的代码与写完的产物
 
-AI 辅助模型: 
+AI 辅助模型:
 
-<!-- 请按照要求，填写完整的 AI 模型名称，如 “Claude Fable 5”，“Kimi-K3” -->
+<!-- 请按照要求，填写完整的 AI 模型名称 -->
 
 ## 提交前检查
 
 - [ ] 我已经填写了 PR 模板中的所有内容
-- [ ] 我已经阅读了 [贡献指引](https://github.com/Predidit/Kazumi/blob/main/static/doc/CONTRIBUTING.md) ，并遵守指引进行开发
+- [ ] `flutter analyze` 与 `flutter test` 通过（无新增 error）
 - [ ] 这个 PR 的功能已经经过我的测试，并且我完全理解我（或 AI）做出的改动
 
 ## 附注

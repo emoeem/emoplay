@@ -54,7 +54,6 @@ class PipUtils {
 
   static Future<void> updateAndroidPIPActions({
     required bool playing,
-    required bool danmakuEnabled,
     int width = 16,
     int height = 9,
     Rect? sourceRect,
@@ -67,7 +66,6 @@ class PipUtils {
     try {
       await pipChannel.invokeMethod('updatePictureInPictureActions', {
         'playing': playing,
-        'danmakuEnabled': danmakuEnabled,
         'width': aspectSize.width.toInt(),
         'height': aspectSize.height.toInt(),
         if (sourceRect != null) ...{

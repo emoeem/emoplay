@@ -1,0 +1,75 @@
+# Changelog
+
+格式参考 Keep a Changelog；预发布序列 alpha → beta → rc。EmoPlay 2.0 是
+1.x（[mpv-emo](https://github.com/emoeem/mpv-emo)，C++/Qt6）在 Flutter 上的
+重写：迁移决策依据 `docs/SPEC.md`，文件级映射见 `docs/PORT-MAP.md`，
+Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
+`CHANGELOG.md`。
+
+## [2.0.0-alpha] — 2026-11-10（未发布）
+
+迁移工程 M1–M8 全部里程碑产物：Kazumi 骨架导入并剥离番剧业务，1.x 行为
+语义逐条平移，数据 schema 与 1.x 逐字段一致。
+
+### Added
+
+- **骨架（M1）**：Kazumi@`7265274`（GPL-3.0）工作树导入，剥离番剧采集 /
+  Bangumi API / XPath 规则引擎 / 弹幕 / Syncplay / 下载；五页签导航
+  （首页 / 媒体库 / 播放 / 插件 / 设置，竖屏 NavigationBar、横屏
+  NavigationRail、`Ctrl+1..5` 直达）；应用名 / applicationId / 图标 /
+  字体全部 EmoPlay 化（占位图标，系统默认字体，无 Kazumi logo、无 Mi Sans）。
+- **播放器（M2）**：media-kit（Predidit fork，锁 commit `83b7ca6`）接入；
+  音轨/字幕面板、外挂字幕、播放列表、倍速、手势与快捷键、截图面板、
+  Android PiP（弹幕按钮随弹幕业务一并移除）、DLNA 投屏、Linux 外部播放器
+  接管；PiliPlus 交互小件摘取改写。
+- **本地媒体（M3）**：文件/目录打开、拖拽导入、媒体分类器（视频/音频/字幕
+  扩展名表）、扫描 isolate（skipHidden、maxDepth 剪枝、不跟随符号链接、
+  进度回调与取消）。
+- **媒体库与历史（M4）**：`library.json` / `history.json` 落盘（SPEC §7
+  schema，与 1.x 逐字段一致；路径去重置顶、上限 50、5s 心跳刷新、暂停不写
+  盘、重扫保留 lastPlayed）；ffmpeg 两段式缩略图（sha1 缓存键、30s 超时、
+  无 ffmpeg 降级类型图标）；首页最近播放 / 继续观看 / 媒体统计。
+- **mpv 兼容（M5）**：mpv.conf / input.conf 解析器；首启导入向导（完整 /
+  选择性 / 独立 / 跳过，可重跑与重置决策）；强制 / 剥离 / 重定向三张规则
+  表（`[profile]` 段只报告不应用；screenshot-template 含 `~~` 整条丢弃）；
+  watch_later / screenshots / shader_cache / icc_cache / demuxer_cache 写
+  路径全部重定向到应用数据目录，**绝不写用户 mpv 目录**；`load-scripts=no`
+  + 显式 scripts 选项表；诊断页运行时审计当前生效选项。
+- **画质引擎（M6）**：Anime4K 链序表照抄 1.x（900/1440p 分组，Mode A / A+A /
+  C 多文件精确序列，HDR/HFR 避让，部分安装优雅降级）；SSimSuperRes 真人
+  高档；HDR tone-mapping 档位；插值/补帧 VapourSynth 六预设 + 掉帧 ≥2/s
+  会话级自动降档 + 探测失败持久化 off；ICC profile 不可读时持久化 off 并
+  恢复启动快照。
+- **插件 / 设置 / 音乐（M7）**：PluginManager 三段式（planOperation → 确认
+  → 执行），check 模式永不覆盖、replace 前 `git status --porcelain` 防线，
+  `.backup-<name>` 备份 + 原子 swap；内置 6 插件 + 在线源清单；设置中心
+  11 类（常规 / 播放 / 视频与画质 / 音频 / mpv 配置 / 着色器管理 / 外观 /
+  快捷键 / 存储 / 诊断 / 关于）；10 段均衡器（`equalizer=f=…:t=q:w=1.4`
+  链）+ 预设 + .lrc 歌词。
+- **交付（M8）**：双语 README、NOTICE.md（Kazumi / PiliPlus / Anime4K /
+  1.x MIT→GPL-3.0 重授权声明）；SPEC §7 数据兼容测试
+  （`test/data_compat_spec7_test.dart`，1.x 样例 JSON 喂入两个 store）；
+  CI 改造——push/PR 仅单 job Linux analyze+test+build，全平台打包矩阵
+  （Windows/macOS/Android/Linux amd64+arm64）仅 `v*` tag 触发，删除全部
+  dart-define 密钥注入与第三方签名服务，iOS 构建保留注释待接入。
+
+### Changed
+
+- 许可：整体 MIT（1.x）→ **GPL-3.0**；Kazumi / PiliPlus 版权声明保留，
+  Anime4K 随 `assets/shaders/LICENSE`（MIT）保留，1.x 代码重授权声明见
+  `NOTICE.md`。
+- 语言：Dart/Flutter 3.47.9 替代 C++20/Qt6；状态管理 MobX（build_runner
+  生成），路由 flutter_modular。
+
+### 兼容性
+
+- 1.x 的 `history.json` / `library.json` / `settings.json` 放入应用数据
+  目录即可直接读取（`test/data_compat_spec7_test.dart` 锁定，含 `lastPlayed`
+  为 null 的外来写入者情形）。
+- 插件 state.json / manager.json 清单格式与 1.x 一致，在线源可继续使用。
+
+### 已知限制
+
+- iOS 构建未进入发布矩阵（workflow 留注释，待签名方案）。
+- Android APK 发布为未签名产物（待仓库配置签名密钥后接入）。
+- Windows / macOS 产物未经实体机验证；无 Authenticode / 公证。

@@ -205,7 +205,6 @@ class _PlayerItemState extends State<PlayerItem>
     _lastPipSourceRect = sourceRect;
     await PipUtils.updateAndroidPIPActions(
       playing: playing,
-      danmakuEnabled: false,
       width: playerController.debug.playerWidth,
       height: playerController.debug.playerHeight,
       sourceRect: sourceRect,
@@ -1148,9 +1147,6 @@ class _PlayerItemState extends State<PlayerItem>
           switch (action) {
             case 'play_pause':
               playerController.playOrPause();
-              break;
-
-            case 'toggle_danmaku':
               break;
 
             case 'forward':
