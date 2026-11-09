@@ -18,10 +18,22 @@ import 'package:emoplay/services/platform/desktop_window_config.dart';
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/navigation.dart';
 import 'package:emoplay/utils/constants.dart';
+import 'package:emoplay/media/media_stores.dart';
+import 'package:emoplay/services/logging/logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  // JSON data layer (library/history/thumbnails/settings, docs/SPEC.md §7):
+  // built before runApp so pages read a fully-initialized MediaStores.
+  // Failure leaves it unready (pages surface their empty states) instead of
+  // blocking startup — unlike the Hive bootstrap, no single JSON store is
+  // required to render the shell.
+  try {
+    await MediaStores.init();
+  } catch (e) {
+    EmoLogger().e('MediaStores initialization failed', error: e);
+  }
   if (Platform.isAndroid || Platform.isIOS) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
