@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
+import 'package:emoplay/pages/settings/import_wizard_dialog.dart';
 import 'package:emoplay/services/storage/storage.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:emoplay/services/logging/logger.dart';
@@ -31,11 +32,23 @@ class _InitPageState extends State<InitPage> {
 
     await _checkRunningOnX11();
     await _showShortcutDialog();
+    await _maybeShowImportWizard();
 
     if (!mounted) {
       return;
     }
     context.navigate(GStorage.getSetting(SettingsKeys.defaultStartupPage));
+  }
+
+  // M5 mpv 兼容层：首启检测到用户 mpv 配置目录且未记录决策时弹导入向导
+  // （1.x main.cpp：QML 向导在启动时出现，选择持久化，导入的引擎选项下次
+  // 启动生效）。向导内部自检 configDetected，未检测到配置时是 no-op。
+  Future<void> _maybeShowImportWizard() async {
+    try {
+      await showMpvImportWizardDialog();
+    } catch (e) {
+      EmoLogger().w('InitPage: import wizard failed', error: e);
+    }
   }
 
   Future<void> _loadShaders() async {

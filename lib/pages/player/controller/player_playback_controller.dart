@@ -20,6 +20,8 @@ import 'package:emoplay/utils/async_serial_queue.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:mobx/mobx.dart';
+import 'package:emoplay/media/media_stores.dart';
+import 'package:emoplay/mpv/config/mpv_player_properties.dart';
 import 'package:emoplay/utils/device.dart';
 import 'package:emoplay/utils/media.dart';
 import 'package:emoplay/services/platform/platform_environment_service.dart';
@@ -322,6 +324,20 @@ abstract class _PlayerPlaybackController with Store {
       }
 
       var pp = player.platform as NativePlayer;
+      // M5 mpv 兼容层：在播放器专属细化之前应用预置属性（1.x 顺序：引擎
+      // 内置默认 → compat 选项；下方播放器细化对同名键保持优先，例如
+      // demuxer-cache-dir 指向 EmoPlay 自有的播放缓存目录，同样不写用户
+      // mpv 目录）。预置在 MediaStores.init 组装一次：compat 选项 →
+      // 插件 scripts 追加 → 播放器初始化。
+      await MpvPlayerProperties.apply(
+        pp,
+        MediaStores.isReady
+            ? MediaStores.instance.startupMpvProperties
+            : const {},
+      );
+      if (!isCurrentPlayer(player)) {
+        return await _discardIfNotCurrent(candidate);
+      }
       // media-kit 默认启用硬盘作为双重缓存，这可以维持大缓存的前提下减轻内存压力
       // media-kit 内部硬盘缓存目录按照 Linux 配置，这导致该功能在其他平台上被损坏
       // 该设置可以在所有平台上正确启用双重缓存

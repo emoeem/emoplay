@@ -6,6 +6,10 @@ import 'package:emoplay/media/history_store.dart';
 import 'package:emoplay/media/library_model.dart';
 import 'package:emoplay/media/library_store.dart';
 import 'package:emoplay/media/thumbnail_service.dart';
+import 'package:emoplay/mpv/compat/compat_controller.dart';
+import 'package:emoplay/mpv/compat/mpv_profile_scanner.dart';
+import 'package:emoplay/mpv/config/mpv_player_properties.dart';
+import 'package:emoplay/services/logging/logger.dart';
 import 'package:emoplay/settings/emoplay_settings.dart';
 
 // The JSON data layer of the app, assembled once at startup (1.x main.cpp
@@ -27,6 +31,8 @@ class MediaStores {
     required this.library,
     required this.history,
     required this.thumbnails,
+    required this.compat,
+    required this.startupMpvProperties,
   }) {
     libraryModel = LibraryModel(library, thumbnails);
   }
@@ -51,6 +57,16 @@ class MediaStores {
   final HistoryStore history;
   final ThumbnailService thumbnails;
 
+  // The mpv compat layer (M5): decision persistence + config-dir scan +
+  // startup option assembly (1.x CompatController, main.cpp L170-223).
+  final CompatController compat;
+
+  // The assembled mpv property preset applied at player creation:
+  // compat options -> plugin scripts appended -> player initialization
+  // (1.x main.cpp assembly order). Computed once here — a wizard choice
+  // made mid-session applies on the NEXT launch, exactly like 1.x.
+  final Map<String, String> startupMpvProperties;
+
   // The grid/list view over the library store with the thumbnail wiring.
   late final LibraryModel libraryModel;
 
@@ -68,6 +84,31 @@ class MediaStores {
     // 1.x main.cpp: settings.json is loaded before the stores so the library
     // scan parameters (behavior section) reach LibraryStore.setScanOptions.
     settings.load();
+
+    // M5 compat: scan the user's mpv config dir and assemble the startup
+    // options for the recorded decision. Failure degrades to an empty
+    // preset (pure EmoPlay defaults + redirects) instead of blocking
+    // startup, the way 1.x logged errorOccurred and continued.
+    final compat = CompatController(
+      settingsPath: settings.filePath,
+      appDataDir: dir.path,
+      configDir: MpvProfileScanner.locateDefaultConfigDir(),
+      onError: (message) => EmoLogger().e('compat: $message'),
+    );
+    var startupMpvProperties = const <String, String>{};
+    try {
+      final compatOptions = compat.startupOptions();
+      // Plugin script options would be APPENDED here (1.x
+      // PluginManager.appendScriptOptions); the plugin store lands in M6
+      // and keeps this exact insertion point.
+      startupMpvProperties = MpvPlayerProperties.build(
+        compatOptions: compatOptions,
+        appDataDir: dir.path,
+        pluginScripts: const [],
+      );
+    } catch (e) {
+      EmoLogger().e('compat: startup options failed', error: e);
+    }
 
     final library = LibraryStore('${dir.path}/library.json');
     library.setScanOptions(ScanOptions(
@@ -88,6 +129,8 @@ class MediaStores {
       library: library,
       history: history,
       thumbnails: thumbnails,
+      compat: compat,
+      startupMpvProperties: startupMpvProperties,
     );
   }
 }
