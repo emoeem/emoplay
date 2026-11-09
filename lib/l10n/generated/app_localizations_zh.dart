@@ -25,4 +25,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get tabSettings => '设置';
+
+  @override
+  String get doubleBackToExit => '再按一次退出应用';
 }

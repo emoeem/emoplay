@@ -25,4 +25,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tabSettings => 'Settings';
+
+  @override
+  String get doubleBackToExit => 'Press back again to exit';
 }

@@ -24,5 +24,9 @@
   "tabSettings": "Settings",
   "@tabSettings": {
     "description": "Main navigation tab 5 (lib/pages/menu/menu.dart:191)."
+  },
+  "doubleBackToExit": "Press back again to exit",
+  "@doubleBackToExit": {
+    "description": "Toast shown when back is pressed twice in a row on the tab shell (lib/pages/menu/menu.dart _handleSystemBack)."
   }
 }

@@ -1,6 +1,6 @@
 {
   "@@locale": "zh",
-  "@@comment": "EmoPlay zh 模板（SPEC §1：默认 zh）。键值取自真实 UI 字符串；页面尚未迁移到 AppLocalizations，迁移为后续轮次工作。",
+  "@@comment": "EmoPlay zh 模板（SPEC §1：默认 zh）。键值取自真实 UI 字符串；R3 起页面逐页迁移（页签壳 menu.dart 已迁移，其余页面见路线图 ☐）。",
   "appTitle": "EmoPlay",
   "@appTitle": {
     "description": "应用名，与 lib/utils/constants.dart 的 appName 常量一致（1.x 约定：应用名不翻译）。"
@@ -24,5 +24,9 @@
   "tabSettings": "设置",
   "@tabSettings": {
     "description": "主导航页签五（lib/pages/menu/menu.dart:191）。"
+  },
+  "doubleBackToExit": "再按一次退出应用",
+  "@doubleBackToExit": {
+    "description": "页签壳上连按两次返回退出时的提示 toast（lib/pages/menu/menu.dart _handleSystemBack）。"
   }
 }

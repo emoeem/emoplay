@@ -133,6 +133,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'设置'**
   String get tabSettings;
+
+  /// 页签壳上连按两次返回退出时的提示 toast（lib/pages/menu/menu.dart _handleSystemBack）。
+  ///
+  /// In zh, this message translates to:
+  /// **'再按一次退出应用'**
+  String get doubleBackToExit;
 }
 
 class _AppLocalizationsDelegate

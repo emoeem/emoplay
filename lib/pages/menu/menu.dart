@@ -3,9 +3,24 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter/services.dart';
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/embedded_native_control_area.dart';
+import 'package:emoplay/l10n/generated/app_localizations.dart';
 import 'package:emoplay/navigation.dart';
 import 'package:emoplay/pages/menu/route_visibility.dart';
 import 'package:emoplay/pages/router.dart';
+
+/// Localized labels for the five EmoPlay tabs (docs/SPEC.md §5), in
+/// navigation order. The bottom NavigationBar and the landscape
+/// NavigationRail share this one list so the two shells can never drift
+/// apart (1.x kept both label sets on the same tab model in qml/Main.qml).
+/// First strings migrated to AppLocalizations (OVERNIGHT-LOOP §四 backlog 8:
+/// the arb keys were established in R2 `b61dff2`; this is the page wiring).
+List<String> menuTabLabels(AppLocalizations l10n) => <String>[
+      l10n.tabHome,
+      l10n.tabLibrary,
+      l10n.tabPlayer,
+      l10n.tabPlugins,
+      l10n.tabSettings,
+    ];
 
 /// Tab shell: portrait NavigationBar / landscape NavigationRail, hosting the
 /// five EmoPlay tabs (docs/SPEC.md §5). Page state survives tab switches via
@@ -91,7 +106,9 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     if (lastPromptAt == null ||
         now.difference(lastPromptAt) > const Duration(seconds: 2)) {
       _lastExitPromptAt = now;
-      EmoDialog.showToast(message: '再按一次退出应用', context: context);
+      EmoDialog.showToast(
+          message: AppLocalizations.of(context).doubleBackToExit,
+          context: context);
       return;
     }
 
@@ -161,34 +178,35 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   }
 
   Widget _bottomMenu(BuildContext context, int selectedIndex) {
+    final labels = menuTabLabels(AppLocalizations.of(context));
     return Scaffold(
       body: _outlet(context),
       bottomNavigationBar: NavigationBar(
-        destinations: const <Widget>[
+        destinations: <Widget>[
           NavigationDestination(
-            selectedIcon: Icon(Icons.home),
-            icon: Icon(Icons.home_outlined),
-            label: '首页',
+            selectedIcon: const Icon(Icons.home),
+            icon: const Icon(Icons.home_outlined),
+            label: labels[0],
           ),
           NavigationDestination(
-            selectedIcon: Icon(Icons.video_library),
-            icon: Icon(Icons.video_library_outlined),
-            label: '媒体库',
+            selectedIcon: const Icon(Icons.video_library),
+            icon: const Icon(Icons.video_library_outlined),
+            label: labels[1],
           ),
           NavigationDestination(
-            selectedIcon: Icon(Icons.play_circle),
-            icon: Icon(Icons.play_circle_outline),
-            label: '播放',
+            selectedIcon: const Icon(Icons.play_circle),
+            icon: const Icon(Icons.play_circle_outline),
+            label: labels[2],
           ),
           NavigationDestination(
-            selectedIcon: Icon(Icons.extension),
-            icon: Icon(Icons.extension_outlined),
-            label: '插件',
+            selectedIcon: const Icon(Icons.extension),
+            icon: const Icon(Icons.extension_outlined),
+            label: labels[3],
           ),
           NavigationDestination(
-            selectedIcon: Icon(Icons.settings),
-            icon: Icon(Icons.settings_outlined),
-            label: '设置',
+            selectedIcon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings_outlined),
+            label: labels[4],
           ),
         ],
         selectedIndex: selectedIndex,
@@ -202,6 +220,7 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
       topLeft: Radius.circular(16),
       bottomLeft: Radius.circular(16),
     );
+    final labels = menuTabLabels(AppLocalizations.of(context));
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
       body: Row(
@@ -211,31 +230,31 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
               backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
               groupAlignment: 1,
               labelType: NavigationRailLabelType.selected,
-              destinations: const <NavigationRailDestination>[
+              destinations: <NavigationRailDestination>[
                 NavigationRailDestination(
-                  selectedIcon: Icon(Icons.home),
-                  icon: Icon(Icons.home_outlined),
-                  label: Text('首页'),
+                  selectedIcon: const Icon(Icons.home),
+                  icon: const Icon(Icons.home_outlined),
+                  label: Text(labels[0]),
                 ),
                 NavigationRailDestination(
-                  selectedIcon: Icon(Icons.video_library),
-                  icon: Icon(Icons.video_library_outlined),
-                  label: Text('媒体库'),
+                  selectedIcon: const Icon(Icons.video_library),
+                  icon: const Icon(Icons.video_library_outlined),
+                  label: Text(labels[1]),
                 ),
                 NavigationRailDestination(
-                  selectedIcon: Icon(Icons.play_circle),
-                  icon: Icon(Icons.play_circle_outline),
-                  label: Text('播放'),
+                  selectedIcon: const Icon(Icons.play_circle),
+                  icon: const Icon(Icons.play_circle_outline),
+                  label: Text(labels[2]),
                 ),
                 NavigationRailDestination(
-                  selectedIcon: Icon(Icons.extension),
-                  icon: Icon(Icons.extension_outlined),
-                  label: Text('插件'),
+                  selectedIcon: const Icon(Icons.extension),
+                  icon: const Icon(Icons.extension_outlined),
+                  label: Text(labels[3]),
                 ),
                 NavigationRailDestination(
-                  selectedIcon: Icon(Icons.settings),
-                  icon: Icon(Icons.settings_outlined),
-                  label: Text('设置'),
+                  selectedIcon: const Icon(Icons.settings),
+                  icon: const Icon(Icons.settings_outlined),
+                  label: Text(labels[4]),
                 ),
               ],
               selectedIndex: selectedIndex,
