@@ -207,6 +207,98 @@ void main() {
     });
   });
 
+  group('QualityController (per-case flows, 1.x test_quality_controller)',
+      () {
+    late Directory tempDir;
+    late EmoPlaySettings settings;
+    late FakeEngine engine;
+    late QualityController controller;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('emoplay_qc_flow_');
+      settings = EmoPlaySettings(p.join(tempDir.path, 'settings.json'));
+      settings.load();
+      engine = FakeEngine();
+      engine.videoParamsMap = <String, Object?>{
+        'w': 1920,
+        'h': 1080,
+        'primaries': 'bt.709',
+        'gamma': 'bt.1886',
+      };
+      engine.fps = 23.976;
+      engine.path = '[VCB-Studio] Kimi no Na wa [Ma10p_1080p].mkv';
+      controller = QualityController(
+        settings: settings,
+        shadersDir: p.join(tempDir.path, 'shaders'),
+        onError: (_) {},
+      );
+      await controller.attachEngine(engine);
+    });
+
+    tearDown(() async {
+      controller.detachEngine();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('manualShaderMountingPersists', () async {
+      // Mounting works even with tier "off" (user-owned list), but the
+      // engine's scalar options are left untouched (still inert).
+      await controller.startup();
+      final shaderA = p.join(tempDir.path, 'shaders', 'a.glsl');
+      await controller.setShaderMounted('a.glsl', true);
+      await pumpEventQueue();
+      expect(engine.mountedShaders, <String>[shaderA]);
+      expect(engine.propertySet('scale'), isNull);
+
+      // The manual list is persisted.
+      final reloaded = EmoPlaySettings(settings.filePath)..load();
+      expect(reloaded.manualShaderList, <String>[shaderA]);
+
+      // Unmounting empties the list again.
+      await controller.setShaderMounted('a.glsl', false);
+      await pumpEventQueue();
+      expect(engine.mountedShaders, isEmpty);
+      final reloaded2 = EmoPlaySettings(settings.filePath)..load();
+      expect(reloaded2.manualShaderList, isEmpty);
+    });
+
+    test('startupAdoptsImportedShaders', () async {
+      // An imported glsl-shaders option (P4) is adopted into the manual
+      // list on the first startup so the panel becomes the source of truth.
+      final shaderA = p.join(tempDir.path, 'shaders', 'a.glsl');
+      engine.mountedShaders.add(shaderA);
+      await controller.startup();
+
+      expect(controller.manualShaders, <String>[shaderA]);
+      final reloaded = EmoPlaySettings(settings.filePath)..load();
+      expect(reloaded.manualShaderList, <String>[shaderA]);
+      // Still mounted on the engine, untouched.
+      expect(engine.mountedShaders, hasLength(1));
+    });
+
+    test('fileLoadedReappliesProfileWithoutDemotion', () async {
+      // file-loaded must rerun the decision table even when the previous
+      // file never triggered the auto demotion: options decided for the old
+      // file must not carry over to the next one.
+      await controller.startup();
+      controller.setQualityTier('high');
+      await controller.applyProfile();
+      expect(engine.propertySet('scale'), 'ewa_lanczossharp');
+      expect(controller.autoDowngraded, isFalse);
+
+      // Simulate a profile change decided outside the controller (another
+      // writer of settings.json), then start the next file. 1.x re-read the
+      // persisted tier live on every applyProfile() run.
+      settings.qualityTier = 'low';
+      expect(engine.propertySet('scale'), 'ewa_lanczossharp');
+      engine.fireFileLoaded();
+      await pumpEventQueue();
+
+      expect(engine.propertySet('scale'), 'lanczos');
+      expect(controller.autoDowngraded, isFalse);
+    });
+  });
+
   group('InterpolationController (fake engine)', () {
     late Directory tempDir;
     late EmoPlaySettings settings;
@@ -293,6 +385,121 @@ void main() {
       expect(engine.mountedVfEntries, hasLength(1));
       expect(engine.mountedVfEntries.single['label'], 'mine');
     });
+
+    test('disabledTouchesNothing', () async {
+      // 1.x test_interpolation_controller.cpp disabledTouchesNothing: a
+      // controller that never got enabled must not touch the vf chain.
+      final controller = build();
+      await controller.attachEngine(engine);
+      await controller.startup();
+
+      expect(controller.enabled, isFalse);
+      expect(controller.blockReason, 'disabled');
+      expect(engine.mountedVfEntries, isEmpty);
+    });
+
+    test('enabledWithMissingScriptBlocksButStaysOn', () async {
+      // No script file anywhere: enabling blocks with the script hint but
+      // is NOT a support failure — the user can drop the script in later.
+      // (FakeEngine supports the filter, so the probe passes and admission
+      // is what blocks — the honest fallback branch is covered by
+      // probeFailurePersistsOffAndSetsVsUnavailable.)
+      engine.supportsVapoursynth = true;
+      final controller = build();
+      await controller.attachEngine(engine);
+      await controller.startup();
+      controller.setEnabled(true);
+      await pumpEventQueue();
+
+      expect(controller.enabled, isTrue);
+      expect(controller.blockReason, 'script-missing');
+      expect(engine.mountedVfEntries, isEmpty);
+      expect(controller.expectedScriptPath,
+          '$scriptsDir/MEMC_RIFE_STD.vpy');
+
+      // The enabled state is persisted.
+      expect(settings.qualityInterpolationEnabled, isTrue);
+    });
+
+    test('enabledWithScriptIsHonestAboutSupport', () async {
+      // Support proven. Idle media: admission holds at fps-unknown, so
+      // nothing is mounted yet and the switch stays on.
+      engine.supportsVapoursynth = true;
+      engine.fps = 0.0; // unknown (idle core)
+      final script = File(p.join(scriptsDir, 'MEMC_RIFE_STD.vpy'));
+      await script.writeAsString('# user-provided VapourSynth preset script');
+      final controller = build();
+      await controller.attachEngine(engine);
+      await controller.startup();
+      controller.setEnabled(true);
+      await pumpEventQueue();
+
+      expect(controller.enabled, isTrue);
+      expect(controller.blockReason, 'fps-unknown');
+      expect(engine.mountedVfEntries, isEmpty);
+      expect(settings.qualityInterpolationEnabled, isTrue);
+    });
+
+    test('unsupportedSessionFallsBackOnEveryEnable', () async {
+      // Only meaningful on a libmpv without vapoursynth: FakeEngine without
+      // the filter rejects the probe append, so the honest fallback wins.
+      final controller = build();
+      await controller.attachEngine(engine);
+      await controller.startup();
+      controller.setEnabled(true);
+      await pumpEventQueue();
+      expect(controller.enabled, isFalse);
+      expect(controller.vsUnavailable, isTrue);
+
+      // An external writer flipping the persisted switch back on must
+      // still not mount anything: the session probe result wins.
+      settings.qualityInterpolationEnabled = true;
+      settings.save();
+      engine.fireFileLoaded();
+      await pumpEventQueue();
+      expect(engine.mountedVfEntries, isEmpty);
+      expect(controller.vsUnavailable, isTrue);
+      expect(settings.qualityInterpolationEnabled, isFalse);
+
+      // Re-enabling in the same session (a new session probe) must fall
+      // back again instead of staying on unmounted and silent.
+      controller.setEnabled(true);
+      await pumpEventQueue();
+      expect(controller.vsUnavailable, isTrue);
+      expect(controller.enabled, isFalse);
+      expect(engine.mountedVfEntries, isEmpty);
+      expect(settings.qualityInterpolationEnabled, isFalse);
+    });
+
+    test('unknownPresetIsIgnoredAndCorruptionBehavesLikeOff', () async {
+      final controller = build();
+      await controller.attachEngine(engine);
+      await controller.startup();
+
+      // Setting an unknown id through the panel is ignored.
+      controller.setEnabled(true);
+      await pumpEventQueue();
+      expect(controller.enabled || controller.vsUnavailable, isTrue);
+      controller.setPreset('MEMC_MAGICAL');
+      expect(controller.preset, 'MEMC_RIFE_STD');
+
+      // A corrupted settings.json (unknown preset with the switch on) must
+      // not enable anything.
+      settings.qualityInterpolationEnabled = true;
+      settings.qualityInterpolationPreset = 'MEMC_MAGICAL';
+      settings.save();
+      final corrupted = build();
+      await corrupted.attachEngine(engine);
+      await corrupted.startup();
+      expect(corrupted.enabled, isTrue); // raw persisted value
+      expect(corrupted.blockReason, 'disabled');
+      expect(engine.mountedVfEntries, isEmpty);
+
+      // A known id round-trips and moves the expected script path.
+      controller.setPreset('MEMC_SVP_PRO');
+      expect(controller.preset, 'MEMC_SVP_PRO');
+      expect(controller.expectedScriptPath, '$scriptsDir/MEMC_SVP_PRO.vpy');
+    });
   });
 
   group('IccController (fake engine)', () {
@@ -365,6 +572,93 @@ void main() {
       expect(controller.failed, isTrue);
       expect(controller.failureHint, contains("read back '"));
       expect(settings.qualityIccEnabled, isFalse);
+    });
+
+    test('disabledStartLeavesImportedProfileAlone', () async {
+      // An imported mpv.conf profile (P4 passes icc-profile through) must
+      // survive a controller that never got enabled
+      // (1.x test_icc_controller.cpp disabledStartLeavesImportedProfileAlone).
+      final imported = p.join(tempDir.path, 'imported.icc');
+      engine.properties['icc-profile'] = imported;
+      final controller = build();
+      controller.attachEngine(engine);
+      await controller.startup();
+
+      expect(controller.enabled, isFalse);
+      expect(engine.properties['icc-profile'], imported);
+      // icc-cache-dir was never written either.
+      expect(engine.propertySet('icc-cache-dir'), isNull);
+      expect(controller.failed, isFalse);
+    });
+
+    test('disableRestoresStartupSnapshot', () async {
+      // An imported profile must come back when EmoPlay's ICC is disabled.
+      final imported = p.join(tempDir.path, 'imported2.icc');
+      engine.properties['icc-profile'] = imported;
+      final controller = build();
+      controller.attachEngine(engine);
+      await controller.startup();
+
+      final ours = File(p.join(tempDir.path, 'ours.icc'));
+      await ours.writeAsBytes(List<int>.filled(8, 0));
+      controller.setProfilePath(ours.path);
+      controller.setEnabled(true);
+      await pumpEventQueue();
+      expect(engine.properties['icc-profile'], ours.path);
+
+      controller.setEnabled(false);
+      await pumpEventQueue();
+      expect(engine.properties['icc-profile'], imported);
+      expect(controller.failed, isFalse);
+
+      // Re-enabling works after a disable round trip.
+      controller.setEnabled(true);
+      await pumpEventQueue();
+      expect(engine.properties['icc-profile'], ours.path);
+    });
+
+    test('fileUrlIsNormalizedToLocalPath', () async {
+      // File dialogs hand out file:// URLs; mpv's M_OPT_FILE wants a plain
+      // filesystem path (1.x MpvEngine::toMediaPath).
+      final profile = File(p.join(tempDir.path, 'url.icc'));
+      await profile.writeAsBytes(List<int>.filled(8, 0));
+      final controller = build();
+      controller.attachEngine(engine);
+      await controller.startup();
+
+      controller.setProfilePath(Uri.file(profile.path).toString());
+      expect(controller.profilePath, profile.path);
+      // The stored path is applied like any other: enable and read back
+      // through mpv.
+      controller.setEnabled(true);
+      await pumpEventQueue();
+      expect(controller.failed, isFalse);
+      expect(engine.properties['icc-profile'], profile.path);
+    });
+
+    test('startupAppliesPersistedPreferences', () async {
+      final profile = File(p.join(tempDir.path, 'startup.icc'));
+      await profile.writeAsBytes(List<int>.filled(8, 0));
+      final file = p.join(tempDir.path, 'startup.json');
+      final seeded = EmoPlaySettings(file);
+      seeded.qualityIccEnabled = true;
+      seeded.qualityIccProfilePath = profile.path;
+      seeded.save();
+
+      final reloaded = EmoPlaySettings(file)..load();
+      final controller = IccController(
+        settings: reloaded,
+        appDataDir: tempDir.path,
+        onError: (_) {},
+      );
+      controller.attachEngine(engine);
+      await controller.startup();
+
+      expect(engine.properties['icc-profile'], profile.path);
+      // The 3DLUT cache follows the P4 redirect table: <appData>/icc_cache.
+      expect(engine.propertySet('icc-cache-dir'),
+          p.join(tempDir.path, 'icc_cache'));
+      expect(controller.enabled, isTrue);
     });
   });
 }

@@ -172,6 +172,18 @@ abstract class _InterpolationController with Store {
     if (currentEngine == null) {
       return;
     }
+
+    // 1.x read enabled()/preset() live through the Q_PROPERTY getters on
+    // every apply() run (InterpolationController.cpp L34/L42: both return
+    // m_settings values); the MobX mirror is re-synced here for the same
+    // contract, so an external writer flipping the persisted switch (or a
+    // corrupted preset id) is honored from the next apply on. setEnabled/
+    // setPreset persist before applying, so this is a no-op in the normal
+    // panel flow.
+    runInAction(() {
+      enabled = _settings.qualityInterpolationEnabled;
+      preset = _settings.qualityInterpolationPreset;
+    });
     _refreshExpectedScriptPath();
 
     // Corrupted settings.json must not enable anything: unknown preset ids

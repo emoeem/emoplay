@@ -1,24 +1,26 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'package:emoplay/music/equalizer.dart';
 import 'package:emoplay/music/lrc_parser.dart';
 import 'package:emoplay/music/music_controller.dart';
 import 'package:emoplay/settings/emoplay_settings.dart';
+import 'package:path/path.dart' as p;
 
 // Pure-logic tests for the music-mode decision rules (no engine) plus the
 // equalizer mapping.
 //
-// Case-for-case port of mpv-emo tests/test_music_controller.cpp — the pure
-// cases only. The C++ file's engine-integration cases
-// (equalizerAppliesToEngine / equalizerDisableClearsChain /
-// equalizerPersistedAcrossInstances) drove a real headless libmpv core to
-// verify the af chain against the linked libavfilter; flutter_test has no
-// libmpv, so those stay runtime-verifiable on a real machine only (same
-// known-limit note as the 1.x test_music_page). The persistence mechanics
-// they exercised are covered engine-free below by
-// equalizerPersistedAcrossInstances.
+// Case-for-case port of mpv-emo tests/test_music_controller.cpp. The pure
+// cases run engine-free; equalizerAppliesToEngine /
+// equalizerDisableClearsChain drive a real (idle) libmpv core exactly like
+// 1.x — media_kit's native assets resolve the bundled libmpv under
+// flutter_test (probed 2026-11-10), so the af chain is verified against the
+// linked libavfilter through the real player. The af readback is mpv's
+// string serialization of the chain; the 2.0 bootstrap additionally mounts
+// scaletempo2=max-speed=8, which the equalizer writes compose behind
+// (1.x wrote the whole chain).
 void main() {
   Map<String, Object?> track(String type, {bool albumart = false}) {
     // Minimal track-list entry for the isAudioMedia() cases: {type: "audio"|
@@ -206,4 +208,97 @@ void main() {
     final controller2 = MusicController(settings: reloaded2);
     expect(controller2.equalizerEnabled, isFalse);
   });
+
+  test('equalizerAppliesToEngine', () async {
+    // 1.x drove a real idle libmpv core and read the af property back: the
+    // runtime proof that the "equalizer" filter name and its f/t/w/g
+    // parameter format parse on the linked libavfilter.
+    MediaKit.ensureInitialized();
+    final dir = Directory.systemTemp.createTempSync('emoplay-eq-engine-');
+    addTearDown(() {
+      try {
+        dir.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    final player = Player();
+    addTearDown(player.dispose);
+    final native = player.platform as NativePlayer;
+    await native.waitForPlayerInitialization;
+
+    final settings = EmoPlaySettings(p.join(dir.path, 'eq-on.json'));
+    settings.load();
+    final controller = MusicController(settings: settings, onError: (_) {});
+    await controller.attachPlayer(player);
+
+    // Startup with disabled EQ must stay inert (nothing touches af).
+    await controller.startup();
+    expect(await native.getProperty('af'), '');
+
+    await controller.setEqualizerEnabled(true);
+    // Flat gains: enabled but no audible band -> the bootstrap's baseline
+    // stays, no equalizer filter is mounted (2.0 composes behind
+    // kPlaybackAfBaseline instead of clobbering af wholesale).
+    expect(await native.getProperty('af'), kPlaybackAfBaseline);
+
+    await controller.applyEqualizerPreset('bass');
+    expect(controller.equalizerPreset, 'bass');
+
+    // mpv 0.37+ serializes the af chain as `name=params` segments; the
+    // decimal frequencies/widths come back %len%-quoted (probed
+    // 2026-11-10). One equalizer entry per band (10 total).
+    final af = await native.getProperty('af');
+    expect('equalizer='.allMatches(af), hasLength(10));
+    // Band 0 of the bass preset: f=31.25, g=7 (1.x params map).
+    expect(af, contains('equalizer=f=%5%31.25:t=q:w=%3%1.4:g=7'));
+
+    // Single-band user adjustment: value lands in the engine and flips the
+    // preset to custom.
+    await controller.setEqualizerBand(3, -5);
+    expect(controller.equalizerPreset, 'custom');
+    final afAfterBand = await native.getProperty('af');
+    expect('equalizer='.allMatches(afAfterBand), hasLength(10));
+    // Band 3 of the bass preset is f=250; its gain is now -5.
+    expect(afAfterBand, contains('equalizer=f=250:t=q:w=%3%1.4:g=-5'));
+
+    // Out-of-range band writes are clamped, unknown bands ignored.
+    await controller.setEqualizerBand(0, 99);
+    expect(controller.equalizerGains[0], 12.0);
+    await controller.setEqualizerBand(-1, 5);
+    await controller.setEqualizerBand(10, 5);
+    expect(controller.equalizerGains, hasLength(10));
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('equalizerDisableClearsChain', () async {
+    MediaKit.ensureInitialized();
+    final dir = Directory.systemTemp.createTempSync('emoplay-eq-off-');
+    addTearDown(() {
+      try {
+        dir.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    final player = Player();
+    addTearDown(player.dispose);
+    final native = player.platform as NativePlayer;
+    await native.waitForPlayerInitialization;
+
+    final settings = EmoPlaySettings(p.join(dir.path, 'eq-off.json'));
+    settings.load();
+    final controller = MusicController(settings: settings, onError: (_) {});
+    await controller.attachPlayer(player);
+
+    await controller.setEqualizerEnabled(true);
+    await controller.applyEqualizerPreset('vocal');
+    final mounted = await native.getProperty('af');
+    expect('equalizer='.allMatches(mounted), hasLength(10));
+
+    await controller.setEqualizerEnabled(false);
+    // 1.x restored an empty af; 2.0 restores the bootstrap baseline — the
+    // equalizer bands are gone either way.
+    expect(await native.getProperty('af'), kPlaybackAfBaseline);
+
+    // Re-enabling re-mounts the last (custom-persisted) gains.
+    await controller.setEqualizerEnabled(true);
+    final remounted = await native.getProperty('af');
+    expect('equalizer='.allMatches(remounted), hasLength(10));
+  }, timeout: const Timeout(Duration(seconds: 60)));
 }

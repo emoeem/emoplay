@@ -488,6 +488,28 @@ void main() {
       expect(model.pathAt(-1), '');
     });
 
+    test('modelRolesExposeEntryFields', () async {
+      // 1.x roleNames() mapped PathRole/TitleRole/TypeRole/SizeRole/
+      // LastPlayedRole to "path"/"title"/"type"/"size"/"lastPlayed"; the
+      // 2.0 rows expose the same fields through the *At(row) accessors
+      // (library_model.dart role-lookup note).
+      final filePath = await writeLibraryFile([
+        entryJson('/media/A/alpha.mkv', 'alpha', 'video', 10, ''),
+      ]);
+
+      final store = LibraryStore(filePath);
+      addTearDown(store.dispose);
+      final model = LibraryModel(store);
+      addTearDown(model.dispose);
+      expect(model.count, 1);
+
+      expect(model.pathAt(0), '/media/A/alpha.mkv'); // PathRole -> "path"
+      expect(model.titleAt(0), 'alpha'); // TitleRole -> "title"
+      expect(model.typeAt(0), 'video'); // TypeRole -> "type"
+      expect(model.sizeAt(0), 10); // SizeRole -> "size"
+      expect(model.lastPlayedAt(0), ''); // LastPlayedRole -> "lastPlayed"
+    });
+
     test('modelFilterNarrowsAndResets', () async {
       final filePath = await writeLibraryFile([
         entryJson('/media/A/alpha.mkv', 'alpha', 'video', 10, ''),

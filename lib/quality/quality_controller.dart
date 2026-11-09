@@ -375,6 +375,20 @@ abstract class _QualityController with Store {
       return;
     }
 
+    // 1.x read the persisted prefs live through the Q_PROPERTY getters on
+    // every applyProfile() run (QualityController.cpp L199-208); the MobX
+    // mirror is re-synced here for the same contract, so a writer outside
+    // this controller (settings.json changed between files) is honored
+    // from the next apply on. Setters persist before applying, so this is
+    // a no-op in the normal panel flow.
+    runInAction(() {
+      contentMode = _settings.qualityContentMode;
+      qualityTier = _settings.qualityTier;
+      toneMappingMode = _settings.qualityToneMapping;
+      scaleOverride = _settings.qualityScaleOverride;
+      debandMode = _settings.qualityDebandMode;
+    });
+
     final prefs = UserPrefs()
       ..contentMode = contentModeFromString(contentMode);
     final userTier = qualityTierFromString(qualityTier);
