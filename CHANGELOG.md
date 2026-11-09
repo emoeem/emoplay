@@ -74,6 +74,20 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   迁移路线图 `docs/UPGRADE_ROADMAP_2026-11-10.md`（M0–M8 ✅+提交哈希、
   R1/R2 收尾轮次、未做项 ☐ 清单、验收标准与贯穿约定）。
 
+- **红灯清零（R3）**：Linux deb `Depends` 从 2 项补到 17 项——GTK 运行库
+  显式钉入（`libgtk-3-0t64`），不再依赖 tray 包侧链隐式捎带，音频输出 /
+  硬解 / GL 视频输出运行库齐备（`7052260`；覆盖经 `apt-cache depends
+  --recurse` 审计：bundle ldd 闭包的 104 个提供包全部落在 17 包递归闭包
+  251 包内，差集为空）；页签壳成为第一个接入 i18n 的页面——五个页签标签
+  经 `menuTabLabels()` 单一来源分发（竖屏 NavigationBar 与横屏
+  NavigationRail 同源，文案不可能漂移）、「再按一次退出应用」toast 换
+  `AppLocalizations`，迁移链由 `test/menu_l10n_test.dart` 3 用例端到端
+  锁定，默认语言仍 zh-Hans-CN、中文界面零变化（`c943414`）；媒体库响应性
+  守卫 `test/performance_guards_test.dart` 3 用例（取消扫描毫秒级停且部分
+  结果保留、进度按节流步触发不逐文件刷屏、flock 实证缩略图至多一个 ffmpeg
+  子进程，与 1.x 单 worker 线程形状一致；isolate 分片多开经评估不采，
+  理由记录在测试文件头注释）。
+
 ### Fixed
 
 - CI 自建仓起零 run：`.github/workflows/pr.yaml` 触发分支写成 `master` 而仓库
@@ -83,6 +97,16 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   shared object file`），两条真开 libmpv 核心的均衡器用例失败；`3379d7a`
   将原生依赖安装步挪到 `flutter test` 之前并补装 `libva2 libva-drm2
   libva-x11-2 libva-wayland2 libvdpau1`（`release.yaml` 同步）。
+- CI 第二跑红灯（run 42712702494）：同一批用例报 `libpulse.so.0: cannot
+  open shared object file`——dlopen 每次只报第一个缺失依赖，R2 补的
+  VA/VDPAU 只是直系依赖的第一层；`7debc83` 按 `readelf -d` 实测
+  `libmpv.so.2` 全部直系 NEEDED 后向 pr.yaml / release.yaml 一次补装
+  14 个运行库（`libpulse0 libxv1 libegl1 libgbm1 libdrm2 libunwind8
+  liblcms2-2 libarchive13t64 libasound2t64 libdbus-1-3 libsndfile1
+  libmpg123-0t64 libopus0 libogg0`；第二层编解码库交给发行版依赖图，
+  不按随发行版变名的 soname 钉死），并把 pr.yaml 步序改为 构建 →
+  `ldd libmpv.so.2 | grep 'not found'` 审计（任一缺失即红灯并列全清单）→
+  测试——依赖缺口从此一次列全，不再逐轮烧 CI 分钟数。
 
 ### Changed
 
