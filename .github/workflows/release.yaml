@@ -121,7 +121,11 @@ jobs:
         uses: subosito/flutter-action@v2.16.0
         with:
           channel: stable
-          flutter-version-file: pubspec.yaml
+          # Pinned instead of flutter-version-file: on windows-latest the
+          # action needs `yq` to parse the version file and yq is not
+          # preinstalled (run 42720144705 "yq not found"). Keep in sync with
+          # pubspec.yaml environment.flutter.
+          flutter-version: '3.47.9'
       - name: Get Flutter dependencies
         run: flutter pub get
         shell: pwsh
