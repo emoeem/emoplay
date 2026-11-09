@@ -53,6 +53,20 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   （Windows/macOS/Android/Linux amd64+arm64）仅 `v*` tag 触发，删除全部
   dart-define 密钥注入与第三方签名服务，iOS 构建保留注释待接入。
 
+- **对账收网（R1）**：1.x `src/update/UpdateChecker.cpp` 平移落地
+  （`lib/services/update_checker.dart`，纯函数与考证注释逐行直译；启动 3s 后
+  至多一次 GET，端点 `repos/emoeem/emoplay/releases/latest`，结果只报告、
+  永不下载安装、失败完全静默；设置页确认新版后给出发布页入口）；画质 /
+  插值控制器补齐 1.x「每次 apply 实时重读持久化设置」语义
+  （`interpolation_controller.dart:172`、`quality_controller.dart:375`）；
+  测试对账：26 个 1.x C++ 测试文件逐一对账（`quality_engine_test.dart` 等补齐，
+  见 `docs/reports/WORK_REPORT_2026-11-10_RECONCILIATION_CLOSEOUT.md` §3.1）。
+
+### Fixed
+
+- CI 自建仓起零 run：`.github/workflows/pr.yaml` 触发分支写成 `master` 而仓库
+  分支是 `main`，每次推送被静默跳过（`916c2d6` 改为 `main`）。
+
 ### Changed
 
 - 许可：整体 MIT（1.x）→ **GPL-3.0**；Kazumi / PiliPlus 版权声明保留，
