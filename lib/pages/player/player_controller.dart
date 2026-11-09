@@ -1,0 +1,385 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter_volume_controller/flutter_volume_controller.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:flutter_modular/flutter_modular.dart';
+import 'package:emoplay/services/player/external_playback_launcher.dart';
+import 'package:emoplay/pages/player/controller/player_debug_controller.dart';
+import 'package:emoplay/pages/player/controller/player_models.dart';
+import 'package:emoplay/pages/player/controller/player_seek_controller.dart';
+import 'package:emoplay/pages/player/controller/player_aspect_ratio.dart';
+import 'package:emoplay/pages/player/controller/player_panel_controller.dart';
+import 'package:emoplay/pages/player/controller/player_playback_controller.dart';
+import 'package:emoplay/pages/player/controller/player_super_resolution.dart';
+import 'package:emoplay/pages/player/controller/player_screenshot_controller.dart';
+import 'package:emoplay/services/storage/storage.dart';
+import 'package:emoplay/services/logging/logger.dart';
+import 'package:emoplay/services/shaders/shader_asset_service.dart';
+import 'package:emoplay/services/player/audio_controller.dart';
+import 'package:emoplay/utils/async_session.dart';
+import 'package:emoplay/utils/device.dart';
+
+export 'package:emoplay/pages/player/controller/player_models.dart';
+
+class PlayerController implements Disposable {
+  PlayerController(
+    this.shaderAssetService,
+    this.audioController,
+  );
+
+  final ShaderAssetService shaderAssetService;
+  final AudioController audioController;
+  final AsyncSessionOwner _initializations = AsyncSessionOwner();
+  Future<void>? _shutdownFuture;
+  final PlayerPanelController panel = PlayerPanelController();
+  final PlayerScreenshotController screenshots = PlayerScreenshotController();
+  final PlayerDebugController debug = PlayerDebugController();
+
+  late final PlayerPlaybackController playback = PlayerPlaybackController(
+    shaderAssetService: shaderAssetService,
+    debug: debug,
+    videoUrl: () => videoUrl,
+    isLocalPlayback: () => isLocalPlayback,
+  );
+  late final PlayerSeekController seeking = PlayerSeekController(
+    playback: playback,
+    pause: pause,
+    play: play,
+    onSeekCompleted: _onSeekCompleted,
+  );
+  late final ExternalPlaybackLauncher externalPlayback =
+      ExternalPlaybackLauncher(
+    videoUrl: () => videoUrl,
+  );
+
+  late String referer = '';
+  String? coverUrl;
+  String videoUrl = '';
+  String _episodeTitle = '';
+  bool isLocalPlayback = false;
+  Timer? hideVolumeUITimer;
+  Timer? _volumeGestureSyncTimer;
+  double? _pendingGestureVolume;
+
+  bool muted = false;
+  double _preMuteVolume = 100;
+
+  Future<void> toggleMute() async {
+    if (!muted && playback.volume > 0) {
+      _preMuteVolume = playback.volume;
+      muted = true;
+      _persistMuteState();
+      await setVolume(0);
+    } else {
+      muted = false;
+      _persistMuteState();
+      await setVolume(_preMuteVolume > 0 ? _preMuteVolume : 100);
+    }
+  }
+
+  void _persistMuteState() {
+    if (!isDesktop()) {
+      return;
+    }
+    unawaited(GStorage.putSetting<bool>(SettingsKeys.playerMuted, muted));
+  }
+
+  /// 在音量被主动调高（手势 / 按键 / 滚轮）时退出静音状态。
+  void _clearMuteIfNeeded(double value) {
+    if (muted && value > 0) {
+      muted = false;
+      _persistMuteState();
+    }
+  }
+
+  void setVolumeDuringGesture(double value) {
+    _pendingGestureVolume = value.clamp(0.0, 100.0);
+    playback.updateVolume(_pendingGestureVolume!);
+    _volumeGestureSyncTimer?.cancel();
+    _volumeGestureSyncTimer = Timer(const Duration(milliseconds: 80), () {
+      final vol = _pendingGestureVolume;
+      if (vol == null) {
+        return;
+      }
+      unawaited(playback.syncVolumeToDevice(vol));
+    });
+  }
+
+  Future<void> finishVolumeGesture() async {
+    _volumeGestureSyncTimer?.cancel();
+    _volumeGestureSyncTimer = null;
+    final vol = _pendingGestureVolume;
+    _pendingGestureVolume = null;
+    if (vol != null) {
+      playback.volume = vol;
+    }
+    playback.invalidatePreciseVolume();
+    await playback.syncVolumeToDevice(vol);
+    final resolved = vol ?? playback.volume;
+    _clearMuteIfNeeded(resolved);
+    _persistDesktopVolume(resolved);
+  }
+
+  void _persistDesktopVolume(double value) {
+    if (!isDesktop()) {
+      return;
+    }
+    if (muted) {
+      return;
+    }
+    final clamped = value.clamp(0.0, 100.0);
+    final stored = GStorage.getSetting(SettingsKeys.defaultVolume);
+    if (stored.round() == clamped.round()) {
+      return;
+    }
+    unawaited(GStorage.putSetting<double>(SettingsKeys.defaultVolume, clamped));
+  }
+
+  /// Human readable title of the currently loaded media.
+  String get mediaTitle => _episodeTitle;
+
+  Future<bool> init(PlaybackInitParams params) async {
+    if (_initializations.isClosed) {
+      return false;
+    }
+    final initialization = _initializations.begin();
+
+    videoUrl = params.videoUrl;
+    _episodeTitle = params.episodeTitle.trim();
+    isLocalPlayback = params.isLocalPlayback;
+
+    EmoLogger().i(
+        'PlayerController: ${params.isLocalPlayback ? "local" : "online"} playback, url: ${params.videoUrl}');
+
+    playback.resetForInit();
+    debug.playerLogLevel = GStorage.getSetting(SettingsKeys.playerLogLevel);
+    playback.playerSpeed = GStorage.getSetting(SettingsKeys.defaultPlaySpeed);
+    panel.aspectRatioMode = PlayerAspectRatio.fromStorageValue(
+      GStorage.getSetting(SettingsKeys.defaultAspectRatioType),
+    );
+
+    playback.buttonSkipTime = GStorage.getSetting(SettingsKeys.buttonSkipTime);
+    playback.arrowKeySkipTime =
+        GStorage.getSetting(SettingsKeys.arrowKeySkipTime);
+    try {
+      await _releasePlaybackResources();
+    } catch (_) {}
+    if (initialization.isStale) {
+      return false;
+    }
+
+    final Player? player;
+    try {
+      player = await playback.createVideoController(
+        params.httpHeaders,
+        canInstall: () => initialization.isActive,
+        offset: params.offset,
+      );
+    } catch (e) {
+      if (initialization.isStale) {
+        return false;
+      }
+      playback.loading = false;
+      EmoLogger()
+          .e('PlayerController: failed to initialize video', error: e);
+      return false;
+    }
+    if (player == null || !_ownsInitialization(initialization, player)) {
+      return false;
+    }
+
+    if (isDesktop()) {
+      final freshStart = playback.volume == -1;
+      if (freshStart) {
+        muted = GStorage.getSetting(SettingsKeys.playerMuted);
+        final remembered = GStorage.getSetting(SettingsKeys.defaultVolume);
+        _preMuteVolume = remembered > 0 ? remembered : 100;
+        playback.volume = muted ? 0 : remembered;
+      }
+      await setVolume(playback.volume);
+      if (!_ownsInitialization(initialization, player)) {
+        return false;
+      }
+    } else {
+      await FlutterVolumeController.getVolume().then((value) {
+        playback.volume = (value ?? 0.0) * 100;
+      });
+      if (!_ownsInitialization(initialization, player)) {
+        return false;
+      }
+
+      await FlutterVolumeController.updateShowSystemUI(false);
+      if (!_ownsInitialization(initialization, player)) {
+        await FlutterVolumeController.updateShowSystemUI(true);
+        return false;
+      }
+
+      FlutterVolumeController.addListener((volume) {
+        if (player == null || !_ownsInitialization(initialization, player)) {
+          return;
+        }
+        if (panel.volumeSeeking) {
+          return;
+        }
+        playback.applyExternalVolume(volume * 100);
+        if (!Platform.isAndroid && !panel.volumeSeeking) {
+          panel.showVolume = true;
+          hideVolumeUITimer?.cancel();
+          hideVolumeUITimer = Timer(const Duration(seconds: 1), () {
+            panel.showVolume = false;
+            hideVolumeUITimer = null;
+          });
+        }
+      }, category: AudioSessionCategory.playback, emitOnStart: false);
+      if (!_ownsInitialization(initialization, player)) {
+        return false;
+      }
+    }
+    await setPlaybackSpeed(playback.playerSpeed);
+    if (!_ownsInitialization(initialization, player)) {
+      return false;
+    }
+    EmoLogger().i('PlayerController: video initialized');
+    playback.loading = false;
+
+    coverUrl = params.coverUrl;
+    return true;
+  }
+
+  bool _ownsInitialization(AsyncSession initialization, Player player) {
+    return initialization.isActive && playback.isCurrentPlayer(player);
+  }
+
+  Future<void> setShader(SuperResolutionMode mode, {Player? player}) async {
+    await playback.setShader(
+      mode,
+      player: player,
+    );
+  }
+
+  Future<void> setPlaybackSpeed(double playerSpeed) async {
+    await playback.setPlaybackSpeed(playerSpeed);
+  }
+
+  Future<void> setVolume(double value) async {
+    await playback.setVolume(value);
+    _clearMuteIfNeeded(value);
+    _persistDesktopVolume(value);
+  }
+
+  void syncPlaybackState() {
+    playback.syncPlaybackState();
+  }
+
+  Future<void> playOrPause() async {
+    await playback.playOrPause(pause: pause, play: play);
+  }
+
+  Future<void> seek(Duration duration, {bool enableSync = true}) =>
+      seeking.seekTo(duration, enableSync: enableSync);
+
+  Future<void> seekBy(Duration offset, {bool enableSync = true}) =>
+      seeking.seekBy(offset, enableSync: enableSync);
+
+  Future<void> _onSeekCompleted(bool enableSync) async {}
+
+  Future<void> pause({bool enableSync = true}) async {
+    final player = playback.mediaPlayer;
+    if (player == null) return;
+    try {
+      await player.pause();
+    } catch (_) {
+      return;
+    }
+    playback.playing = false;
+  }
+
+  Future<void> play({bool enableSync = true}) async {
+    final player = playback.mediaPlayer;
+    if (player == null) return;
+    try {
+      await player.play();
+    } catch (_) {
+      return;
+    }
+    playback.playing = true;
+  }
+
+  @override
+  void dispose() {
+    beginShutdown();
+  }
+
+  /// Starts the idempotent player shutdown without blocking route navigation.
+  ///
+  /// Native media and audio-session cleanup may finish after the route is
+  /// removed. Immediate ownership detachment happens synchronously before this
+  /// method returns.
+  void beginShutdown() {
+    _initializations.close();
+    if (_shutdownFuture != null) {
+      return;
+    }
+    screenshots.dispose();
+    final shutdown = _shutdownResources();
+    _shutdownFuture = shutdown;
+    unawaited(
+      shutdown.catchError((Object error, StackTrace stackTrace) {
+        EmoLogger().e(
+          'PlayerController: failed to dispose asynchronously',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }),
+    );
+  }
+
+  Future<void> _shutdownResources() async {
+    await _releasePlaybackResources();
+  }
+
+  Future<void> _releasePlaybackResources() async {
+    hideVolumeUITimer?.cancel();
+    _volumeGestureSyncTimer?.cancel();
+    FlutterVolumeController.removeListener();
+    await Future.wait([
+      audioController.deactivate(),
+      playback.stop(),
+      _restoreSystemVolumeUi(),
+    ]);
+  }
+
+  Future<void> _restoreSystemVolumeUi() async {
+    try {
+      await FlutterVolumeController.updateShowSystemUI(true);
+    } catch (error, stackTrace) {
+      EmoLogger().w(
+        'PlayerController: failed to restore the system volume UI',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> stop() async {
+    _initializations.cancel();
+    await _releasePlaybackResources();
+  }
+
+  Future<Uint8List?> screenshotPng() => playback.screenshotPng();
+
+  void setButtonForwardTime(int time) {
+    playback.buttonSkipTime = time;
+    GStorage.putSetting(SettingsKeys.buttonSkipTime, time);
+  }
+
+  void setArrowKeyForwardTime(int time) {
+    playback.arrowKeySkipTime = time;
+    GStorage.putSetting(SettingsKeys.arrowKeySkipTime, time);
+  }
+
+  Future<void> launchExternalPlayer() async {
+    await externalPlayback.launch();
+  }
+}

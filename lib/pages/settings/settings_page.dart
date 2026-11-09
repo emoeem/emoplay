@@ -1,0 +1,389 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_modular/flutter_modular.dart';
+
+import 'package:emoplay/bean/appbar/sys_app_bar.dart';
+import 'package:emoplay/bean/settings/settings_detail_scaffold.dart';
+import 'package:emoplay/bean/settings/settings_list.dart';
+import 'package:emoplay/bean/widget/content_section.dart';
+import 'package:emoplay/pages/settings/player_settings.dart';
+import 'package:emoplay/utils/constants.dart';
+
+class _SettingsCategory {
+  const _SettingsCategory({
+    required this.label,
+    required this.description,
+    required this.icon,
+    required this.path,
+  });
+
+  final String label;
+  final String description;
+  final IconData icon;
+  final String path;
+}
+
+class _SettingsGroup {
+  const _SettingsGroup({required this.title, required this.categories});
+
+  final String title;
+  final List<_SettingsCategory> categories;
+}
+
+const List<_SettingsGroup> _settingsGroups = [
+  _SettingsGroup(
+    title: '播放',
+    categories: [
+      _SettingsCategory(
+        label: '播放设置',
+        description: '解码、渲染与播放行为',
+        icon: Icons.display_settings_rounded,
+        path: '/settings/player',
+      ),
+      _SettingsCategory(
+        label: '操作设置',
+        description: '播放器按键映射',
+        icon: Icons.keyboard_rounded,
+        path: '/settings/keyboard',
+      ),
+    ],
+  ),
+  _SettingsGroup(
+    title: '应用',
+    categories: [
+      _SettingsCategory(
+        label: '外观设置',
+        description: '主题、配色与显示',
+        icon: Icons.palette_rounded,
+        path: '/settings/theme',
+      ),
+      _SettingsCategory(
+        label: '界面设置',
+        description: '启动、窗口行为与展示信息',
+        icon: Icons.pages_rounded,
+        path: '/settings/interface',
+      ),
+    ],
+  ),
+  _SettingsGroup(
+    title: '其他',
+    categories: [
+      _SettingsCategory(
+        label: '更新设置',
+        description: '应用更新',
+        icon: Icons.update_rounded,
+        path: '/settings/update',
+      ),
+      _SettingsCategory(
+        label: '存储与日志',
+        description: '缓存与错误日志',
+        icon: Icons.storage_rounded,
+        path: '/settings/storage',
+      ),
+      _SettingsCategory(
+        label: '关于',
+        description: '版本与开源信息',
+        icon: Icons.info_outline_rounded,
+        path: '/settings/about',
+      ),
+    ],
+  ),
+];
+
+String _normalizePath(String path) =>
+    path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+
+bool _isWithinPath(String location, String path) =>
+    location == path || location.startsWith('$path/');
+
+String _categoryPath(String location) {
+  if (location == '/settings') {
+    return '/settings/player';
+  }
+  for (final group in _settingsGroups) {
+    for (final category in group.categories) {
+      if (_isWithinPath(location, category.path)) {
+        return category.path;
+      }
+    }
+  }
+  return location;
+}
+
+class _SettingsCategorySelected extends Notification {
+  const _SettingsCategorySelected(this.path);
+
+  final String path;
+}
+
+class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key, required this.location});
+
+  final String location;
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  final _outletKey = GlobalKey<RouterOutletState>();
+  Object? _categoryNavigation;
+  late String _location = _normalizePath(widget.location);
+
+  String get _selectedCategoryPath => _categoryPath(_location);
+  bool get _isSecondaryRoute =>
+      _location != '/settings' && _location != _selectedCategoryPath;
+
+  @override
+  void didUpdateWidget(covariant SettingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.location != widget.location) {
+      _categoryNavigation = null;
+      _location = _normalizePath(widget.location);
+    }
+  }
+
+  void _replaceCategory(String path) {
+    final outlet = _outletKey.currentState!;
+    // Nested pushes leave _location unchanged, so check the stack as well.
+    if (!outlet.canPop &&
+        !_isSecondaryRoute &&
+        _selectedCategoryPath == path) {
+      return;
+    }
+    _categoryNavigation = null;
+    outlet.navigate(path);
+    setState(() => _location = path);
+  }
+
+  Future<void> _pushCategory(String path) async {
+    if (_categoryNavigation != null) return;
+    final navigation = Object();
+    final previousLocation = _location;
+    _categoryNavigation = navigation;
+    setState(() => _location = path);
+    await _outletKey.currentState!.push<void>(path);
+    // Ignore completions from history replaced by a rail selection.
+    if (!mounted || _categoryNavigation != navigation) return;
+    setState(() {
+      _categoryNavigation = null;
+      _location = previousLocation;
+    });
+  }
+
+  void _goBack() {
+    if (_outletKey.currentState?.maybePop() ?? false) return;
+    _exitSettings();
+  }
+
+  void _exitSettings() {
+    if (!context.maybePop()) context.navigate('/tab/home');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth > LayoutBreakpoint.compact['width']!;
+      return NavigatorPopHandler<Object?>(
+        onPopWithResult: (_) => _goBack(),
+        child: Scaffold(
+          appBar: wide
+              ? SysAppBar(
+                  title: const Text('设置'),
+                  leading: BackButton(onPressed: _exitSettings),
+                )
+              : null,
+          body: SafeArea(
+            top: false,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Keep the outlet at the same tree position on resize.
+                SizedBox(
+                  width: wide ? 280 : 0,
+                  child: Offstage(
+                    offstage: !wide,
+                    child: _SettingsMenu(
+                      wide: true,
+                      selectedPath: _selectedCategoryPath,
+                      onSelect: _replaceCategory,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: SettingsPaneScope(
+                    embedded: wide,
+                    showBackButton: _isSecondaryRoute,
+                    onBack: _goBack,
+                    child: NotificationListener<_SettingsCategorySelected>(
+                      onNotification: (notification) {
+                        _pushCategory(notification.path);
+                        return true;
+                      },
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          pageTransitionsTheme: settingsPageTransitionsTheme,
+                        ),
+                        child: RouterOutlet(key: _outletKey),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class SettingsIndexPage extends StatelessWidget {
+  const SettingsIndexPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (SettingsPaneScope.of(context)?.embedded ?? false) {
+      return const PlayerSettingsPage();
+    }
+    return Scaffold(
+      appBar: SysAppBar(
+        title: const Text('设置'),
+        leading: BackButton(onPressed: () {
+          if (!context.maybePop()) context.navigate('/tab/home');
+        }),
+      ),
+      body: _SettingsMenu(
+        wide: false,
+        onSelect: (path) => _SettingsCategorySelected(path).dispatch(context),
+      ),
+    );
+  }
+}
+
+/// 设置 Tab 的入口页.
+///
+/// The settings route tree stays mounted at the top-level `/settings` path so
+/// deep links keep working; this tab entry pushes the corresponding category
+/// onto the root stack, mirroring Kazumi's behavior.
+class SettingsTabHome extends StatelessWidget {
+  const SettingsTabHome({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('设置'),
+        centerTitle: false,
+      ),
+      body: _SettingsMenu(
+        wide: false,
+        onSelect: (path) => context.pushNamed(path),
+      ),
+    );
+  }
+}
+
+class _SettingsMenu extends StatelessWidget {
+  const _SettingsMenu({
+    required this.wide,
+    this.selectedPath,
+    required this.onSelect,
+  });
+
+  final bool wide;
+  final String? selectedPath;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: ListView(
+        padding: wide
+            ? const EdgeInsets.fromLTRB(4, 0, 0, 12)
+            : const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          for (final group in _settingsGroups)
+            if (wide) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 16, 28, 8),
+                child: SectionHeader(title: Text(group.title)),
+              ),
+              for (final category in group.categories)
+                _RailDestination(
+                  category: category,
+                  selected: selectedPath == category.path,
+                  onTap: () => onSelect(category.path),
+                ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: ContentSection.group(
+                  title: group.title,
+                  children: [
+                    for (final category in group.categories)
+                      SettingsCategoryTile(
+                        icon: category.icon,
+                        title: category.label,
+                        description: category.description,
+                        onTap: () => onSelect(category.path),
+                      ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RailDestination extends StatelessWidget {
+  const _RailDestination({
+    required this.category,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _SettingsCategory category;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final foreground = selected
+        ? colorScheme.onSecondaryContainer
+        : colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: Material(
+        color: selected ? colorScheme.secondaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(28),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            height: 56,
+            child: Row(
+              children: [
+                const SizedBox(width: 16),
+                Icon(category.icon, size: 24, color: foreground),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    category.label,
+                    style: textTheme.labelLarge?.copyWith(color: foreground),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

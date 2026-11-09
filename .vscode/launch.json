@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "EmoPlay (debug, Skia)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "toolArgs": [
+        "--no-enable-impeller"
+      ]
+    },
+    {
+      "name": "EmoPlay (debug, Skia, local defines)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "toolArgs": [
+        "--no-enable-impeller",
+        "--dart-define-from-file=.emoplay_build_defines.env"
+      ]
+    },
+    {
+      "name": "EmoPlay (debug, Impeller)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "toolArgs": [
+        "--enable-impeller"
+      ]
+    },
+    {
+      "name": "EmoPlay (debug, Impeller, local defines)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "toolArgs": [
+        "--enable-impeller",
+        "--dart-define-from-file=.emoplay_build_defines.env"
+      ]
+    }
+  ]
+}
