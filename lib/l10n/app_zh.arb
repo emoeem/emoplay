@@ -1,0 +1,28 @@
+{
+  "@@locale": "zh",
+  "@@comment": "EmoPlay zh 模板（SPEC §1：默认 zh）。键值取自真实 UI 字符串；页面尚未迁移到 AppLocalizations，迁移为后续轮次工作。",
+  "appTitle": "EmoPlay",
+  "@appTitle": {
+    "description": "应用名，与 lib/utils/constants.dart 的 appName 常量一致（1.x 约定：应用名不翻译）。"
+  },
+  "tabHome": "首页",
+  "@tabHome": {
+    "description": "主导航页签一（lib/pages/menu/menu.dart:171，SPEC §5 五页签）。"
+  },
+  "tabLibrary": "媒体库",
+  "@tabLibrary": {
+    "description": "主导航页签二（lib/pages/menu/menu.dart:176）。"
+  },
+  "tabPlayer": "播放",
+  "@tabPlayer": {
+    "description": "主导航页签三（lib/pages/menu/menu.dart:181）。"
+  },
+  "tabPlugins": "插件",
+  "@tabPlugins": {
+    "description": "主导航页签四（lib/pages/menu/menu.dart:186）。"
+  },
+  "tabSettings": "设置",
+  "@tabSettings": {
+    "description": "主导航页签五（lib/pages/menu/menu.dart:191）。"
+  }
+}

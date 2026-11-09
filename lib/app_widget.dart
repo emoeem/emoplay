@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
+import 'package:emoplay/l10n/generated/app_localizations.dart';
 import 'package:emoplay/services/storage/storage.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:emoplay/services/logging/logger.dart';
@@ -272,11 +272,12 @@ class _AppWidgetState extends State<AppWidget>
 
         return MaterialApp.router(
           title: appName,
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
-          supportedLocales: const [
-            Locale.fromSubtags(
-                languageCode: 'zh', scriptCode: 'Hans', countryCode: "CN")
-          ],
+          // i18n 骨架（SPEC §1：默认 zh，arb 结构预留 en）：delegates 与
+          // supportedLocales 由 l10n.yaml + lib/l10n/*.arb 生成（M-R2）；
+          // 默认语言仍锁定 zh-Hans-CN，页面字符串尚未迁移到
+          // AppLocalizations（后续轮次逐页替换）。
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           locale: const Locale.fromSubtags(
               languageCode: 'zh', scriptCode: 'Hans', countryCode: "CN"),
           theme: lightTheme,

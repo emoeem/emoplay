@@ -104,6 +104,10 @@ msix_config:
   protocol_activation: emoplay
 
 flutter:
+  # gen-l10n (l10n.yaml, lib/l10n/*.arb): required for flutter gen-l10n /
+  # build to emit the AppLocalizations classes into lib/l10n/generated
+  # (i18n skeleton, SPEC §1 — default zh, en structure reserved).
+  generate: true
   uses-material-design: true
   assets:
     - assets/images/

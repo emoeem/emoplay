@@ -53,8 +53,7 @@ Linux debug 构建通过，版本仍是未发布的 2.0.0-alpha，CI 因触发�
 
 ## 路线图
 
-`UPGRADE_ROADMAP_2026-11-10.md` **尚未建立**（这是已知欠账，见工作报告 §5）；
-在此之前，路线以两处为准：已完成里程碑看
-[CHANGELOG.md](../CHANGELOG.md) 的 2.0.0-alpha 小节（M1–M8 每条带内容），
-未做项与优先级看 [OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md) §四。路线图建立后请
-回填本节链接。
+路线图的权威来源是 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md)
+（R2 轮建立，M0–M8 ✅+提交哈希、R1/R2 收尾轮次、未做项 ☐、验收标准与贯穿约定）；
+逐里程碑的内容细节另见 [CHANGELOG.md](../CHANGELOG.md) 的 2.0.0-alpha 小节，
+轮次结构与积压清单见 [OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md) §四。

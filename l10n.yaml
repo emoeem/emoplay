@@ -1,0 +1,15 @@
+# Flutter localization generation (flutter gen-l10n).
+#
+# i18n skeleton per docs/SPEC.md §1 ("默认 zh，arb 结构预留 en") and
+# OVERNIGHT-LOOP §四 backlog #8: the arb structure and the zh template are
+# established; page-by-page string migration is a follow-up (see the
+# 2026-11-10 R2 round notes). Generated classes land in lib/l10n/generated
+# (non-synthetic — the synthetic-package flag is deprecated and cannot be
+# enabled on Flutter 3.47.9), so they are committed and importable directly.
+arb-dir: lib/l10n
+template-arb-file: app_zh.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+output-dir: lib/l10n/generated
+nullable-getter: false
+preferred-supported-locales: zh

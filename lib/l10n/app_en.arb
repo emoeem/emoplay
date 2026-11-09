@@ -1,0 +1,28 @@
+{
+  "@@locale": "en",
+  "@@comment": "EmoPlay en 骨架（SPEC §1：arb 结构预留 en）。键集必须与模板 app_zh.arb 一致，译文缺失会在 gen-l10n 时报告 untranslated。",
+  "appTitle": "EmoPlay",
+  "@appTitle": {
+    "description": "Application name, matches the appName constant in lib/utils/constants.dart (1.x convention: the app name is not translated)."
+  },
+  "tabHome": "Home",
+  "@tabHome": {
+    "description": "Main navigation tab 1 (lib/pages/menu/menu.dart:171, SPEC §5 five tabs)."
+  },
+  "tabLibrary": "Library",
+  "@tabLibrary": {
+    "description": "Main navigation tab 2 (lib/pages/menu/menu.dart:176)."
+  },
+  "tabPlayer": "Player",
+  "@tabPlayer": {
+    "description": "Main navigation tab 3 (lib/pages/menu/menu.dart:181)."
+  },
+  "tabPlugins": "Plugins",
+  "@tabPlugins": {
+    "description": "Main navigation tab 4 (lib/pages/menu/menu.dart:186)."
+  },
+  "tabSettings": "Settings",
+  "@tabSettings": {
+    "description": "Main navigation tab 5 (lib/pages/menu/menu.dart:191)."
+  }
+}
