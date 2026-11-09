@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:emoplay/media/media_classifier.dart';
 import 'package:emoplay/services/player/external_playback_launcher.dart';
 import 'package:emoplay/pages/player/controller/player_debug_controller.dart';
 import 'package:emoplay/pages/player/controller/player_models.dart';
@@ -249,6 +250,24 @@ class PlayerController implements Disposable {
 
   bool _ownsInitialization(AsyncSession initialization, Player player) {
     return initialization.isActive && playback.isCurrentPlayer(player);
+  }
+
+  /// Loads an external subtitle (srt/ass/ssa/vtt/sub) into the current media.
+  ///
+  /// Ported from mpv-emo `PlaybackController::addSubtitle`
+  /// (src/mpv/PlaybackController.cpp:233): `sub-add <path> select`, with the
+  /// same 1.x guards — no-op without a live player or an empty path. The
+  /// command fails audibly when the media does not support it, so errors
+  /// propagate to the caller for user feedback.
+  Future<void> addSubtitle(String path) async {
+    if (path.isEmpty) {
+      return;
+    }
+    final platform = playback.mediaPlayer?.platform;
+    if (platform is NativePlayer) {
+      await platform.command(
+          ['sub-add', MediaClassifier.normalise(path), 'select']);
+    }
   }
 
   Future<void> setShader(SuperResolutionMode mode, {Player? player}) async {

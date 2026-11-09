@@ -48,6 +48,7 @@ class PlayerItem extends StatefulWidget {
     this.onToggleSidePanel,
     required this.onSelectItem,
     required this.onBackPressed,
+    this.onLoadSubtitle,
     required this.keyboardFocus,
     required this.pauseForTimedShutdown,
     this.disableAnimations = false,
@@ -61,6 +62,10 @@ class PlayerItem extends StatefulWidget {
   /// Switches the player to the playlist entry at [index].
   final Future<void> Function(int index) onSelectItem;
   final VoidCallback onBackPressed;
+
+  /// Opens the external-subtitle picker for the current media (M3 sub-add
+  /// side-load; null hides the panel entry).
+  final VoidCallback? onLoadSubtitle;
   final FocusNode keyboardFocus;
   final bool disableAnimations;
   final VoidCallback pauseForTimedShutdown;
@@ -1373,6 +1378,7 @@ class _PlayerItemState extends State<PlayerItem>
                             setPlaybackSpeed: setPlaybackSpeed,
                             onToggleSidePanel: widget.onToggleSidePanel,
                             onSelectItem: widget.onSelectItem,
+                            onLoadSubtitle: widget.onLoadSubtitle,
                             handleFullscreen: handleFullscreen,
                             enterAndroidPictureInPicture:
                                 enterAndroidPictureInPicture,

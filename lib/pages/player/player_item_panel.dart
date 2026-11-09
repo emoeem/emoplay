@@ -30,6 +30,7 @@ class PlayerItemPanel extends StatefulWidget {
     required this.setPlaybackSpeed,
     this.onToggleSidePanel,
     required this.onSelectItem,
+    this.onLoadSubtitle,
     required this.handleFullscreen,
     required this.enterAndroidPictureInPicture,
     required this.handleProgressBarDragStart,
@@ -56,6 +57,10 @@ class PlayerItemPanel extends StatefulWidget {
   final Future<void> Function(double) setPlaybackSpeed;
   final VoidCallback? onToggleSidePanel;
   final Future<void> Function(int index) onSelectItem;
+
+  /// Opens the external-subtitle picker for the current media (M3 sub-add
+  /// side-load; null hides the panel entry).
+  final VoidCallback? onLoadSubtitle;
   final VoidCallback handleFullscreen;
   final Future<void> Function() enterAndroidPictureInPicture;
   final VoidCallback handleProgressBarDragStart;
@@ -149,6 +154,12 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
           const Icon(Icons.chevron_right),
           '下一个',
           widget.onNextItem,
+        ),
+        _iconButton(
+          context,
+          const Icon(Icons.subtitles_outlined),
+          '加载字幕',
+          widget.onLoadSubtitle,
         ),
         _iconButton(
           context,
