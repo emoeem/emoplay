@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:emoplay/app_module.dart';
@@ -20,6 +21,7 @@ import 'package:emoplay/navigation.dart';
 import 'package:emoplay/utils/constants.dart';
 import 'package:emoplay/media/media_stores.dart';
 import 'package:emoplay/services/logging/logger.dart';
+import 'package:emoplay/services/update_checker.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -108,4 +110,14 @@ void main() async {
       child: const AppWidget(),
     ),
   );
+
+  // P9 update check: one background GET of the GitHub releases API per
+  // launch (mpv-emo src/main.cpp:315-321 semantics — delayed so it never
+  // competes with startup; the result is only ever reported, never
+  // downloaded or installed, and every failure stays silent). Gated on the
+  // settings-center toggle (Kazumi SettingsKeys.autoUpdate, default on).
+  Timer(const Duration(seconds: 3), () {
+    if (!GStorage.getSetting(SettingsKeys.autoUpdate)) return;
+    UpdateChecker.instance.check();
+  });
 }

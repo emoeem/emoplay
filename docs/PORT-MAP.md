@@ -34,7 +34,7 @@
 | `src/quality/QualityController.{h,cpp}` | `quality/quality_controller.dart`（MobX） | fileLoaded/videoParams/fps 事件驱动重算、掉帧≥2/s 会话降档、`change-list glsl-shaders clr+append` |
 | `src/quality/InterpolationController.{h,cpp}` | `quality/interpolation_controller.dart` | 会话级 probe（append→读回 vf→remove）、失败持久化 off + vsUnavailable |
 | `src/quality/IccController.{h,cpp}` | `quality/icc_controller.dart` | 存在/可读校验→设置+读回校验→禁用恢复快照→失败持久化 off |
-| `src/media/MediaBrowser.{h,cpp}` | `media/media_browser.dart` | 异步+generation 号防陈旧、面包屑/历史/quickLinks（path_provider）、filter/search/status |
+| `src/media/MediaBrowser.{h,cpp}` | **N/A（不落地）** | 职责已被 file_picker + LibraryStore 覆盖（对照 lib/ 现状判定，2026-11-10）：目录导航/面包屑/历史/快捷位置全部由原生 file_picker 对话框承担（player_page.dart:88/109、home_page.dart:53/79、library_page.dart:53）；媒体种类过滤 = pickFiles allowedExtensions + MediaClassifier 扩展名表（player_page.dart:88-94）；搜索/类型过滤/排序 = LibraryModel.filter/typeFilter/sortMode（library_page.dart:150-198）；generation 号防陈旧的唯一异步列举 = 库扫描，已按本表下一行 LibraryScanWorker（Isolate.run + 取消标志）落地。1.x 自研目录浏览器无对应 UI，不再引入 |
 | `src/library/LibraryScanWorker` | `Isolate.run`/`compute` + 取消标志 | 取消语义按文件轮询 |
 | `src/main.cpp` 装配 | `lib/app/` DI（flutter_modular coreModule） | 装配顺序语义：compat 选项→插件 scripts 追加→播放器初始化→stores |
 
