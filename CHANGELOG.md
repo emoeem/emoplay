@@ -6,6 +6,58 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
+## [Unreleased] - 2026-11-10（面板观感轮）
+
+### Fixed
+
+- **播放中快捷键全部失效**：早期键盘处理器把「是否处理」门在 primaryFocus
+  位于面板自建 `keyboardFocus` 内，而没有任何交互会让它成为 primaryFocus，
+  条件永假。现改为「当前路由 isCurrent + 焦点不在任何 EditableText」
+  （PiliPlus player_focus 语义，`player_keyboard_shortcuts.dart`）。
+- **播放页导航浮层残留**：壳层 `menu.dart` 在 Observer builder 内用 `&&`
+  短路读状态，observable 未被读取、Observer 从未订阅，导航条 / rail 该
+  隐藏时不隐藏。现 observable 无条件读取；`PlayerPageController` 新增
+  `pageCurrent`（`ModalRoute.isCurrent` 驱动），全出血条件 = 播放页
+  isCurrent 且有活动媒体，页签高亮随路由状态派生。
+- **CJK 落楷体（LXGW ZhenKai）**：M1 剥离时删除内置字体且主题未设
+  fontFamily，fontconfig 在部分 Linux 环境把中文 dump 到楷体风字体。
+  两层修复：恢复 Kazumi 的 MiSans-Regular（`assets/fonts/`，8,122,324
+  字节）+ 按 Kazumi useSystemFont 设计端到端落地（见下）。
+
+### Added
+
+- **设置 → 主题「使用系统字体」开关**（默认开，`useSystemFont`）：关闭后
+  切换到内置 MiSans（Kazumi 同款）；两条路径都显式携带 CJK 兜底
+  （Noto Sans CJK SC / Noto Sans SC / sans-serif），fontFamily 置空也
+  不再信任 fontconfig 猜字体；静态主题切换时重发射 setTheme（否则非
+  动态配色下开关不生效）。SPEC §1 字体行同步。
+- **音频诊断探针** `test/audio_probe_test.dart`：针对「无声」报告，fixture
+  存在才真跑（runner 上缺失即早退通过）；双趟探测 default ao 与 pinned
+  ao=pulse。本轮实测 pinned 趟 `AO: [pulse] 44100Hz stereo 2ch float`。
+
+### Changed
+
+- **播放面板按 Kazumi@`7265274` 逐槽位重组**（`player_item_panel.dart`
+  单文件，402 插入 / 485 删除）：取代上轮「手机 6 键传输行 + 底部更多
+  面板」的 PiliPlus 式组合，手机与桌面共用一套槽位（底条 = 播放/暂停、
+  下一集、进度+时间、全屏；宽控件进顶部「更多」菜单，compact 子集 =
+  视频比例 / 倍速 / 超分辨率）；弹幕与 Syncplay 槽位有意缺席；渐变遮罩
+  与安全区 insets 保留；播放 tick 只重建进度条与时间标签。
+- **发布矩阵九个 job 补齐 timeout-minutes**（pr linux-ci 20 分钟；release
+  test / analyze 15、Android / Linux amd64 / arm64 40、Windows / macOS
+  45、Release job 15）。
+- **Windows 版本单一来源恢复**：release.yaml Windows job 前置
+  `choco install yq`，flutter-action 恢复 `flutter-version-file:
+  pubspec.yaml`（取代 R4 钉死 `flutter-version: '3.47.9'` 的权宜）。
+
+### 验证
+
+- `flutter analyze` 0 告警；`flutter test` 34 文件 342 用例全绿（1 skip
+  维持：Windows-only probe）；`flutter build linux --debug` 通过；ldd
+  审计 0 缺失。Android assembleDebug 本轮未重跑（无 Android 原生改动）。
+- CI 结论本窗口不可测：`gh run list` 两次连接 EOF（api.github.com 不可达）；
+  `d446bb8` / `8ed84c4` 未推送，推送后预期签名 342 passed / 1 skipped。
+
 ## [Unreleased] - 2026-11-10（移动端播放修复轮）
 
 ### Fixed

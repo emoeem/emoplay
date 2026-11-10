@@ -2,21 +2,48 @@
 
 | 项     | 值                                                                          |
 | ------ | --------------------------------------------------------------------------- |
-| 状态   | 生效中（2026-11-10 R5 移动端播放修复轮之后）                                  |
-| 日期   | 2026-11-10（最后实质性更新）                                                 |
-| 适用版本 | git `2c6bf06` + R5 工作树（未提交）                                        |
+| 状态   | 生效中（2026-11-11 凌晨 R5 面板观感轮之后）                                  |
+| 日期   | 2026-11-11（最后实质性更新）                                                 |
+| 适用版本 | git `8ed84c4`（origin/main 停在 `63d9f59`，`d446bb8` / `8ed84c4` 待推送）  |
 | 相关   | [SPEC.md](SPEC.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md) |
 
 ## 现状一句话
 
-M1-M8 迁移主流程与 R1-R4 四轮收尾全部完成：Kazumi 骨架上重建的 Flutter/mpv
-本地播放器功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv 兼容导入 / 画质
-引擎 / 插件 / 11 类设置 / 更新检查），**CI 首绿已达成**（run 42718530280，
-`332 tests passed, 1 skipped`），**v2.0.0-alpha 已公开发布**（tag 指向
-`bd36f70`，GitHub Release 9 资产：Linux amd64/arm64 deb+tar.gz、3 APK、
-macOS/Windows zip）；本地 33 个测试文件 341 用例全绿、analyze 0 告警、
-debug 构建与 ldd 审计实测通过；R4 后两个提交（`2598bc8` engine apply
-测试 / `2c6bf06` 音频页 i18n + README）待推送，版本仍是 2.0.0-alpha。
+M1-M8 迁移主流程、R1-R4 四轮收尾与 R5 两小轮（移动端播放修复 / 面板观感）
+全部完成：Kazumi 骨架上重建的 Flutter/mpv 本地播放器功能对等（播放 / 本地
+媒体 / 媒体库 / 历史 / mpv 兼容导入 / 画质引擎 / 插件 / 11 类设置 / 更新
+检查），**CI 首绿已达成**（run 42718530280，`332 tests passed, 1 skipped`），
+**v2.0.0-alpha 已公开发布**（tag 指向 `bd36f70`，GitHub Release 9 资产）；
+本地 34 个测试文件 342 用例全绿、analyze 0 告警、debug 构建与 ldd 审计实测
+通过；origin/main 停在 `63d9f59`，`d446bb8` / `8ed84c4` 待推送（本窗口
+api.github.com 不可达，推送后预期 CI 签名 **342 passed / 1 skipped**），
+版本仍是 2.0.0-alpha。
+
+## 最近实质性变更（R5·面板观感，2026-11-11 00:19-01:11 CST）
+
+五个提交（`ec1c91e` / `aeda939` / `63d9f59` / `d446bb8` / `8ed84c4`）+ 本轮
+文档收网。细节与证据见
+[发布说明](releases/RELEASE_2026-11-10_PANEL_LOOK.md) 与
+[工作报告](reports/WORK_REPORT_2026-11-10_PANEL_LOOK.md)。
+
+- 播放页两处整页失效修复（`ec1c91e`）：快捷键门禁改 route.isCurrent +
+  EditableText 语义（旧门禁守着一个永远没人聚焦的自建 Focus 节点）；
+  壳层浮层的 Observer 补上订阅（`&&` 短路导致从不订阅），`pageCurrent`
+  observable 由 ModalRoute.isCurrent 驱动。
+- 字体定案（`aeda939` + `63d9f59`）：恢复内置 MiSans 后按 Kazumi
+  useSystemFont 设计端到端落地：默认系统字体 + 显式 Noto Sans CJK SC
+  兜底 + 设置「使用系统字体」开关（默认 true）；SPEC §1 字体行同步。
+- 播放面板按 Kazumi@`7265274` 逐槽位重组（`d446bb8`，单文件 402 插入 /
+  485 删除），取代上轮 PiliPlus 式手机 6 键行 + 底部更多面板；手机底条
+  收敛为播放/暂停、下一集、进度+时间、全屏，宽控件进顶部「更多」菜单。
+- 发布管线（`8ed84c4`）：九个 job 补 timeout-minutes；Windows 前置
+  `choco install yq` 后恢复 `flutter-version-file: pubspec.yaml`（坑 8(c)
+  的权宜转正，版本单一来源）。
+- 诊断探针 `test/audio_probe_test.dart` 上线并真跑：pinned ao=pulse 可达
+  宿主 pipewire-pulse（`AO: [pulse] 44100Hz stereo 2ch float`）；首趟
+  default-ao 读数空串待查（见工作报告 §5）。
+- 门禁实测：analyze 0 告警、34 文件 342 用例全绿（1 skip 维持）、Linux
+  debug 构建通过、ldd 0 缺失；CI 不可测（api.github.com 两次 EOF）。
 
 ## 最近实质性变更（R5，2026-11-10 上午：移动端播放修复 + 手机媒体自动扫描）
 
@@ -97,20 +124,35 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
    46 分钟+）；(b) **发布产物对应 tag 指向的提交，不是 main HEAD** - 推送
    R4 后不重打 tag 就不会有新产物；(c) Windows 上 flutter-action 的
    `flutter-version-file` 需要 yq（runner 不预装），版本钉在
-   release.yaml（升级 Flutter 时与 `pubspec.yaml` 同步手改）。
+   release.yaml（升级 Flutter 时与 `pubspec.yaml` 同步手改）。`8ed84c4`
+   起已转正：Windows job 前置 `choco install yq`，版本恢复
+   `flutter-version-file: pubspec.yaml` 单一来源，升级 Flutter 只改
+   `pubspec.yaml`。
+9. **门禁别守「没人会聚焦的节点」**：播放页快捷键曾整页失效（门禁要求
+   primaryFocus 在自建 `keyboardFocus` 内，而没有任何交互会让它成为
+   primaryFocus），壳层浮层曾不隐藏（Observer builder 内 `&&` 短路导致
+   从未订阅）。写法约定：快捷键门禁用 route.isCurrent + EditableText
+   检测（`player_keyboard_shortcuts.dart:134-148`）；Observer 内
+   observable 必须无条件读取。
+10. **字体链动一处要想到 fontconfig**：fontFamily 置空必须同时带显式 CJK
+   兜底（`theme_provider.dart` 的 `kAppFontFamilyFallback`），否则中文
+   可能被 fontconfig dump 到楷体风字体（M1 的楷体事故）；改字体相关
+   代码时三条 ThemeData 路径（静态 / 动态配色）都要带上 fontFamily。
 
 ## 接手第一步清单
 
 1. `source /opt/emoplay-env.sh && cd /home/emo/code/emoplay && flutter analyze && flutter test`
-    - 预期 0 告警 + 341 通过 / 1 skipped（33 文件），达不到先查环境再查代码。
+    - 预期 0 告警 + 342 通过 / 1 skipped（34 文件），达不到先查环境再查代码。
 2. `git fetch origin && git log origin/main..HEAD --oneline` 与
-   `gh run list -R emoeem/emoplay --limit 5`  - 确认 R4 两个提交是否已推送、
-   推送后 CI 是否 **341 passed / 1 skipped**；红灯按坑 2 的归因链处理。
+   `gh run list -R emoeem/emoplay --limit 5`（gh 需要外网，R5 收网窗口内
+   api.github.com 不可达） - 确认 `d446bb8` / `8ed84c4` 与本轮文档是否已
+   推送、推送后 CI 是否 **342 passed / 1 skipped**；红灯按坑 2 的归因链
+   处理。
 3. 通读 [SPEC.md](SPEC.md) §4 不变量与 [PORT-MAP.md](PORT-MAP.md) 头部铁律。
 4. 待办从 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) §四
    未做项清单取（发布产物实体机验证 → prerelease 语义 → i18n 第三页 →
    AppImage/签名 → 性能实测），以及
-   [工作报告 §6](reports/WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md)
+   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_PANEL_LOOK.md)
    的优先级建议。
 5. 改完代码跑 SPEC §9 gate（build_runner → analyze → test → build linux）。
 

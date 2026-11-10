@@ -20,16 +20,17 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [DOC-STANDARD.md](DOC-STANDARD.md) | docs/ 写作与维护标准（三类底线、命名、骨架、提交前检查清单） |
 | [OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md) | 过夜自动循环手册：轮次结构、停止条件、起始积压清单（当前待办的权威来源） |
 | [HANDOVER.md](HANDOVER.md) | 交接现状：一句话现状、最近实质变更、最易踩的坑、接手第一步清单 |
-| [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) | 迁移路线图：M0–M8 ✅+提交哈希、R1–R4 收尾轮次、未做项 ☐ 清单、验收标准与贯穿约定 |
+| [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) | 迁移路线图：M0-M8 ✅+提交哈希、R1-R4 收尾轮次、未做项 ☐ 清单、验收标准与贯穿约定 |
 
 ## 更新记录（releases/，读者是用户）
 
 | 文档 | 主题 |
 | --- | --- |
-| [RELEASE_2026-11-10_RECONCILIATION_CLOSEOUT.md](releases/RELEASE_2026-11-10_RECONCILIATION_CLOSEOUT.md) | 对账收网 R1：更新检查上线、CI 触发分支修复、画质控制器语义对齐；M1–M8 之前的变化见仓库根 [CHANGELOG.md](../CHANGELOG.md) |
+| [RELEASE_2026-11-10_RECONCILIATION_CLOSEOUT.md](releases/RELEASE_2026-11-10_RECONCILIATION_CLOSEOUT.md) | 对账收网 R1：更新检查上线、CI 触发分支修复、画质控制器语义对齐；M1-M8 之前的变化见仓库根 [CHANGELOG.md](../CHANGELOG.md) |
 | [RELEASE_2026-11-10_TURN_GREEN_BACKFILL.md](releases/RELEASE_2026-11-10_TURN_GREEN_BACKFILL.md) | 转绿补账 R2：CI 首跑红灯定位与修复（VA/VDPAU 运行库）、健壮性边界 11 用例、settings 语义 2 用例、i18n 骨架；30 文件 326 用例全绿 |
 | [RELEASE_2026-11-10_RED_LIGHT_ZEROING.md](releases/RELEASE_2026-11-10_RED_LIGHT_ZEROING.md) | 红灯清零 R3：CI 第二层红灯修复（libpulse + ldd 审计步一次列全缺口）、deb Depends 17 项经递归闭包审计、页签壳 i18n 第一页、媒体库响应性守卫 3 用例；32 文件 332 用例全绿，首绿待推送确认 |
 | [RELEASE_2026-11-10_FIRST_GREEN_RELEASE.md](releases/RELEASE_2026-11-10_FIRST_GREEN_RELEASE.md) | 首绿发布 R4：CI 首绿达成（332/1 与预期一致）、v2.0.0-alpha 发布演练三跑打穿（macOS Kazumi.app 残留 / Windows 缺 yq / arm64 缺 ALSA / Windows 死 include 四红灯修复）、GitHub Release 公开 9 资产、mpv apply 半边 5 条 live 用例、音频设置页 i18n 第二页；33 文件 341 用例全绿 |
+| [RELEASE_2026-11-10_PANEL_LOOK.md](releases/RELEASE_2026-11-10_PANEL_LOOK.md) | 面板观感 R5：播放页两处整页失效修复（快捷键焦点门禁 / Observer 短路）、字体定案（系统字体默认 + 显式 CJK 兜底 + 设置开关）、播放面板按 Kazumi 逐槽位重组、发布矩阵 9 job 超时 + Windows 版本单一来源；34 文件 342 用例全绿，CI 本窗口不可测 |
 
 ## 工作报告（reports/，读者是维护者与接手者）
 
@@ -39,6 +40,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [WORK_REPORT_2026-11-10_TURN_GREEN_BACKFILL.md](reports/WORK_REPORT_2026-11-10_TURN_GREEN_BACKFILL.md) | R2 转绿补账：CI 首跑红灯归因链（混合 push 触发 / libva 缺失）、门禁实测（30 文件 326 用例全绿）、路线图滞后数字修正 |
 | [WORK_REPORT_2026-11-10_RED_LIGHT_ZEROING.md](reports/WORK_REPORT_2026-11-10_RED_LIGHT_ZEROING.md) | R3 红灯清零：CI 第二层红灯归因链（dlopen 只报第一层 / libpulse 缺失）、deb 依赖审计与打包实测、ldd 闭包覆盖验证（104 ⊂ 251 差集空）、门禁实测（32 文件 332 用例全绿） |
 | [WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md](reports/WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md) | R4 首绿发布：CI 首绿签名实测（42718530280 = 332/1）、发布演练三次跑归因链（四红灯逐层修复，第三次全绿发布）、GitHub Release 9 资产实测（字节数/prerelease 状态）、engine apply 对账与门禁实测（33 文件 341 用例全绿、build_runner 幂等、ldd 0 缺失） |
+| [WORK_REPORT_2026-11-10_PANEL_LOOK.md](reports/WORK_REPORT_2026-11-10_PANEL_LOOK.md) | R5 面板观感：两处整页失效根因链（焦点门禁永假 / Observer && 短路）、楷体事故归因（M1 删字体 + fontconfig 猜错）、面板单文件重组（402 插入 / 485 删除）、门禁实测（34 文件 342 用例全绿 / analyze 0 / ldd 0 / 音频探针真跑）、CI 不可测窗口记录 |
 
 ## 审计（audits/）
 
