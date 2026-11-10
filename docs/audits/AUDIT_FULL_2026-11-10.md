@@ -82,7 +82,25 @@
 - 九条不变量（§二全表）；子进程参数形态；manifest 拉取超时与降级；`assets/` 无未引用垃圾（forward_80.png 在用、shaders 9 GLSL+LICENSE、icon 四平台）；五 Tab 与设置 11 分类目录级+内容级落地；`.g.dart` 提交是明示设计决策（pr.yaml 注释）；linux/DEBIAN postinst+postrm 存在且与 deb 链配套；`.github/actions/flutter-arm64-setup` 被 release.yaml 正确引用。
 - 已消化勿重复施工：tag 发布演练、CI 首绿、`test_mpv_engine.cpp` apply() 半边、i18n 第二页（音频设置）、README 双语终稿。
 
-## 八、汇总与优先修复顺序
+## 八、E2E 实测记录（2026-11-10 23:32–23:38，容器内 debug 构建）
+
+- 环境：宿主 niri + 容器构建产物；grim 截图取证、uinput 键盘注入（vkbd.py）、wlrctl 虚拟指针。
+- **已验证**：
+  1. 启动渲染 ✓：首页完整（欢迎区/继续观看/最近播放空态/媒体统计 0 视频 0 音频 0 目录），任务栏标题 "EmoPlay · 暂无播放内容"；
+  2. 自适应导航 ✓：窗口窄列 = 底部 NavigationBar，全屏 = 左侧 NavigationRail，切换正确无残影；
+  3. 键盘快捷键 ✓：Ctrl+2 切媒体库，页内元素齐全（搜索/类型筛选/排序/已索引 0 项/添加文件夹/重新扫描/空态按钮）；
+  4. 存活 6 分钟无崩溃，日志无 error/exception 级输出。
+- **新发现**：
+
+| 级别 | 问题 | 位置 | 建议 |
+| ---- | ---- | ---- | ---- |
+| P2 | MobX 空 Observer：`No observables detected in the build method of Observer` 6 分钟刷 13 次 | lib/pages/menu/menu.dart:157（R4-C 选中态同步代码） | 去掉空 Observer 包装或补 observable |
+| P2 | 启动期 GTK/音频 CRITICAL 噪音各一次：`atk_socket_embed: plug_id != NULL`、`Failed to initiate default card instance` | 启动日志 | 无功能影响；低优先排查 a11y 桥与音频卡初始化 |
+
+- **工具链备注（E2E 基建，非应用问题）**：uinput 指针注入（vkbd.py click/move）在本环境未生效（键盘路径正常）；wlrctl 虚拟指针可用，但 niri 动态平铺使绝对坐标在截图与点击之间失稳——**指针类 E2E 必须在桌面空闲时执行**（本次因用户正在使用桌面而中止）。
+- **未覆盖（待桌面空闲窗口）**：文件对话框→目录添加→扫描→点条目播放全链路、字幕加载、画质面板 Anime4K 实挂、corrupt.mp4 错误态、音乐模式、首启导入向导（容器无 ~/.config/mpv 未触发）。
+
+## 九、汇总与优先修复顺序
 
 1. **P1 立即**：CI timeout 三处 → Windows 双源改 `flutter-version-file` → ESC/选中态两个 UI 缺陷（下一轮施工首选）。
 2. **P1 结构**：player_item.dart 拆分（大工程，建议独立一轮，342 用例护航）。
