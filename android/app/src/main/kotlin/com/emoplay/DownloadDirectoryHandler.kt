@@ -32,6 +32,7 @@ class DownloadDirectoryHandler(private val activity: Activity) : MethodChannel.M
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "hasStorageAccess" -> result.success(hasStorageAccess())
             "requestStorageAccess" -> requestStorageAccess(result)
             "pickDirectory" -> pickDirectory(call.argument<String>("initialDirectory"), result)
             else -> result.notImplemented()

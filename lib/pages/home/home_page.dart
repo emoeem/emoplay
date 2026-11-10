@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -148,121 +150,167 @@ class _HomePageState extends State<HomePage> {
               .toList();
           final recent =
               _showAllHistory ? history : history.take(_recentLimit).toList();
+          // Rows show a generated frame when ffmpeg is available; the
+          // requests dedupe inside the service and the AnimatedBuilder above
+          // re-runs on each ready notification.
+          for (final entry in [
+            ...continueWatching.take(_recentLimit),
+            ...recent,
+          ]) {
+            _stores.thumbnails.requestThumbnail(entry.path);
+          }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '欢迎回来',
-                  style: theme.textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$appName · 本地媒体播放器',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // ---- quick open ----
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _pickMediaFile,
-                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                      label: const Text('选择媒体文件'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _addMediaFolder,
-                      icon: const Icon(Icons.folder_open_rounded, size: 18),
-                      label: const Text('添加媒体文件夹'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                // ---- continue watching ----
-                _section(
-                  context,
-                  title: '继续观看',
-                  icon: Icons.play_circle_outline_rounded,
-                  child: continueWatching.isEmpty
-                      ? const GeneralEmptyState(
-                          compact: true,
-                          icon: Icons.history_rounded,
-                          title: '暂无未看完的媒体',
-                        )
-                      : Column(
+          return LayoutBuilder(builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 720;
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ---- header + quick open, side by side on wide windows ----
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            for (final entry in continueWatching)
-                              _HistoryRow(
-                                entry: entry,
-                                timeText: _relativeTime(entry.lastPlayedAt),
-                                highlightProgress: true,
-                                onPlay: () => _play(entry),
-                                onRemove: () =>
-                                    _stores.history.removeEntry(entry.path),
+                            Text(
+                              '欢迎回来',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
                               ),
-                          ],
-                        ),
-                ),
-                _section(
-                  context,
-                  title: '最近播放',
-                  icon: Icons.schedule_rounded,
-                  child: history.isEmpty
-                      ? GeneralEmptyState(
-                          compact: true,
-                          icon: Icons.movie_outlined,
-                          title: '播放过的媒体会出现在这里',
-                          actions: [
-                            FilledButton.tonalIcon(
-                              onPressed: _pickMediaFile,
-                              icon: const Icon(Icons.open_in_new_rounded,
-                                  size: 18),
-                              label: const Text('选择媒体文件'),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$appName · 本地媒体播放器',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
-                        )
-                      : Column(
-                          children: [
-                            for (final entry in recent)
-                              _HistoryRow(
-                                entry: entry,
-                                timeText: _relativeTime(entry.lastPlayedAt),
-                                onPlay: () => _play(entry),
-                                onRemove: () =>
-                                    _stores.history.removeEntry(entry.path),
-                              ),
-                            if (history.length > _recentLimit)
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () => setState(
-                                      () => _showAllHistory =
-                                          !_showAllHistory),
-                                  child: Text(_showAllHistory
-                                      ? '收起'
-                                      : '查看全部（${history.length}）'),
-                                ),
-                              ),
-                          ],
                         ),
-                ),
-                _section(
-                  context,
-                  title: '媒体统计',
-                  icon: Icons.donut_small_rounded,
-                  child: _statsCard(context),
-                ),
-              ],
-            ),
-          );
+                      ),
+                      if (wide)
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          children: [_quickActions()],
+                        ),
+                    ],
+                  ),
+                  if (!wide) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [_quickActions()],
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  // ---- continue watching ----
+                  _section(
+                    context,
+                    title: '继续观看',
+                    icon: Icons.play_circle_outline_rounded,
+                    child: continueWatching.isEmpty
+                        ? const GeneralEmptyState(
+                            compact: true,
+                            icon: Icons.history_rounded,
+                            title: '暂无未看完的媒体',
+                          )
+                        : Column(
+                            children: [
+                              for (final entry in continueWatching)
+                                _HistoryRow(
+                                  entry: entry,
+                                  thumbnail: _stores.thumbnails
+                                      .cachedThumbnailPath(entry.path),
+                                  timeText: _relativeTime(entry.lastPlayedAt),
+                                  highlightProgress: true,
+                                  onPlay: () => _play(entry),
+                                  onRemove: () =>
+                                      _stores.history.removeEntry(entry.path),
+                                ),
+                            ],
+                          ),
+                  ),
+                  _section(
+                    context,
+                    title: '最近播放',
+                    icon: Icons.schedule_rounded,
+                    child: history.isEmpty
+                        ? GeneralEmptyState(
+                            compact: true,
+                            icon: Icons.movie_outlined,
+                            title: '播放过的媒体会出现在这里',
+                            actions: [
+                              FilledButton.tonalIcon(
+                                onPressed: _pickMediaFile,
+                                icon: const Icon(Icons.open_in_new_rounded,
+                                    size: 18),
+                                label: const Text('选择媒体文件'),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              for (final entry in recent)
+                                _HistoryRow(
+                                  entry: entry,
+                                  thumbnail: _stores.thumbnails
+                                      .cachedThumbnailPath(entry.path),
+                                  timeText: _relativeTime(entry.lastPlayedAt),
+                                  onPlay: () => _play(entry),
+                                  onRemove: () =>
+                                      _stores.history.removeEntry(entry.path),
+                                ),
+                              if (history.length > _recentLimit)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () => setState(
+                                        () => _showAllHistory =
+                                            !_showAllHistory),
+                                    child: Text(_showAllHistory
+                                        ? '收起'
+                                        : '查看全部（${history.length}）'),
+                                  ),
+                                ),
+                            ],
+                          ),
+                  ),
+                  _section(
+                    context,
+                    title: '媒体统计',
+                    icon: Icons.donut_small_rounded,
+                    child: _statsCard(context),
+                  ),
+                ],
+              ),
+            );
+          });
         },
       ),
+    );
+  }
+
+  Widget _quickActions() {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 8,
+      children: [
+        FilledButton.icon(
+          onPressed: _pickMediaFile,
+          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+          label: const Text('选择媒体文件'),
+        ),
+        OutlinedButton.icon(
+          onPressed: _addMediaFolder,
+          icon: const Icon(Icons.folder_open_rounded, size: 18),
+          label: const Text('添加媒体文件夹'),
+        ),
+      ],
     );
   }
 
@@ -350,12 +398,13 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-/// One "recently played" row (1.x qml/HistoryRow.qml): title, path, progress
-/// and last-played time. All actions are emitted upwards; the row itself
-/// only reads the stores.
+/// One "recently played" row (1.x qml/HistoryRow.qml): thumbnail, title,
+/// path, progress and last-played time. All actions are emitted upwards; the
+/// row itself only reads the stores.
 class _HistoryRow extends StatelessWidget {
   const _HistoryRow({
     required this.entry,
+    required this.thumbnail,
     required this.timeText,
     required this.onPlay,
     required this.onRemove,
@@ -363,6 +412,9 @@ class _HistoryRow extends StatelessWidget {
   });
 
   final HistoryEntry entry;
+
+  /// Generated frame (cached thumbnail path, empty while pending/unavailable).
+  final String thumbnail;
 
   /// Relative last-played text (1.x HistoryRow.relativeTime).
   final String timeText;
@@ -391,59 +443,103 @@ class _HistoryRow extends StatelessWidget {
     final theme = Theme.of(context);
     final hasProgress =
         entry.duration > 0 && entry.position > 0 && entry.position < entry.duration;
-    return ListTile(
-      dense: true,
-      leading: Icon(
-        Icons.play_circle_outline_rounded,
-        color: theme.colorScheme.primary,
-      ),
-      title: Text(
-        entry.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.bodyMedium,
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            entry.path,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    final radius = BorderRadius.circular(12);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPlay,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                // Thumbnail (or type placeholder) in a fixed 16:9 frame.
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 64,
+                    height: 40,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    alignment: Alignment.center,
+                    child: thumbnail.isEmpty
+                        ? Icon(
+                            Icons.play_circle_outline_rounded,
+                            size: 20,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          )
+                        : Image.file(
+                            File(thumbnail),
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            errorBuilder: (_, _, _) => Icon(
+                              Icons.play_circle_outline_rounded,
+                              size: 20,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        entry.path,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (hasProgress && highlightProgress) ...[
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value:
+                                (entry.position / entry.duration).clamp(0.0, 1.0),
+                            minHeight: 3,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  hasProgress
+                      ? '${_formatTime(entry.position)} / ${_formatTime(entry.duration)}'
+                      : timeText,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: '从历史中移除',
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onRemove,
+                ),
+              ],
             ),
           ),
-          if (hasProgress && highlightProgress) ...[
-            const SizedBox(height: 4),
-            LinearProgressIndicator(
-              value: (entry.position / entry.duration).clamp(0.0, 1.0),
-              minHeight: 3,
-            ),
-          ],
-        ],
+        ),
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            hasProgress
-                ? '${_formatTime(entry.position)} / ${_formatTime(entry.duration)}'
-                : timeText,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: '从历史中移除',
-            icon: const Icon(Icons.close_rounded, size: 16),
-            visualDensity: VisualDensity.compact,
-            onPressed: onRemove,
-          ),
-        ],
-      ),
-      onTap: onPlay,
     );
   }
 }

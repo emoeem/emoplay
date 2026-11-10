@@ -134,6 +134,33 @@ class _PlayerItemState extends State<PlayerItem>
   void didChangeMetrics() {
     super.didChangeMetrics();
     _scheduleAndroidPIPSourceRectSync();
+    _syncOrientationFullscreen();
+  }
+
+  /// PiliPlus auto-rotate fullscreen (controller.dart _onOrientationChanged):
+  /// physically rotating a phone while playing enters fullscreen, rotating
+  /// back leaves it. Idempotent against the programmatic rotation from
+  /// [PlayerPageController.setFullscreen] — the flag flip and the metrics
+  /// event settle in either order without re-triggering.
+  void _syncOrientationFullscreen() {
+    if (!mounted || (!Platform.isAndroid && !Platform.isIOS)) {
+      return;
+    }
+    if (playerPageController.isPip || playerController.panel.lockPanel) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || playerPageController.isPip) {
+        return;
+      }
+      final landscape =
+          MediaQuery.orientationOf(context) == Orientation.landscape;
+      if (landscape && !playerPageController.isFullscreen) {
+        unawaited(playerPageController.setFullscreen(true));
+      } else if (!landscape && playerPageController.isFullscreen) {
+        unawaited(playerPageController.setFullscreen(false));
+      }
+    });
   }
 
   @override
@@ -1210,6 +1237,11 @@ class _PlayerItemState extends State<PlayerItem>
       PipUtils.disposePipHandler();
     }
     playerController.panel.reset();
+    // Route teardown can bypass _handleBack (tab switch shortcuts, shell
+    // pop); immersive bars and the landscape lock must not outlive playback.
+    if (!isDesktop() && playerPageController.isFullscreen) {
+      unawaited(playerPageController.setFullscreen(false));
+    }
     super.dispose();
   }
 

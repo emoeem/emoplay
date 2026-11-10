@@ -4,12 +4,15 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 
+import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/empty_state_widget.dart';
 import 'package:emoplay/bean/widget/tonal_card.dart';
 import 'package:emoplay/media/library_model.dart';
 import 'package:emoplay/media/library_store.dart';
 import 'package:emoplay/media/media_stores.dart';
 import 'package:emoplay/models/playback_args.dart';
+import 'package:emoplay/services/platform/mobile_media_scanner.dart';
+import 'package:emoplay/services/storage/storage.dart';
 import 'package:emoplay/utils/format.dart';
 
 /// 媒体库 Tab.
@@ -33,11 +36,72 @@ class _LibraryPageState extends State<LibraryPage> {
   bool _showDirectories = false;
   bool _gridView = true;
 
+  /// True while the phone storage discovery walks the volumes.
+  bool _mobileScanning = false;
+
   @override
   void initState() {
     super.initState();
     _stores = MediaStores.instance;
     _model = _stores.libraryModel;
+    // Phone one-shot: the very first library visit discovers the storage
+    // volumes on its own (only when access was granted before — the automatic
+    // path must never open the system permission page).
+    if (MobileMediaScanner.isSupported &&
+        _stores.library.directories.isEmpty &&
+        !GStorage.getSetting(SettingsKeys.mobileAutoScanDone)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _scanPhoneMedia(auto: true);
+        }
+      });
+    }
+  }
+
+  // ---- phone storage discovery -------------------------------------------
+
+  /// Discovers media folders on the phone's storage volumes and adds them to
+  /// the library (addDirectory chains one scan for all of them).
+  Future<void> _scanPhoneMedia({bool auto = false}) async {
+    final store = _stores.library;
+    if (_mobileScanning) {
+      return;
+    }
+    if (auto && !(await MobileMediaScanner.hasStorageAccess())) {
+      return;
+    }
+    if (!auto && !(await MobileMediaScanner.requestStorageAccess())) {
+      EmoDialog.showToast(message: '需要"所有文件访问"权限才能扫描手机媒体');
+      return;
+    }
+    setState(() => _mobileScanning = true);
+    try {
+      final found = await MobileMediaScanner.discoverMediaDirectories();
+      if (!mounted) {
+        return;
+      }
+      var added = 0;
+      for (final directory in found) {
+        if (store.addDirectory(directory.path)) {
+          added++;
+        }
+      }
+      await GStorage.putSetting(SettingsKeys.mobileAutoScanDone, true);
+      if (!mounted) {
+        return;
+      }
+      if (added == 0 && found.isEmpty) {
+        EmoDialog.showToast(message: auto ? '手机上暂未发现媒体文件' : '没有发现新的媒体文件夹');
+      } else if (added > 0) {
+        EmoDialog.showToast(message: '发现 $added 个媒体文件夹，正在索引…');
+      }
+    } catch (e) {
+      EmoDialog.showToast(message: '扫描手机媒体失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() => _mobileScanning = false);
+      }
+    }
   }
 
   /// 1.x: grid cell click -> openMedia(path, 0) — library entries start at
@@ -62,6 +126,9 @@ class _LibraryPageState extends State<LibraryPage> {
 
   String _scanStateLabel() {
     final store = _stores.library;
+    if (_mobileScanning) {
+      return '正在扫描手机存储…';
+    }
     if (store.isScanning) {
       return '正在扫描 · 已发现 ${store.scanFileCount} 个媒体文件';
     }
@@ -69,7 +136,7 @@ class _LibraryPageState extends State<LibraryPage> {
       return '扫描已取消';
     }
     if (store.directories.isEmpty) {
-      return '尚未添加媒体目录';
+      return MobileMediaScanner.isSupported ? '尚未扫描手机媒体' : '尚未添加媒体目录';
     }
     return '空闲 · 已索引 ${_model.count} 个媒体文件';
   }
@@ -157,11 +224,17 @@ class _LibraryPageState extends State<LibraryPage> {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 280),
           child: TextField(
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               isDense: true,
-              prefixIcon: Icon(Icons.search_rounded),
+              prefixIcon: const Icon(Icons.search_rounded),
               hintText: '搜索标题或路径',
-              border: OutlineInputBorder(),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerLow,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
             ),
             onChanged: (value) => _model.filter = value,
           ),
@@ -226,6 +299,12 @@ class _LibraryPageState extends State<LibraryPage> {
           icon: const Icon(Icons.folder_open_rounded, size: 18),
           label: const Text('添加文件夹…'),
         ),
+        if (MobileMediaScanner.isSupported)
+          OutlinedButton.icon(
+            onPressed: _mobileScanning ? null : () => _scanPhoneMedia(),
+            icon: const Icon(Icons.smartphone_rounded, size: 18),
+            label: const Text('扫描手机媒体'),
+          ),
         FilledButton.tonalIcon(
           // 1.x: the scan button flips to cancel while scanning and is
           // disabled with no directories to scan.
@@ -309,17 +388,31 @@ class _LibraryPageState extends State<LibraryPage> {
           ? '媒体库还是空的'
           : (filtered ? '没有匹配的媒体' : '还没有索引到媒体文件'),
       actions: [
+        if (noDirectories && MobileMediaScanner.isSupported)
+          FilledButton.icon(
+            onPressed: _mobileScanning ? null : () => _scanPhoneMedia(),
+            icon: const Icon(Icons.smartphone_rounded),
+            label: const Text('扫描手机媒体'),
+          ),
         FilledButton.icon(
-          onPressed: noDirectories
+          onPressed: noDirectories && !MobileMediaScanner.isSupported
               ? _addFolder
               : () => store.requestScan(),
           icon: Icon(
-            noDirectories
+            noDirectories && !MobileMediaScanner.isSupported
                 ? Icons.add_rounded
                 : Icons.refresh_rounded,
           ),
-          label: Text(noDirectories ? '添加媒体文件夹' : '重新扫描'),
+          label: Text(noDirectories && !MobileMediaScanner.isSupported
+              ? '添加媒体文件夹'
+              : '重新扫描'),
         ),
+        if (noDirectories && MobileMediaScanner.isSupported)
+          FilledButton.tonalIcon(
+            onPressed: _addFolder,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('添加媒体文件夹'),
+          ),
       ],
     );
   }
@@ -415,7 +508,7 @@ class _LibraryPageState extends State<LibraryPage> {
       );
 }
 
-class _GridCell extends StatelessWidget {
+class _GridCell extends StatefulWidget {
   const _GridCell({
     required this.title,
     required this.thumbnail,
@@ -431,16 +524,36 @@ class _GridCell extends StatelessWidget {
   final VoidCallback onPlay;
 
   @override
+  State<_GridCell> createState() => _GridCellState();
+}
+
+class _GridCellState extends State<_GridCell> {
+  bool _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onPlay,
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerLow,
-        child: Padding(
+    final widget = this.widget;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: InkWell(
+        onTap: widget.onPlay,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: _hovering
+                ? theme.colorScheme.surfaceContainerHigh
+                : theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _hovering
+                  ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                  : Colors.transparent,
+            ),
+          ),
           padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -451,21 +564,21 @@ class _GridCell extends StatelessWidget {
                   child: Container(
                     color: theme.colorScheme.surfaceContainerHighest,
                     alignment: Alignment.center,
-                    child: thumbnail.isEmpty
-                        ? placeholder
+                    child: widget.thumbnail.isEmpty
+                        ? widget.placeholder
                         : Image.file(
-                            File(thumbnail),
+                            File(widget.thumbnail),
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
-                            errorBuilder: (_, _, _) => placeholder,
+                            errorBuilder: (_, _, _) => widget.placeholder,
                           ),
                   ),
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                title,
+                widget.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter/services.dart';
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
@@ -6,6 +7,7 @@ import 'package:emoplay/bean/widget/embedded_native_control_area.dart';
 import 'package:emoplay/l10n/generated/app_localizations.dart';
 import 'package:emoplay/navigation.dart';
 import 'package:emoplay/pages/menu/route_visibility.dart';
+import 'package:emoplay/pages/player/controller/player_page_controller.dart';
 import 'package:emoplay/pages/router.dart';
 
 /// Localized labels for the five EmoPlay tabs (docs/SPEC.md §5), in
@@ -38,6 +40,9 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   final _outletKey = GlobalKey<RouterOutletState>();
   late int _selectedIndex = menu.indexForPath(widget.location);
   DateTime? _lastExitPromptAt;
+
+  /// Tab index of the player tab (router.dart menu order).
+  static final int _playerTabIndex = menu.indexForPath('/tab/player');
 
   /// The shell sits at the bottom of the root stack and stays mounted while
   /// other pages cover it, so it publishes that state for its subtree.
@@ -149,9 +154,27 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
           },
           child: OrientationBuilder(
             builder: (context, orientation) {
-              return orientation == Orientation.portrait
-                  ? _bottomMenu(context, _selectedIndex)
-                  : _sideMenu(context, _selectedIndex);
+              return Observer(
+                builder: (context) {
+                  final landscape = orientation == Orientation.landscape;
+                  // Fullscreen playback owns the whole window (PiliPlus video
+                  // page is a full route), and so does landscape playback on
+                  // a phone before the immersive switch lands — otherwise the
+                  // landscape rail shows up beside the video as a leftover
+                  // "options bar". Portrait keeps the NavigationBar so tabs
+                  // stay reachable during audio playback.
+                  final player = inject<PlayerPageController>();
+                  final hideChrome = _selectedIndex == _playerTabIndex &&
+                      (player.isFullscreen ||
+                          (landscape && player.currentIndex >= 0));
+                  if (hideChrome) {
+                    return _fullBleed(context);
+                  }
+                  return orientation == Orientation.portrait
+                      ? _bottomMenu(context, _selectedIndex)
+                      : _sideMenu(context, _selectedIndex);
+                },
+              );
             },
           ),
         ),
@@ -174,6 +197,15 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
         borderRadius: borderRadius,
       ),
       child: child,
+    );
+  }
+
+  /// Chrome-less shell: the outlet fills the window edge-to-edge on black, so
+  /// fullscreen playback loses the system navigation area visually.
+  Widget _fullBleed(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: _outlet(context),
     );
   }
 

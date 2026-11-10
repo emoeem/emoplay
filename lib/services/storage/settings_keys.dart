@@ -241,6 +241,12 @@ class SettingsKeys {
     true,
     group: SettingGroup.player,
   );
+  /// Phone media library: the one-time automatic storage discovery has run.
+  static const mobileAutoScanDone = SettingKey<bool>(
+    _SettingBoxKey.mobileAutoScanDone,
+    false,
+    group: SettingGroup.misc,
+  );
   static const playerControllerLayerDisappearTime = SettingKey<int>(
     'playerControllerLayerDisappearTime',
     4000,
@@ -355,5 +361,6 @@ class _SettingBoxKey {
       proxyEnable = 'proxyEnable',
       proxyUrl = 'proxyUrl',
       shortcutDialogShown = 'shortcutDialogShown',
-      brightnessVolumeGesture = 'brightnessVolumeGesture';
+      brightnessVolumeGesture = 'brightnessVolumeGesture',
+      mobileAutoScanDone = 'mobileAutoScanDone';
 }

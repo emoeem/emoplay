@@ -4,6 +4,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:flutter_modular/flutter_modular.dart';
 
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/empty_state_widget.dart';
@@ -12,6 +13,7 @@ import 'package:emoplay/models/playback_args.dart';
 import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/pages/player/player_item.dart';
 import 'package:emoplay/pages/player/controller/player_page_controller.dart';
+import 'package:emoplay/utils/device.dart';
 
 /// 播放 Tab.
 ///
@@ -392,6 +394,15 @@ class _PlayerPageState extends State<PlayerPage> {
                               icon: const Icon(Icons.link_rounded),
                               label: const Text('打开 URL'),
                             ),
+                            // Phones pick folders poorly; the library tab is
+                            // where the storage auto-scan lives.
+                            if (!isDesktop())
+                              FilledButton.tonalIcon(
+                                onPressed: () =>
+                                    context.navigate('/tab/library/'),
+                                icon: const Icon(Icons.video_library_rounded),
+                                label: const Text('媒体库'),
+                              ),
                           ],
                         ),
                       ),

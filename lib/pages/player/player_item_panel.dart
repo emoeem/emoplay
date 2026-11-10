@@ -20,6 +20,11 @@ import 'package:emoplay/utils/format.dart';
 /// M1 rebuild of the Kazumi panel without the danmaku/syncplay feature set:
 /// transport bar, playlist, speed/volume, screenshots, super resolution,
 /// window fullscreen and (Android) picture in picture.
+///
+/// Layout follows the PiliPlus video page: gradient scrims behind the two
+/// bars (never a full-surface dim), bars padded by the system insets while
+/// the window is not fullscreen, and on phones the secondary actions move
+/// into a "more" sheet so the transport row never overflows.
 class PlayerItemPanel extends StatefulWidget {
   const PlayerItemPanel({
     super.key,
@@ -84,243 +89,331 @@ class PlayerItemPanel extends StatefulWidget {
 }
 
 class _PlayerItemPanelState extends State<PlayerItemPanel> {
+  static const _iconColor = Colors.white;
+
+  bool get _fullscreen => widget.playerPageController.isFullscreen;
+
+  /// System insets while the bars are visible. Fullscreen playback runs
+  /// immersive (bars hidden), so the bars hug the edges; otherwise the panel
+  /// clears the status bar and the gesture navigation area (edge-to-edge).
+  EdgeInsets get _systemInsets =>
+      _fullscreen ? EdgeInsets.zero : MediaQuery.viewPaddingOf(context);
+
   @override
   Widget build(BuildContext context) {
-    final overlayColor = Colors.white;
     return FadeTransition(
       opacity: widget.panelVisibilityController,
       child: Observer(builder: (context) {
         final visible = widget.playerController.panel.showVideoController;
         return IgnorePointer(
           ignoring: !visible,
-          child: ColoredBox(
-            color: visible
-                ? Colors.black.withValues(alpha: 0.35)
-                : Colors.transparent,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _topBar(context, overlayColor),
-                _bottomBar(context, overlayColor),
-              ],
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _topBar(context),
+              _bottomBar(context),
+            ],
           ),
         );
       }),
     );
   }
 
+  /// Compact icon button: PiliPlus bottom controls are 30-42px, so a phone
+  /// transport row fits without spilling.
   Widget _iconButton(
     BuildContext context,
     Widget icon,
     String tooltip,
-    VoidCallback? onPressed,
-  ) {
+    VoidCallback? onPressed, {
+    bool compact = false,
+    double? iconSize,
+  }) {
     return IconButton(
       icon: icon,
-      color: Colors.white,
+      color: _iconColor,
       tooltip: tooltip,
+      iconSize: iconSize,
+      constraints: compact
+          ? const BoxConstraints(minWidth: 40, minHeight: 40)
+          : null,
+      padding: EdgeInsets.zero,
+      visualDensity: compact ? VisualDensity.compact : null,
       onPressed: onPressed,
     );
   }
 
-  Widget _topBar(BuildContext context, Color color) {
+  Widget _topBar(BuildContext context) {
     final title = widget.playerController.mediaTitle;
-    return Row(
-      children: [
-        _iconButton(
-          context,
-          const Icon(Icons.arrow_back),
-          '返回',
-          widget.onBackPressed,
+    final insets = _systemInsets;
+    return Container(
+      // Top scrim (PiliPlus app_bar_ani): readable title over any frame,
+      // without dimming the whole picture.
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withValues(alpha: 0.72), Colors.transparent],
         ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            title,
-            style: TextStyle(color: color, fontSize: 16),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-        ),
-        _iconButton(
-          context,
-          const Icon(Icons.chevron_left),
-          '上一个',
-          widget.onPrevItem,
-        ),
-        _iconButton(
-          context,
-          const Icon(Icons.chevron_right),
-          '下一个',
-          widget.onNextItem,
-        ),
-        _iconButton(
-          context,
-          const Icon(Icons.subtitles_outlined),
-          '加载字幕',
-          widget.onLoadSubtitle,
-        ),
-        _iconButton(
-          context,
-          const Icon(Icons.video_library_rounded),
-          '播放列表',
-          () => _openMenu(_showPlaylistSheet),
-        ),
-        if (widget.onToggleSidePanel != null)
+      ),
+      padding: EdgeInsets.fromLTRB(4, insets.top + 4, 4, 14),
+      child: Row(
+        children: [
           _iconButton(
             context,
-            const Icon(Icons.view_sidebar_outlined),
-            '信息面板',
-            widget.onToggleSidePanel,
+            const Icon(Icons.arrow_back),
+            '返回',
+            widget.onBackPressed,
+            compact: true,
           ),
-      ],
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(color: _iconColor, fontSize: 16),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+          _iconButton(
+            context,
+            const Icon(Icons.chevron_left),
+            '上一个',
+            widget.onPrevItem,
+            compact: true,
+          ),
+          _iconButton(
+            context,
+            const Icon(Icons.chevron_right),
+            '下一个',
+            widget.onNextItem,
+            compact: true,
+          ),
+          if (isDesktop())
+            _iconButton(
+              context,
+              const Icon(Icons.subtitles_outlined),
+              '加载字幕',
+              widget.onLoadSubtitle,
+            ),
+          _iconButton(
+            context,
+            const Icon(Icons.video_library_rounded),
+            '播放列表',
+            () => _openMenu(_showPlaylistSheet),
+            compact: true,
+          ),
+          if (widget.onToggleSidePanel != null)
+            _iconButton(
+              context,
+              const Icon(Icons.view_sidebar_outlined),
+              '信息面板',
+              widget.onToggleSidePanel,
+              compact: true,
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _bottomBar(BuildContext context, Color color) {
+  Widget _bottomBar(BuildContext context) {
     final playback = widget.playerController.playback;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _progressRow(context, color),
-        Row(
-          children: [
-            Observer(builder: (context) {
-              return _iconButton(
-                context,
-                Icon(playback.playing
-                    ? Icons.pause_circle_outline_rounded
-                    : Icons.play_arrow_rounded),
-                playback.playing ? '暂停' : '播放',
-                () => widget.playerController.playOrPause(),
-              );
-            }),
-            _iconButton(
-              context,
-              Image.asset(
-                'assets/images/forward_80.png',
-                width: 24,
-                height: 24,
-                color: Colors.white,
-              ),
-              '跳过片头',
-              widget.skipOP,
-            ),
-            if (isDesktop())
-              _volumeButton(context),
-            _speedButton(context),
-            const Spacer(),
-            _iconButton(
-              context,
-              const Icon(Icons.photo_camera_outlined),
-              '截图',
-              widget.handleScreenShot,
-            ),
-            if (isDesktop())
-              _iconButton(
-                context,
-                const Icon(Icons.photo_library_outlined),
-                '挑选截图',
-                widget.showScreenshotCandidates,
-              ),
-            _superResolutionButton(context),
-            _iconButton(
-              context,
-              const Icon(Icons.info_outline),
-              '视频详情',
-              widget.showVideoInfo,
-            ),
-            _iconButton(
-              context,
-              const Icon(Icons.timer_outlined),
-              '定时关闭',
-              () => _openMenu(_showSleepTimerSheet),
-            ),
-            _iconButton(
-              context,
-              const Icon(Icons.lock_outline),
-              '锁定控制',
-              () {
-                setState(() {
-                  widget.playerController.panel.lockPanel = true;
-                });
-              },
-            ),
-            if (Platform.isAndroid)
-              _iconButton(
-                context,
-                const Icon(Icons.picture_in_picture_alt),
-                '画中画',
-                () => widget.enterAndroidPictureInPicture(),
-              ),
-            Observer(builder: (context) {
-              return _iconButton(
-                context,
-                Icon(widget.playerPageController.isFullscreen
-                    ? Icons.fullscreen_exit
-                    : Icons.fullscreen),
-                '全屏',
-                widget.handleFullscreen,
-              );
-            }),
-          ],
+    final insets = _systemInsets;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Colors.black.withValues(alpha: 0.72), Colors.transparent],
         ),
-      ],
-    );
-  }
-
-  Widget _progressRow(BuildContext context, Color color) {
-    final playback = widget.playerController.playback;
-    return Row(
-      children: [
-        Expanded(
-          child: Observer(builder: (context) {
-            final duration = playback.duration;
-            final position = playback.currentPosition;
-            final maxMs =
-                duration.inMilliseconds == 0 ? 1 : duration.inMilliseconds;
-            return Row(
+      ),
+      padding: EdgeInsets.only(bottom: insets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _progressRow(context),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 0, 6, 4),
+            child: Row(
               children: [
-                SizedBox(
-                  width: 52,
-                  child: Text(
-                    durationToString(position),
-                    style: TextStyle(color: color, fontSize: 12),
-                    textAlign: TextAlign.center,
+                Observer(builder: (context) {
+                  return _iconButton(
+                    context,
+                    Icon(playback.playing
+                        ? Icons.pause_circle_outline_rounded
+                        : Icons.play_arrow_rounded),
+                    playback.playing ? '暂停' : '播放',
+                    () => widget.playerController.playOrPause(),
+                    compact: true,
+                  );
+                }),
+                _iconButton(
+                  context,
+                  Image.asset(
+                    'assets/images/forward_80.png',
+                    width: 22,
+                    height: 22,
+                    color: _iconColor,
                   ),
+                  '跳过片头',
+                  widget.skipOP,
+                  compact: true,
                 ),
-                Expanded(
-                  child: Slider(
-                    value: position.inMilliseconds
-                        .clamp(0, maxMs)
-                        .toDouble(),
-                    max: maxMs.toDouble(),
-                    onChangeStart: (_) => widget.handleProgressBarDragStart(),
-                    onChanged: (value) {
-                      playback.currentPosition =
-                          Duration(milliseconds: value.round());
-                    },
-                    onChangeEnd: (value) {
-                      widget.playerController
-                          .seek(Duration(milliseconds: value.round()));
-                      widget.handleProgressBarDragEnd(false);
-                    },
+                _speedButton(context),
+                if (isDesktop()) ...[
+                  _volumeButton(context),
+                  _superResolutionButton(context),
+                  _iconButton(
+                    context,
+                    const Icon(Icons.photo_camera_outlined),
+                    '截图',
+                    widget.handleScreenShot,
                   ),
-                ),
-                SizedBox(
-                  width: 52,
-                  child: Text(
-                    durationToString(duration),
-                    style: TextStyle(color: color, fontSize: 12),
-                    textAlign: TextAlign.center,
+                  _iconButton(
+                    context,
+                    const Icon(Icons.photo_library_outlined),
+                    '挑选截图',
+                    widget.showScreenshotCandidates,
                   ),
-                ),
+                  _iconButton(
+                    context,
+                    const Icon(Icons.info_outline),
+                    '视频详情',
+                    widget.showVideoInfo,
+                  ),
+                  _iconButton(
+                    context,
+                    const Icon(Icons.timer_outlined),
+                    '定时关闭',
+                    () => _openMenu(_showSleepTimerSheet),
+                  ),
+                  if (Platform.isAndroid)
+                    _iconButton(
+                      context,
+                      const Icon(Icons.picture_in_picture_alt),
+                      '画中画',
+                      () => widget.enterAndroidPictureInPicture(),
+                    ),
+                ] else
+                  _iconButton(
+                    context,
+                    const Icon(Icons.photo_camera_outlined),
+                    '截图',
+                    widget.handleScreenShot,
+                    compact: true,
+                  ),
+                const Spacer(),
+                if (!isDesktop())
+                  _iconButton(
+                    context,
+                    const Icon(Icons.more_vert_rounded),
+                    '更多',
+                    () => _openMenu(_showMoreSheet),
+                    compact: true,
+                  ),
+                _lockButton(context),
+                Observer(builder: (context) {
+                  return _iconButton(
+                    context,
+                    Icon(widget.playerPageController.isFullscreen
+                        ? Icons.fullscreen_exit
+                        : Icons.fullscreen),
+                    '全屏',
+                    widget.handleFullscreen,
+                    compact: true,
+                  );
+                }),
               ],
-            );
-          }),
-        ),
-      ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 锁定控制: a toggle with visible state — the previous lock-only button had
+  /// no unlock affordance (fullscreen change resets the lock implicitly).
+  Widget _lockButton(BuildContext context) {
+    return Observer(builder: (context) {
+      final locked = widget.playerController.panel.lockPanel;
+      return _iconButton(
+        context,
+        Icon(locked ? Icons.lock_rounded : Icons.lock_outline),
+        locked ? '解除锁定' : '锁定控制',
+        () {
+          widget.playerController.panel.lockPanel = !locked;
+        },
+        compact: true,
+      );
+    });
+  }
+
+  Widget _progressRow(BuildContext context) {
+    final playback = widget.playerController.playback;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Observer(builder: (context) {
+              final duration = playback.duration;
+              final position = playback.currentPosition;
+              final maxMs =
+                  duration.inMilliseconds == 0 ? 1 : duration.inMilliseconds;
+              return Row(
+                children: [
+                  SizedBox(
+                    width: 46,
+                    child: Text(
+                      durationToString(position),
+                      style:
+                          const TextStyle(color: _iconColor, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 3,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        overlayShape:
+                            const RoundSliderOverlayShape(overlayRadius: 12),
+                      ),
+                      child: Slider(
+                        value: position.inMilliseconds
+                            .clamp(0, maxMs)
+                            .toDouble(),
+                        max: maxMs.toDouble(),
+                        onChangeStart: (_) =>
+                            widget.handleProgressBarDragStart(),
+                        onChanged: (value) {
+                          playback.currentPosition =
+                              Duration(milliseconds: value.round());
+                        },
+                        onChangeEnd: (value) {
+                          widget.playerController
+                              .seek(Duration(milliseconds: value.round()));
+                          widget.handleProgressBarDragEnd(false);
+                        },
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 46,
+                    child: Text(
+                      durationToString(duration),
+                      style:
+                          const TextStyle(color: _iconColor, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 
@@ -330,17 +423,24 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
       child: Observer(builder: (context) {
         return SizedBox(
           width: 120,
-          child: Slider(
-            value: widget.playerController.playback.volume
-                .clamp(0.0, 100.0)
-                .toDouble(),
-            max: 100,
-            onChanged: (value) {
-              widget.playerController.setVolumeDuringGesture(value);
-            },
-            onChangeEnd: (value) {
-              widget.playerController.finishVolumeGesture();
-            },
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+            ),
+            child: Slider(
+              value: widget.playerController.playback.volume
+                  .clamp(0.0, 100.0)
+                  .toDouble(),
+              max: 100,
+              onChanged: (value) {
+                widget.playerController.setVolumeDuringGesture(value);
+              },
+              onChangeEnd: (value) {
+                widget.playerController.finishVolumeGesture();
+              },
+            ),
           ),
         );
       }),
@@ -357,6 +457,7 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
           const Icon(Icons.speed_rounded),
           '倍速',
           showMenu,
+          compact: true,
         );
       },
       menuChildren: [
@@ -383,7 +484,7 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
             context,
             Icon(
               Icons.auto_awesome,
-              color: mode == SuperResolutionMode.off ? null : Colors.lightBlue,
+              color: mode == SuperResolutionMode.off ? _iconColor : Colors.lightBlue,
             ),
             '超分辨率',
             showMenu,
@@ -400,6 +501,102 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
             },
           ),
       ],
+    );
+  }
+
+  // ---- mobile "more" sheet ------------------------------------------------
+
+  /// Phone transport row keeps six controls (PiliPlus budget); everything
+  /// else lives here.
+  Future<void> _showMoreSheet() {
+    final playback = widget.playerController.playback;
+    return showAdaptiveBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Observer(
+            builder: (context) {
+              final mode = playback.superResolutionMode;
+              Widget tile(
+                IconData icon,
+                String label,
+                VoidCallback onTap, {
+                bool selected = false,
+              }) {
+                return ListTile(
+                  leading: Icon(icon),
+                  title: Text(label),
+                  trailing: selected
+                      ? Icon(
+                          Icons.check_rounded,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
+                      : null,
+                  onTap: () {
+                    EmoDialog.dismiss();
+                    onTap();
+                  },
+                );
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.onLoadSubtitle != null)
+                    tile(
+                      Icons.subtitles_outlined,
+                      '加载字幕',
+                      widget.onLoadSubtitle!,
+                    ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '超分辨率',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
+                  ),
+                  for (final candidate in SuperResolutionMode.values)
+                    tile(
+                      Icons.auto_awesome,
+                      candidate.label,
+                      () => widget.handleSuperResolutionChange(candidate),
+                      selected: mode == candidate,
+                    ),
+                  const Divider(height: 1),
+                  tile(Icons.info_outline, '视频详情', widget.showVideoInfo),
+                  tile(
+                    Icons.timer_outlined,
+                    '定时关闭',
+                    () => _openMenu(_showSleepTimerSheet),
+                  ),
+                  tile(
+                    widget.playerController.panel.lockPanel
+                        ? Icons.lock_open_rounded
+                        : Icons.lock_outline,
+                    widget.playerController.panel.lockPanel
+                        ? '解除锁定'
+                        : '锁定控制',
+                    () {
+                      widget.playerController.panel.lockPanel =
+                          !widget.playerController.panel.lockPanel;
+                    },
+                  ),
+                  if (Platform.isAndroid)
+                    tile(
+                      Icons.picture_in_picture_alt,
+                      '画中画',
+                      () => widget.enterAndroidPictureInPicture(),
+                    ),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 

@@ -1,5 +1,12 @@
 allprojects {
     repositories {
+        // China mirrors first (see settings.gradle); storage.flutter-io.cn
+        // mirrors download.flutter.io for the io.flutter embedding artifacts
+        // that storage.googleapis.com serves elsewhere.
+        maven { url 'https://storage.flutter-io.cn/download.flutter.io' }
+        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
         google()
         mavenCentral()
     }

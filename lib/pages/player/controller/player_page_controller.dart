@@ -1,3 +1,5 @@
+import 'package:emoplay/services/platform/display_mode_service.dart';
+import 'package:emoplay/utils/device.dart';
 import 'package:mobx/mobx.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -91,20 +93,39 @@ abstract class _PlayerPageController with Store {
     isPip = value;
   }
 
-  /// Toggles window fullscreen on desktop platforms.
+  /// Toggles fullscreen, per platform (PiliPlus triggerFullScreen split):
+  ///
+  /// - desktop: window fullscreen via window_manager;
+  /// - mobile: landscape orientation lock + immersive system bars, through
+  ///   [DisplayModeService] (its native `setSystemBarsHidden` channel and the
+  ///   orientation apply were previously wired but never called).
   ///
   /// The fullscreen flag is owned here (not by the player surface) so that the
   /// route shell can react to it, mirroring the Kazumi fullscreen controller.
   @action
   Future<void> toggleFullscreen() async {
-    final target = !isFullscreen;
-    await WindowManager.instance.setFullScreen(target);
-    isFullscreen = target;
+    await setFullscreen(!isFullscreen);
   }
 
   @action
   Future<void> setFullscreen(bool value) async {
-    await WindowManager.instance.setFullScreen(value);
+    if (value == isFullscreen) {
+      return;
+    }
+    if (isDesktop()) {
+      await WindowManager.instance.setFullScreen(value);
+      isFullscreen = value;
+      return;
+    }
+    // PiliPlus enter/exit order: bars first, then the orientation lock; the
+    // exit restores rotation before the bars so the layout lands with the
+    // insets it lays out for.
+    await DisplayModeService.applyVideoFullscreen(value);
+    if (value) {
+      await DisplayModeService.setSystemBarsHidden(owner: this, hidden: true);
+    } else {
+      DisplayModeService.releaseSystemBars(this);
+    }
     isFullscreen = value;
   }
 }
