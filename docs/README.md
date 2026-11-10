@@ -43,6 +43,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md](reports/WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md) | R4 首绿发布：CI 首绿签名实测（42718530280 = 332/1）、发布演练三次跑归因链（四红灯逐层修复，第三次全绿发布）、GitHub Release 9 资产实测（字节数/prerelease 状态）、engine apply 对账与门禁实测（33 文件 341 用例全绿、build_runner 幂等、ldd 0 缺失） |
 | [WORK_REPORT_2026-11-10_PANEL_LOOK.md](reports/WORK_REPORT_2026-11-10_PANEL_LOOK.md) | R5 面板观感：两处整页失效根因链（焦点门禁永假 / Observer && 短路）、楷体事故归因（M1 删字体 + fontconfig 猜错）、面板单文件重组（402 插入 / 485 删除）、门禁实测（34 文件 342 用例全绿 / analyze 0 / ldd 0 / 音频探针真跑）、CI 不可测窗口记录 |
 | [WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md](reports/WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md) | R6 卫生与交付形态：审计 P2 卫生批次三项逐条对账、AppImage 产物与 runtime 实测（35,584,504 B / static-pie / help exit 0 / gitignore 覆盖）、门禁实测（35 文件 345+1 全绿 / analyze 0，与施工轮两次同数）、守护测试注释与 CI 现实不符项挂账（hardcoded-color grep 不存在）、CHANGELOG 一轮一节结构修复 |
+| [WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md](reports/WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md) | R7 性能定量实测：路线图 §4.1「性能实测」☐→✅（容器环境实测）。2000 文件夹具扫描吞吐（worker 热扫 125ms / 16000 files/s，直连遍历冷 160-179ms，进度回调实数 63 次）、首帧同步 IO 静态清单 + 2000 条目 library.json 装载 1.7-2.2ms（远低于 100ms 阈值，不改代码）、缩略图串行链 77-81ms/作业（并发重叠 0）；基准 skip-if-fixture-missing；**容器 Isolate 计时，非宿主基线**，GUI 首帧墙钟与真 ffmpeg 速率仍归 SPEC §9；门禁实测（36 文件 349+1 全绿 / analyze 0） |
 
 ## 审计（audits/）
 

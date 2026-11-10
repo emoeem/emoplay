@@ -18,11 +18,13 @@
 //      binary is absent, mirroring the shellAvailable QSKIP-analog guard).
 //
 // Deliberately out of scope here: a hard scan-throughput wall-clock number
-// and 首帧时间 (first frame) — both need real hardware / a live player and
-// belong to the GUI/manual acceptance round (SPEC §9); multi-isolate scan
-// sharding is NOT adopted (1.x used a single worker thread; the cooperative
-// per-file yield already bounds cancel latency, and a second isolate would
-// break progress ordering for no measured need).
+// and 首帧时间 (first frame) — the measured versions of those live in
+// test/perf_scan_benchmark_test.dart (2026-11-11 性能定量实测 round,
+// container Isolate timings, skip-if-fixture-missing); host-hardware
+// numbers still belong to the GUI/manual acceptance round (SPEC §9);
+// multi-isolate scan sharding is NOT adopted (1.x used a single worker
+// thread; the cooperative per-file yield already bounds cancel latency,
+// and a second isolate would break progress ordering for no measured need).
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
