@@ -55,3 +55,9 @@ android/build/reports/problems/
 **/macos/Pods/
 **/ios/Podfile.lock
 **/macos/Podfile.lock
+
+# packaging artifacts (package-linux.sh writes to cwd)
+EmoPlay_linux_*/
+*.deb
+.v2c/
+.video_agent/
