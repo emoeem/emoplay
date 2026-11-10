@@ -223,6 +223,192 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'频段增益（dB）'**
   String get equalizerGainSection;
+
+  /// 设置中心「常规」分类页标题（lib/pages/settings/general_settings.dart SettingsDetailScaffold，SPEC §6 category 1）。
+  ///
+  /// In zh, this message translates to:
+  /// **'常规'**
+  String get generalTitle;
+
+  /// 常规页「启动」分组标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'启动'**
+  String get generalStartupSection;
+
+  /// 常规页启动页下拉瓦片标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'启动页'**
+  String get startupPageTitle;
+
+  /// 常规页启动页下拉瓦片描述。
+  ///
+  /// In zh, this message translates to:
+  /// **'应用开启时的默认页面'**
+  String get startupPageDescription;
+
+  /// 常规页继续播放开关瓦片标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'继续播放'**
+  String get resumeTitle;
+
+  /// 常规页继续播放开关瓦片描述。
+  ///
+  /// In zh, this message translates to:
+  /// **'打开看过的文件时从上次位置继续（关闭则从头播放）'**
+  String get resumeDescription;
+
+  /// 常规页媒体库扫描分组标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'媒体库扫描'**
+  String get libraryScanSection;
+
+  /// 常规页扫描深度滑块瓦片标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'扫描深度'**
+  String get scanDepthTitle;
+
+  /// 常规页扫描深度滑块瓦片描述。
+  ///
+  /// In zh, this message translates to:
+  /// **'媒体根目录之下允许下钻的目录层数（0 = 不限）'**
+  String get scanDepthDescription;
+
+  /// 扫描深度为 0 时的取值标签。
+  ///
+  /// In zh, this message translates to:
+  /// **'不限'**
+  String get scanDepthUnlimited;
+
+  /// 扫描深度取值标签（n ≥ 1）。
+  ///
+  /// In zh, this message translates to:
+  /// **'{n} 层'**
+  String scanDepthLayers(int n);
+
+  /// 常规页跳过隐藏文件开关瓦片标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'跳过隐藏文件'**
+  String get skipHiddenTitle;
+
+  /// 常规页跳过隐藏文件开关瓦片描述。
+  ///
+  /// In zh, this message translates to:
+  /// **'扫描时不进入隐藏目录、不收录隐藏文件'**
+  String get skipHiddenDescription;
+
+  /// 常规页更新分组标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'更新'**
+  String get updateSection;
+
+  /// 常规页更新检查瓦片标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'更新检查'**
+  String get updateCheckTitle;
+
+  /// 常规页更新检查瓦片描述。
+  ///
+  /// In zh, this message translates to:
+  /// **'启动时检查应用更新'**
+  String get updateCheckDescription;
+
+  /// 常规页窗口行为分组标题（仅桌面端）。
+  ///
+  /// In zh, this message translates to:
+  /// **'窗口行为'**
+  String get windowBehaviorSection;
+
+  /// 常规页关闭窗口行为下拉瓦片标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭窗口时'**
+  String get exitBehaviorTitle;
+
+  /// 常规页关闭窗口行为下拉瓦片描述。
+  ///
+  /// In zh, this message translates to:
+  /// **'设置点击窗口关闭按钮后的行为'**
+  String get exitBehaviorDescription;
+
+  /// 关闭窗口行为选项一（原「界面设置」键值不变：SettingsKeys.exitBehavior = 0）。
+  ///
+  /// In zh, this message translates to:
+  /// **'退出 EmoPlay'**
+  String get exitBehaviorExit;
+
+  /// 关闭窗口行为选项二（SettingsKeys.exitBehavior = 1）。
+  ///
+  /// In zh, this message translates to:
+  /// **'最小化至托盘'**
+  String get exitBehaviorTray;
+
+  /// 关闭窗口行为选项三（SettingsKeys.exitBehavior = 2）。
+  ///
+  /// In zh, this message translates to:
+  /// **'每次都询问'**
+  String get exitBehaviorAsk;
+
+  /// 常规页恢复默认设置分组标题（施工件 B：1.x SettingsService::restoreDefaults 的 UI 槽位）。
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复'**
+  String get generalRestoreSection;
+
+  /// 恢复默认设置瓦片标题。
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复默认设置'**
+  String get restoreDefaultsTitle;
+
+  /// 恢复默认设置瓦片描述：作用域为 settings.json 的 quality/behavior/music 三分区。
+  ///
+  /// In zh, this message translates to:
+  /// **'将画质、常规与音频偏好重置为默认值'**
+  String get restoreDefaultsDescription;
+
+  /// 恢复默认设置危险确认对话框标题（EmoDialog + AlertDialog）。
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复默认设置？'**
+  String get restoreDefaultsDialogTitle;
+
+  /// 恢复默认设置确认对话框正文：对齐 1.x 语义（test_settings_service.cpp restoreDefaultsKeepsMediaAndHistory——媒体库、历史与导入决策不动）。
+  ///
+  /// In zh, this message translates to:
+  /// **'画质、常规（继续播放与扫描参数）与音频均衡器将回到默认值。媒体库与观看历史不会删除；mpv 配置导入决策不受影响。'**
+  String get restoreDefaultsDialogContent;
+
+  /// 确认对话框的危险确认按钮文字（error 色 FilledButton）。
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复默认'**
+  String get restoreDefaultsConfirm;
+
+  /// 确认对话框取消按钮文字。
+  ///
+  /// In zh, this message translates to:
+  /// **'取消'**
+  String get cancel;
+
+  /// settings.json 写失败 toast（_persistBehavior / 恢复默认共用的页面侧契约）。
+  ///
+  /// In zh, this message translates to:
+  /// **'设置保存失败，请检查磁盘'**
+  String get settingsSaveFailed;
+
+  /// 恢复默认设置成功 toast。
+  ///
+  /// In zh, this message translates to:
+  /// **'已恢复默认设置'**
+  String get restoreDefaultsDone;
 }
 
 class _AppLocalizationsDelegate

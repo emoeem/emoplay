@@ -166,6 +166,21 @@ abstract class _InterpolationController with Store {
     apply();
   }
 
+  /// Out-of-band settings writer path (restore-defaults control,
+  /// general_settings.dart): the persisted interpolation object was reset
+  /// under this controller. [apply]'s prelude re-syncs enabled/preset, but
+  /// only after its engine guard — so this re-syncs the mirror explicitly
+  /// (the panel reads the observables even while no player is attached)
+  /// and then applies like the setters do.
+  void reloadFromSettings() {
+    runInAction(() {
+      enabled = _settings.qualityInterpolationEnabled;
+      preset = _settings.qualityInterpolationPreset;
+    });
+    _refreshExpectedScriptPath();
+    apply();
+  }
+
   /// The applied admission flow (1.x InterpolationController::apply).
   Future<void> apply() async {
     final currentEngine = _engine;

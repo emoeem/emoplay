@@ -478,6 +478,50 @@ class EmoPlaySettings extends ChangeNotifier {
     }
   }
 
+  // Restores the three persisted preference sections ("quality",
+  // "behavior", "music") to their constructor defaults and notifies
+  // listeners once.
+  //
+  // 1.x contract (src/settings/SettingsService.cpp restoreDefaults +
+  // test_settings_service.cpp restoreDefaultsKeepsMediaAndHistory): the
+  // media library, the playback history and the user's mpv-config import
+  // decision are never touched — the top-level import-decision fields
+  // (importDecision / dontAskAgain / selectedFiles / lastImportSummary /
+  // importedAt) stay as they are; resetting that choice is the mpv settings
+  // page's own「重置导入决策」tile (mpv_settings.dart _confirmReset).
+  // 2.0 extends the reset scope to all three sections (施工件 B), so the
+  // quality panel and equalizer preferences join the behavior fields.
+  //
+  // Same persistence contract as the setters: this only mutates memory,
+  // the caller saves() and pushes the new values into the session
+  // controllers (QualityController / InterpolationController /
+  // IccController / MusicController reloadFromSettings) plus
+  // LibraryStore.setScanOptions so every page and the next scan see them.
+  void restoreDefaults() {
+    // quality section (the 1.x schema defaults; qualityTier/debandMode keep
+    // the 1.x domain values the store preserves for old files).
+    _qualityContentMode = 'auto';
+    _qualityTier = 'off';
+    _qualityToneMapping = 'auto';
+    _qualityScaleOverride = '';
+    _qualityDebandMode = 'auto';
+    _manualShaderList.clear();
+    _qualityInterpolationEnabled = false;
+    _qualityInterpolationPreset = 'MEMC_RIFE_STD';
+    _qualityIccEnabled = false;
+    _qualityIccProfilePath = '';
+    // behavior section.
+    _resumeOnReopen = true;
+    _libraryMaxDepth = 2;
+    _librarySkipHidden = true;
+    // music section (gains default to empty, exactly like load()'s reset —
+    // a fresh / shortened list loads as the flat preset with zero gains).
+    _musicEqualizerEnabled = false;
+    _musicEqualizerPreset = 'flat';
+    _musicEqualizerGains.clear();
+    notifyListeners();
+  }
+
   // element-wise comparison, the QVariantList == QVariantList semantics the
   // guarded setters rely on (no extra dependency: package:collection is not
   // a direct one).

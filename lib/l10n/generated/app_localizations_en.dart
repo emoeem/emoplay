@@ -74,4 +74,105 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get equalizerGainSection => 'Band gains (dB)';
+
+  @override
+  String get generalTitle => 'General';
+
+  @override
+  String get generalStartupSection => 'Startup';
+
+  @override
+  String get startupPageTitle => 'Startup page';
+
+  @override
+  String get startupPageDescription => 'The page shown when the app launches';
+
+  @override
+  String get resumeTitle => 'Resume playback';
+
+  @override
+  String get resumeDescription =>
+      'Reopening a watched file continues at the last position (off: start over)';
+
+  @override
+  String get libraryScanSection => 'Library scan';
+
+  @override
+  String get scanDepthTitle => 'Scan depth';
+
+  @override
+  String get scanDepthDescription =>
+      'How many directory levels below a media root are descended (0 = unlimited)';
+
+  @override
+  String get scanDepthUnlimited => 'Unlimited';
+
+  @override
+  String scanDepthLayers(int n) {
+    return '$n levels';
+  }
+
+  @override
+  String get skipHiddenTitle => 'Skip hidden files';
+
+  @override
+  String get skipHiddenDescription =>
+      'Hidden directories are not entered and hidden files are not indexed';
+
+  @override
+  String get updateSection => 'Updates';
+
+  @override
+  String get updateCheckTitle => 'Update check';
+
+  @override
+  String get updateCheckDescription => 'Check for app updates at startup';
+
+  @override
+  String get windowBehaviorSection => 'Window behavior';
+
+  @override
+  String get exitBehaviorTitle => 'When closing the window';
+
+  @override
+  String get exitBehaviorDescription =>
+      'What happens when the window close button is clicked';
+
+  @override
+  String get exitBehaviorExit => 'Exit EmoPlay';
+
+  @override
+  String get exitBehaviorTray => 'Minimize to tray';
+
+  @override
+  String get exitBehaviorAsk => 'Ask every time';
+
+  @override
+  String get generalRestoreSection => 'Restore';
+
+  @override
+  String get restoreDefaultsTitle => 'Restore default settings';
+
+  @override
+  String get restoreDefaultsDescription =>
+      'Reset picture-quality, general and audio preferences to their defaults';
+
+  @override
+  String get restoreDefaultsDialogTitle => 'Restore default settings?';
+
+  @override
+  String get restoreDefaultsDialogContent =>
+      'Picture quality, general (resume playback and scan options) and the audio equalizer return to their defaults. The media library and watch history are kept; the mpv config import decision is not touched.';
+
+  @override
+  String get restoreDefaultsConfirm => 'Restore defaults';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get settingsSaveFailed => 'Failed to save settings — check your disk';
+
+  @override
+  String get restoreDefaultsDone => 'Default settings restored';
 }

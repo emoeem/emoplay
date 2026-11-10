@@ -325,6 +325,28 @@ abstract class _QualityController with Store {
     _apply();
   }
 
+  /// Out-of-band settings writer path (restore-defaults control,
+  /// general_settings.dart): the persisted quality section was reset under
+  /// this controller, so re-sync the MobX mirror and re-apply once. The
+  /// _apply() prelude already honors external writers for the five
+  /// preferences ("honored from the next apply on") — this adds
+  /// [manualShaders], which otherwise is only re-read in startup(), and
+  /// lifts a stale auto-demotion the way a manual tier choice does.
+  /// Mount bookkeeping (_engineApplied/_shaderListTouched) stays untouched
+  /// so a running engine actually unmounts the previous selection instead
+  /// of hitting the inert-at-"off" early return.
+  @action
+  void reloadFromSettings() {
+    contentMode = _settings.qualityContentMode;
+    qualityTier = _settings.qualityTier;
+    toneMappingMode = _settings.qualityToneMapping;
+    scaleOverride = _settings.qualityScaleOverride;
+    debandMode = _settings.qualityDebandMode;
+    manualShaders = List<String>.of(_settings.manualShaderList);
+    autoDowngraded = false;
+    _apply();
+  }
+
   /// Panel shader list: mount/unmount a relative shader path.
   @action
   Future<void> setShaderMounted(String relativePath, bool mounted) async {

@@ -150,6 +150,19 @@ abstract class _IccController with Store {
     apply();
   }
 
+  /// Out-of-band settings writer path (restore-defaults control,
+  /// general_settings.dart): the persisted icc object was reset under this
+  /// controller. [apply] reads the observables (not the settings store),
+  /// so the mirror is re-synced here first, then applied — a previously
+  /// applied profile is released through the same disable path.
+  void reloadFromSettings() {
+    runInAction(() {
+      enabled = _settings.qualityIccEnabled;
+      profilePath = _settings.qualityIccProfilePath;
+    });
+    apply();
+  }
+
   /// The applied option flow (1.x IccController::apply).
   Future<void> apply() async {
     final engine = _engine;

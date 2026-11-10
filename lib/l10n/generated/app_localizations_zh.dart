@@ -70,4 +70,100 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get equalizerGainSection => '频段增益（dB）';
+
+  @override
+  String get generalTitle => '常规';
+
+  @override
+  String get generalStartupSection => '启动';
+
+  @override
+  String get startupPageTitle => '启动页';
+
+  @override
+  String get startupPageDescription => '应用开启时的默认页面';
+
+  @override
+  String get resumeTitle => '继续播放';
+
+  @override
+  String get resumeDescription => '打开看过的文件时从上次位置继续（关闭则从头播放）';
+
+  @override
+  String get libraryScanSection => '媒体库扫描';
+
+  @override
+  String get scanDepthTitle => '扫描深度';
+
+  @override
+  String get scanDepthDescription => '媒体根目录之下允许下钻的目录层数（0 = 不限）';
+
+  @override
+  String get scanDepthUnlimited => '不限';
+
+  @override
+  String scanDepthLayers(int n) {
+    return '$n 层';
+  }
+
+  @override
+  String get skipHiddenTitle => '跳过隐藏文件';
+
+  @override
+  String get skipHiddenDescription => '扫描时不进入隐藏目录、不收录隐藏文件';
+
+  @override
+  String get updateSection => '更新';
+
+  @override
+  String get updateCheckTitle => '更新检查';
+
+  @override
+  String get updateCheckDescription => '启动时检查应用更新';
+
+  @override
+  String get windowBehaviorSection => '窗口行为';
+
+  @override
+  String get exitBehaviorTitle => '关闭窗口时';
+
+  @override
+  String get exitBehaviorDescription => '设置点击窗口关闭按钮后的行为';
+
+  @override
+  String get exitBehaviorExit => '退出 EmoPlay';
+
+  @override
+  String get exitBehaviorTray => '最小化至托盘';
+
+  @override
+  String get exitBehaviorAsk => '每次都询问';
+
+  @override
+  String get generalRestoreSection => '恢复';
+
+  @override
+  String get restoreDefaultsTitle => '恢复默认设置';
+
+  @override
+  String get restoreDefaultsDescription => '将画质、常规与音频偏好重置为默认值';
+
+  @override
+  String get restoreDefaultsDialogTitle => '恢复默认设置？';
+
+  @override
+  String get restoreDefaultsDialogContent =>
+      '画质、常规（继续播放与扫描参数）与音频均衡器将回到默认值。媒体库与观看历史不会删除；mpv 配置导入决策不受影响。';
+
+  @override
+  String get restoreDefaultsConfirm => '恢复默认';
+
+  @override
+  String get cancel => '取消';
+
+  @override
+  String get settingsSaveFailed => '设置保存失败，请检查磁盘';
+
+  @override
+  String get restoreDefaultsDone => '已恢复默认设置';
 }

@@ -82,6 +82,135 @@
     "description": "Display name for the live equalizer preset (audioEqualizerPresetLabels)."
   },
   "equalizerGainSection": "Band gains (dB)",
+  "generalTitle": "General",
+  "@generalTitle": {
+    "description": "Settings category 1 page title (lib/pages/settings/general_settings.dart, SPEC §6)."
+  },
+  "generalStartupSection": "Startup",
+  "@generalStartupSection": {
+    "description": "Startup group title on the general page."
+  },
+  "startupPageTitle": "Startup page",
+  "@startupPageTitle": {
+    "description": "Startup-page dropdown tile title."
+  },
+  "startupPageDescription": "The page shown when the app launches",
+  "@startupPageDescription": {
+    "description": "Startup-page dropdown tile description."
+  },
+  "resumeTitle": "Resume playback",
+  "@resumeTitle": {
+    "description": "Resume-playback switch tile title."
+  },
+  "resumeDescription": "Reopening a watched file continues at the last position (off: start over)",
+  "@resumeDescription": {
+    "description": "Resume-playback switch tile description."
+  },
+  "libraryScanSection": "Library scan",
+  "@libraryScanSection": {
+    "description": "Library-scan group title on the general page."
+  },
+  "scanDepthTitle": "Scan depth",
+  "@scanDepthTitle": {
+    "description": "Scan-depth slider tile title."
+  },
+  "scanDepthDescription": "How many directory levels below a media root are descended (0 = unlimited)",
+  "@scanDepthDescription": {
+    "description": "Scan-depth slider tile description."
+  },
+  "scanDepthUnlimited": "Unlimited",
+  "@scanDepthUnlimited": {
+    "description": "Value label when the scan depth is 0."
+  },
+  "scanDepthLayers": "{n} levels",
+  "@scanDepthLayers": {
+    "description": "Value label for a scan depth of n >= 1.",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "skipHiddenTitle": "Skip hidden files",
+  "@skipHiddenTitle": {
+    "description": "Skip-hidden-files switch tile title."
+  },
+  "skipHiddenDescription": "Hidden directories are not entered and hidden files are not indexed",
+  "@skipHiddenDescription": {
+    "description": "Skip-hidden-files switch tile description."
+  },
+  "updateSection": "Updates",
+  "@updateSection": {
+    "description": "Updates group title on the general page."
+  },
+  "updateCheckTitle": "Update check",
+  "@updateCheckTitle": {
+    "description": "Update-check tile title."
+  },
+  "updateCheckDescription": "Check for app updates at startup",
+  "@updateCheckDescription": {
+    "description": "Update-check tile description."
+  },
+  "windowBehaviorSection": "Window behavior",
+  "@windowBehaviorSection": {
+    "description": "Window-behavior group title on the general page (desktop only)."
+  },
+  "exitBehaviorTitle": "When closing the window",
+  "@exitBehaviorTitle": {
+    "description": "Close-window-behavior dropdown tile title."
+  },
+  "exitBehaviorDescription": "What happens when the window close button is clicked",
+  "@exitBehaviorDescription": {
+    "description": "Close-window-behavior dropdown tile description."
+  },
+  "exitBehaviorExit": "Exit EmoPlay",
+  "@exitBehaviorExit": {
+    "description": "Close-window option one (SettingsKeys.exitBehavior = 0, key unchanged)."
+  },
+  "exitBehaviorTray": "Minimize to tray",
+  "@exitBehaviorTray": {
+    "description": "Close-window option two (SettingsKeys.exitBehavior = 1)."
+  },
+  "exitBehaviorAsk": "Ask every time",
+  "@exitBehaviorAsk": {
+    "description": "Close-window option three (SettingsKeys.exitBehavior = 2)."
+  },
+  "generalRestoreSection": "Restore",
+  "@generalRestoreSection": {
+    "description": "Restore-defaults group title on the general page (the UI slot for 1.x SettingsService::restoreDefaults)."
+  },
+  "restoreDefaultsTitle": "Restore default settings",
+  "@restoreDefaultsTitle": {
+    "description": "Restore-defaults tile title."
+  },
+  "restoreDefaultsDescription": "Reset picture-quality, general and audio preferences to their defaults",
+  "@restoreDefaultsDescription": {
+    "description": "Restore-defaults tile description: scope is the quality/behavior/music sections of settings.json."
+  },
+  "restoreDefaultsDialogTitle": "Restore default settings?",
+  "@restoreDefaultsDialogTitle": {
+    "description": "Danger confirmation dialog title (EmoDialog + AlertDialog)."
+  },
+  "restoreDefaultsDialogContent": "Picture quality, general (resume playback and scan options) and the audio equalizer return to their defaults. The media library and watch history are kept; the mpv config import decision is not touched.",
+  "@restoreDefaultsDialogContent": {
+    "description": "Confirmation dialog body: aligned with 1.x semantics (test_settings_service.cpp restoreDefaultsKeepsMediaAndHistory — library, history and import decision untouched)."
+  },
+  "restoreDefaultsConfirm": "Restore defaults",
+  "@restoreDefaultsConfirm": {
+    "description": "Danger confirm button label in the dialog (error-colored FilledButton)."
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button label in the dialog."
+  },
+  "settingsSaveFailed": "Failed to save settings — check your disk",
+  "@settingsSaveFailed": {
+    "description": "Toast for a failed settings.json write (shared page-side contract of _persistBehavior and the restore flow)."
+  },
+  "restoreDefaultsDone": "Default settings restored",
+  "@restoreDefaultsDone": {
+    "description": "Success toast after restoring the default settings."
+  },
   "@equalizerGainSection": {
     "description": "Band-gains group title on the audio page (second SettingsSection; band numbers and the Hz/dB units are universal notation and stay out of the arb)."
   }

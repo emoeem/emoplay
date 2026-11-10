@@ -243,6 +243,18 @@ mixin _$QualityController on _QualityController, Store {
   }
 
   @override
+  void reloadFromSettings() {
+    final _$actionInfo = _$_QualityControllerActionController.startAction(
+      name: '_QualityController.reloadFromSettings',
+    );
+    try {
+      return super.reloadFromSettings();
+    } finally {
+      _$_QualityControllerActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   String toString() {
     return '''
 contentMode: ${contentMode},

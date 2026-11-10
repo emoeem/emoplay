@@ -498,6 +498,21 @@ class MusicController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Out-of-band settings writer path (restore-defaults control,
+  /// general_settings.dart): the persisted music section was reset under
+  /// this controller, so rerun the constructor's _loadPersistedEqualizer
+  /// contract mid-session and re-apply the af chain (a guarded no-op while
+  /// no player is attached). No-op without settings (tests run the
+  /// controller bare).
+  Future<void> reloadFromSettings() async {
+    if (_settings == null) {
+      return;
+    }
+    _loadPersistedEqualizer();
+    await _applyEqualizerToEngine();
+    notifyListeners();
+  }
+
   void _persistEqualizer() {
     final settings = _settings;
     if (settings == null) {
