@@ -93,6 +93,21 @@ abstract class _PlayerPageController with Store {
     isPip = value;
   }
 
+  /// Whether the player route is the outlet's current route. Driven by
+  /// PlayerPage's ModalRoute.isCurrent; the shell keys chrome visibility and
+  /// the tab highlight off this instead of the stale IndexPage tab index
+  /// (programmatic jumps like home-card resume never touch that index).
+  @observable
+  bool pageCurrent = false;
+
+  @action
+  void setPageCurrent(bool value) {
+    if (pageCurrent == value) {
+      return;
+    }
+    pageCurrent = value;
+  }
+
   /// Toggles fullscreen, per platform (PiliPlus triggerFullScreen split):
   ///
   /// - desktop: window fullscreen via window_manager;

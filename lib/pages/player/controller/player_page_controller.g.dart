@@ -122,6 +122,24 @@ mixin _$PlayerPageController on _PlayerPageController, Store {
     });
   }
 
+  late final _$pageCurrentAtom = Atom(
+    name: '_PlayerPageController.pageCurrent',
+    context: context,
+  );
+
+  @override
+  bool get pageCurrent {
+    _$pageCurrentAtom.reportRead();
+    return super.pageCurrent;
+  }
+
+  @override
+  set pageCurrent(bool value) {
+    _$pageCurrentAtom.reportWrite(value, super.pageCurrent, () {
+      super.pageCurrent = value;
+    });
+  }
+
   late final _$toggleFullscreenAsyncAction = AsyncAction(
     '_PlayerPageController.toggleFullscreen',
     context: context,
@@ -196,6 +214,18 @@ mixin _$PlayerPageController on _PlayerPageController, Store {
   }
 
   @override
+  void setPageCurrent(bool value) {
+    final _$actionInfo = _$_PlayerPageControllerActionController.startAction(
+      name: '_PlayerPageController.setPageCurrent',
+    );
+    try {
+      return super.setPageCurrent(value);
+    } finally {
+      _$_PlayerPageControllerActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   String toString() {
     return '''
 playlist: ${playlist},
@@ -203,6 +233,7 @@ currentIndex: ${currentIndex},
 loading: ${loading},
 isPip: ${isPip},
 isFullscreen: ${isFullscreen},
+pageCurrent: ${pageCurrent},
 currentItem: ${currentItem},
 title: ${title},
 src: ${src}

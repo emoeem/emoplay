@@ -156,23 +156,31 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
             builder: (context, orientation) {
               return Observer(
                 builder: (context) {
-                  final landscape = orientation == Orientation.landscape;
-                  // Fullscreen playback owns the whole window (PiliPlus video
-                  // page is a full route), and so does landscape playback on
-                  // a phone before the immersive switch lands — otherwise the
-                  // landscape rail shows up beside the video as a leftover
-                  // "options bar". Portrait keeps the NavigationBar so tabs
-                  // stay reachable during audio playback.
+                  // Read every observable unconditionally: a short-circuited
+                  // `&&` never subscribes this Observer and the shell stops
+                  // reacting to playback entirely.
                   final player = inject<PlayerPageController>();
-                  final hideChrome = _selectedIndex == _playerTabIndex &&
-                      (player.isFullscreen ||
-                          (landscape && player.currentIndex >= 0));
+                  final pageCurrent = player.pageCurrent;
+                  final isFullscreen = player.isFullscreen;
+                  final currentIndex = player.currentIndex;
+                  // Fullscreen playback owns the whole window (PiliPlus video
+                  // page is a full route) — and so does any live playback on
+                  // the player tab: a floating rail over the video reads as a
+                  // leftover "options bar". An idle player tab keeps the
+                  // chrome so tabs stay reachable.
+                  final hideChrome =
+                      pageCurrent && (isFullscreen || currentIndex >= 0);
+                  // Tab highlight derives from the real route state:
+                  // programmatic jumps (home card → player) never touch
+                  // _selectedIndex, which only tracks rail taps.
+                  final selected =
+                      pageCurrent ? _playerTabIndex : _selectedIndex;
                   if (hideChrome) {
                     return _fullBleed(context);
                   }
                   return orientation == Orientation.portrait
-                      ? _bottomMenu(context, _selectedIndex)
-                      : _sideMenu(context, _selectedIndex);
+                      ? _bottomMenu(context, selected)
+                      : _sideMenu(context, selected);
                 },
               );
             },

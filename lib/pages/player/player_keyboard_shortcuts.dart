@@ -135,14 +135,12 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
       return false;
     }
 
+    // 播放器快捷键 = "页面可见即全局"（PiliPlus player_focus 语义）：路由
+    // current + 焦点不在任何文本框即可。旧的"主焦点必须落在 keyboardFocus
+    // 子树"判定依赖外部有人 requestFocus——全工程从没人请求过它，导致播放
+    // 时所有快捷键在这里被静默拒绝。
     final primaryFocus = FocusManager.instance.primaryFocus;
-    if (primaryFocus == null ||
-        (primaryFocus != widget.focusScopeNode &&
-            !primaryFocus.ancestors.contains(widget.focusScopeNode))) {
-      return false;
-    }
-
-    final focusContext = primaryFocus.context;
+    final focusContext = primaryFocus?.context;
     if (focusContext == null) {
       return true;
     }

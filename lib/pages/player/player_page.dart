@@ -69,6 +69,16 @@ class _PlayerPageState extends State<PlayerPage> {
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The shell keys chrome visibility and the tab highlight off this flag;
+    // IndexPage's tab index is stale for programmatic jumps (home card →
+    // player). ModalRoute.of registers the dependency, so this fires whenever
+    // the route becomes/stops being current (tab switches, covers, dialogs).
+    _pageController.setPageCurrent(ModalRoute.of(context)?.isCurrent ?? false);
+  }
+
   /// Plays the file handed over through the route (mpv-emo openAt semantics:
   /// [LocalFilePlaybackArgs.startAt] is deferred to file-loaded by the
   /// playback controller). Entry through the route replaces the playlist.
