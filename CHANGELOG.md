@@ -6,7 +6,7 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
-## [Unreleased] - 2026-11-11（R6 打磨轮）
+## [Unreleased] - 2026-11-11（R6 卫生与交付形态轮）
 
 ### Added
 
@@ -18,7 +18,8 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 - **Kazumi 对齐守护测试** `test/kazumi_alignment_ui_test.dart`（3 用例，
   headless 挂载真实页面）：关于页许可证 tile 指向本项目 LICENSE（曾误指
   Kazumi 仓库）；首页 / 媒体库空态按钮走 Kazumi `StateActionButton` idiom
-  （64×48 药丸样式断言）。
+  （64×48 药丸样式断言）；`url_launcher_platform_interface` 以
+  dev_dependency `^2.3.2` 作启动捕获测试缝（`pubspec.yaml:69`）。
 
 ### Changed
 
@@ -31,7 +32,37 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   模式徽章补 `onSecondary/onTertiaryContainer` 前景；「本地定制永不覆盖」
   说明与「暂无在线条目」提示改为 `bodySmall + onSurfaceVariant` 弱化
   （Kazumi 次要文案 idiom）。
+- **依赖收敛与死配置清理**（`988122f`）：三处 `any` 约束钉上确切版本
+  （synchronized `^3.6.1+1` / material_color_utilities `^0.13.0` /
+  path `^1.9.1`，审计 P2「any×3」）；`analysis_options.yaml` 删掉
+  `lib/bbcode/generated/**` 与 `web/**` 两条指向已不存在路径的死排除。
 
+### Removed
+
+- **web/ Flutter 模板目录**（`988122f`）：`index.html` / `manifest.json` /
+  favicon / 4 张 icon（111 行 + 5 图）整体删除，理由：目标平台只有桌面与
+  移动，不构建 web（审计 P2）；`.metadata` 同步去掉 web 平台登记。
+- **`screen_brightness_ohos` 依赖**（`988122f`）：lib/ 零直接引用
+  （审计 P2「依赖必要性存疑」项；`screen_brightness_android/ios/
+  platform_interface` 保留在用）。
+
+### 验证
+
+- `flutter analyze` 0 告警（`No issues found! (ran in 5.3s)`）；
+  `flutter test` 35 文件 **345 通过 + 1 skipped** 全绿（1 skip 维持：
+  Windows-only probe）。2026-11-11 02:21 CST 前后文档收网窗口独立复测，
+  与施工轮 HANDOVER 数字一致（上轮 34 文件 / 342 + 1）。Linux debug 构建
+  与 Android `assembleDebug` 本轮未重跑（R6 无原生构建面改动）。
+- AppImage amd64 产物实测：仓库根 `EmoPlay_linux_v2.0.0-alpha_amd64.AppImage`
+  35,584,504 字节、ELF static-pie（`file` 实测），runtime `--appimage-help`
+  应答正常（exit 0），`.gitignore:62 *.AppImage` 覆盖不入侵仓库；
+  extract-and-run 冒烟由施工轮完成（`.github/scripts/package-appimage.sh`
+  头注释）。CI 结论本窗口不可测：`gh run list` EOF（02:21 CST，
+  api.github.com 不可达）；`d446bb8` / `8ed84c4` / `1dc5d14` / `988122f` /
+  `e1a2df0` / `b0e1a06` 六个提交未推送，推送后预期签名
+  **345 passed / 1 skipped**。
+
+## [Unreleased] - 2026-11-10（面板观感轮）
 
 ### Fixed
 

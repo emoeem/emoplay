@@ -31,6 +31,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [RELEASE_2026-11-10_RED_LIGHT_ZEROING.md](releases/RELEASE_2026-11-10_RED_LIGHT_ZEROING.md) | 红灯清零 R3：CI 第二层红灯修复（libpulse + ldd 审计步一次列全缺口）、deb Depends 17 项经递归闭包审计、页签壳 i18n 第一页、媒体库响应性守卫 3 用例；32 文件 332 用例全绿，首绿待推送确认 |
 | [RELEASE_2026-11-10_FIRST_GREEN_RELEASE.md](releases/RELEASE_2026-11-10_FIRST_GREEN_RELEASE.md) | 首绿发布 R4：CI 首绿达成（332/1 与预期一致）、v2.0.0-alpha 发布演练三跑打穿（macOS Kazumi.app 残留 / Windows 缺 yq / arm64 缺 ALSA / Windows 死 include 四红灯修复）、GitHub Release 公开 9 资产、mpv apply 半边 5 条 live 用例、音频设置页 i18n 第二页；33 文件 341 用例全绿 |
 | [RELEASE_2026-11-10_PANEL_LOOK.md](releases/RELEASE_2026-11-10_PANEL_LOOK.md) | 面板观感 R5：播放页两处整页失效修复（快捷键焦点门禁 / Observer 短路）、字体定案（系统字体默认 + 显式 CJK 兜底 + 设置开关）、播放面板按 Kazumi 逐槽位重组、发布矩阵 9 job 超时 + Windows 版本单一来源；34 文件 342 用例全绿，CI 本窗口不可测 |
+| [RELEASE_2026-11-10_HYGIENE_DELIVERY.md](releases/RELEASE_2026-11-10_HYGIENE_DELIVERY.md) | 卫生与交付形态 R6：AppImage 打包落地（linuxdeploy；amd64 产物与 runtime 本机实测，arm64 仅 CI 可验）、web 残留 / any×3 / screen_brightness_ohos 清账（审计 P2 卫生批次）、Kazumi 空态按钮 / 徽章 / 许可证 tile 样式对齐 + 3 守护用例、README 对账与截图占位；35 文件 345 用例全绿，CI 不可测、6 提交待推送 |
 
 ## 工作报告（reports/，读者是维护者与接手者）
 
@@ -41,6 +42,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [WORK_REPORT_2026-11-10_RED_LIGHT_ZEROING.md](reports/WORK_REPORT_2026-11-10_RED_LIGHT_ZEROING.md) | R3 红灯清零：CI 第二层红灯归因链（dlopen 只报第一层 / libpulse 缺失）、deb 依赖审计与打包实测、ldd 闭包覆盖验证（104 ⊂ 251 差集空）、门禁实测（32 文件 332 用例全绿） |
 | [WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md](reports/WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md) | R4 首绿发布：CI 首绿签名实测（42718530280 = 332/1）、发布演练三次跑归因链（四红灯逐层修复，第三次全绿发布）、GitHub Release 9 资产实测（字节数/prerelease 状态）、engine apply 对账与门禁实测（33 文件 341 用例全绿、build_runner 幂等、ldd 0 缺失） |
 | [WORK_REPORT_2026-11-10_PANEL_LOOK.md](reports/WORK_REPORT_2026-11-10_PANEL_LOOK.md) | R5 面板观感：两处整页失效根因链（焦点门禁永假 / Observer && 短路）、楷体事故归因（M1 删字体 + fontconfig 猜错）、面板单文件重组（402 插入 / 485 删除）、门禁实测（34 文件 342 用例全绿 / analyze 0 / ldd 0 / 音频探针真跑）、CI 不可测窗口记录 |
+| [WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md](reports/WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md) | R6 卫生与交付形态：审计 P2 卫生批次三项逐条对账、AppImage 产物与 runtime 实测（35,584,504 B / static-pie / help exit 0 / gitignore 覆盖）、门禁实测（35 文件 345+1 全绿 / analyze 0，与施工轮两次同数）、守护测试注释与 CI 现实不符项挂账（hardcoded-color grep 不存在）、CHANGELOG 一轮一节结构修复 |
 
 ## 审计（audits/）
 
