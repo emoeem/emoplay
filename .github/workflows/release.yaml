@@ -332,6 +332,13 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          # Draft release: the run's artifacts are only visible to the
+          # maintainer until someone verifies the asset set and publishes
+          # manually with `gh release edit <tag> --draft=false` (procedure
+          # in docs/guides/BUILD_GUIDE.md). Keeps an alpha/mis-tagged run
+          # from grabbing the public Latest slot (pitfall 8(a) in
+          # docs/HANDOVER.md); draft releases cannot be Latest.
+          draft: true
           files: |
             android_outputs/*.apk
             windows_outputs/*.zip

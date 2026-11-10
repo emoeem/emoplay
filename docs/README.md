@@ -21,6 +21,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md) | 过夜自动循环手册：轮次结构、停止条件、起始积压清单（当前待办的权威来源） |
 | [HANDOVER.md](HANDOVER.md) | 交接现状：一句话现状、最近实质变更、最易踩的坑、接手第一步清单 |
 | [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) | 迁移路线图：M0-M8 ✅+提交哈希、R1-R4 收尾轮次、未做项 ☐ 清单、验收标准与贯穿约定 |
+| [guides/BUILD_GUIDE.md](guides/BUILD_GUIDE.md) | 构建与发布手册：前置条件与可复制构建/打包命令、draft 发布流程（人工核对后 `gh release edit <tag> --draft=false`）、常见故障排查、已知限制 |
 
 ## 更新记录（releases/，读者是用户）
 

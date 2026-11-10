@@ -166,7 +166,7 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
    `macos/Runner.xcodeproj/project.pbxproj` 的 Kazumi.app 引用漏网，直到
    发布演练才在 CI 炸出（drill#1）；改平台工程文件时逐平台 grep 旧品牌名
    （Kazumi / com.example.kazumi）再收工。
-8. **发布语义三件事**：(a) `v2.0.0-alpha` 已是公开的 Latest release - 再演练
+8. **发布语义四件事**：(a) `v2.0.0-alpha` 已是公开的 Latest release - 再演练
    要先删 release 与 tag，且移动 tag 重跑会连烧三次矩阵分钟数（本轮
    46 分钟+）；(b) **发布产物对应 tag 指向的提交，不是 main HEAD** - 推送
    R4 后不重打 tag 就不会有新产物；(c) Windows 上 flutter-action 的
@@ -174,7 +174,12 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
    release.yaml（升级 Flutter 时与 `pubspec.yaml` 同步手改）。`8ed84c4`
    起已转正：Windows job 前置 `choco install yq`，版本恢复
    `flutter-version-file: pubspec.yaml` 单一来源，升级 Flutter 只改
-   `pubspec.yaml`。
+   `pubspec.yaml`；(d) **R7 起发布为 draft 制**：tag 触发的 `Create release`
+   步带 `draft: true`，跑完是 draft（不公开、不占 Latest、draft 不能被设为
+   Latest），人工核对产物后手动 publish：`gh release edit <tag>
+   --draft=false`（流程见 [guides/BUILD_GUIDE.md](guides/BUILD_GUIDE.md)
+   §四）- **忘 publish 是新流程的主要失效模式**，draft release 在公开
+   Releases 页看不到。
 9. **门禁别守「没人会聚焦的节点」**：播放页快捷键曾整页失效（门禁要求
    primaryFocus 在自建 `keyboardFocus` 内，而没有任何交互会让它成为
    primaryFocus），壳层浮层曾不隐藏（Observer builder 内 `&&` 短路导致

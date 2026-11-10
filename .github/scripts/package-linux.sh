@@ -55,8 +55,26 @@ installed_size="$(du -sk "$pkgdir/opt" | cut -f1)"
 #   * Other non-bundled closure libraries (libgnutls30t64, liblcms2-2,
 #     libxkbcommon0, libepoxy0, libwayland-*, libdbus-1-3, codec libs
 #     libsndfile1/libmpg123-0t64/libopus0/libogg0/...) are pulled in
-#     transitively by the set above; the full 115-library ldd closure of the
-#     bundle maps inside this set's recursive Depends closure (diff empty).
+#     transitively by the set above; the bundle's ldd closure maps inside
+#     this set's recursive Depends closure (diff empty; verified R3
+#     2026-11-10: the closure's 104 dpkg packages ⊂ the 251-package
+#     recursive Depends closure of the 17 Depends above).
+#   * Library-count口径 (audit P2 re-measure 2026-11-11, per
+#     AUDIT_FULL_2026-11-10 §P2: `readelf -d | NEEDED | sort -u | wc -l`
+#     over every bundle ELF): direct NEEDED union = 63 unique sonames
+#     (release == debug bundle; 13 / 12 ELFs; ldd not-found = 0), 9 of
+#     them bundled (8 plugin .so + libflutter_linux_gtk.so). ldd
+#     transitive closure = 125 unique resolved paths = 9 bundled + 116
+#     external, plus 3 dlopen-only bundled libs (libapp.so /
+#     libmedia_kit_event_loop.so / libmpv.so.2 — never in ldd output;
+#     loaded by the Flutter engine / native assets, not DT_NEEDED).
+#     Historical five口径 (R3 2026-11-10: 250 / 234 / 166 / 64 / 113)
+#     differ by statistical scope — direct NEEDED union vs transitive
+#     closure, whole bundle vs lib/ only vs main binary, with/without
+#     bundled libs — none equals the originally written 115. 64→63
+#     matches the R6 screen_brightness_ohos removal; the R3 "113
+#     external" subtracted all 12 bundled FILES from the 125 ldd paths
+#     although 3 of those files are dlopen-only (116 external today).
 #   * t64 package names are the Ubuntu 24.04 (noble) and later ones — the
 #     same naming the CI native-tool install steps already use.
 cat > "$pkgdir/DEBIAN/control" <<EOF
