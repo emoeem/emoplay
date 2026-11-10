@@ -103,11 +103,13 @@ class _AppWidgetState extends State<AppWidget>
     final defaultDarkTheme = _buildAppTheme(
       brightness: Brightness.dark,
       color: color,
+      fontFamily: themeProvider.currentFontFamily,
     );
     themeProvider.setTheme(
       _buildAppTheme(
         brightness: Brightness.light,
         color: color,
+        fontFamily: themeProvider.currentFontFamily,
       ),
       oledEnhance ? oledDarkTheme(defaultDarkTheme) : defaultDarkTheme,
       notify: false,
@@ -134,18 +136,14 @@ class _AppWidgetState extends State<AppWidget>
     required Brightness brightness,
     Color? color,
     ColorScheme? colorScheme,
+    String? fontFamily,
   }) {
     return ThemeData(
       useMaterial3: true,
-      // Kazumi 同款全局字体（MiSans）：仅删字体后 Flutter 的 Roboto 兜底经
-      // fontconfig 落到楷体（fc-match sans → LXGW ZhenKai），中文观感明显
-      // 不对——恢复 Kazumi 内置的 MiSans-Regular，CJK/拉丁统一走同一族。
-      fontFamily: 'MI_Sans_Regular',
-      fontFamilyFallback: const [
-        'Noto Sans CJK SC',
-        'Noto Sans SC',
-        'sans-serif',
-      ],
+      // 字体走 Kazumi 约定（theme_provider）：默认系统字体，CJK 用显式兜底
+      // 链防 fontconfig 落到楷体；设置里可切内置 MiSans。
+      fontFamily: fontFamily,
+      fontFamilyFallback: kAppFontFamilyFallback,
       brightness: brightness,
       colorSchemeSeed: color,
       colorScheme: colorScheme,
@@ -267,12 +265,14 @@ class _AppWidgetState extends State<AppWidget>
             ? _buildAppTheme(
                 brightness: Brightness.light,
                 colorScheme: theme,
+                fontFamily: themeProvider.currentFontFamily,
               )
             : themeProvider.light;
         final dynamicDarkTheme = useDynamicColor
             ? _buildAppTheme(
                 brightness: Brightness.dark,
                 colorScheme: darkTheme,
+                fontFamily: themeProvider.currentFontFamily,
               )
             : themeProvider.dark;
         final effectiveDarkTheme = useDynamicColor && oledEnhance

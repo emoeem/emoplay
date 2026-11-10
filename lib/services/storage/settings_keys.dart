@@ -211,7 +211,7 @@ class SettingsKeys {
   );
   static const useSystemFont = SettingKey<bool>(
     _SettingBoxKey.useSystemFont,
-    false,
+    true,
     group: SettingGroup.theme,
   );
   static const backgroundPlayback = SettingKey<bool>(

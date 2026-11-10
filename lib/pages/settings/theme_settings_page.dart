@@ -27,6 +27,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
   late bool oledEnhance;
   late bool useDynamicColor;
   late bool showWindowButton;
+  late bool useSystemFont;
   late final ThemeProvider themeProvider;
 
   @override
@@ -37,12 +38,16 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     oledEnhance = GStorage.getSetting(SettingsKeys.oledEnhance);
     useDynamicColor = GStorage.getSetting(SettingsKeys.useDynamicColor);
     showWindowButton = GStorage.getSetting(SettingsKeys.showWindowButton);
+    useSystemFont = GStorage.getSetting(SettingsKeys.useSystemFont);
     themeProvider = context.read<ThemeProvider>();
+    // 本页局部构建的 ThemeData 也要带同一字体（取色器/OLED 预览不能丢字体）。
+    themeProvider.setFontFamily(useSystemFont, notify: false);
   }
 
   void setTheme(Color? color) {
     var defaultDarkTheme = ThemeData(
         useMaterial3: true,
+        fontFamily: themeProvider.currentFontFamily,
         brightness: Brightness.dark,
         colorSchemeSeed: color,
         progressIndicatorTheme: progressIndicatorTheme2024,
@@ -52,6 +57,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     themeProvider.setTheme(
       ThemeData(
           useMaterial3: true,
+          fontFamily: themeProvider.currentFontFamily,
           brightness: Brightness.light,
           colorSchemeSeed: color,
           progressIndicatorTheme: progressIndicatorTheme2024,
@@ -66,6 +72,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
   void resetTheme() {
     var defaultDarkTheme = ThemeData(
         useMaterial3: true,
+        fontFamily: themeProvider.currentFontFamily,
         brightness: Brightness.dark,
         colorSchemeSeed: Colors.green,
         progressIndicatorTheme: progressIndicatorTheme2024,
@@ -75,6 +82,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     themeProvider.setTheme(
       ThemeData(
           useMaterial3: true,
+          fontFamily: themeProvider.currentFontFamily,
           brightness: Brightness.light,
           colorSchemeSeed: Colors.green,
           progressIndicatorTheme: progressIndicatorTheme2024,
@@ -218,6 +226,24 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                 title: Text('OLED优化'),
                 description: Text('深色模式下使用纯黑背景'),
                 initialValue: oledEnhance,
+              ),
+              SettingsTile.switchTile(
+                leading: Icons.font_download_rounded,
+                onToggle: (value) async {
+                  useSystemFont = value ?? !useSystemFont;
+                  await GStorage.putSetting(
+                      SettingsKeys.useSystemFont, useSystemFont);
+                  themeProvider.setFontFamily(useSystemFont);
+                  // 静态主题（themeProvider.light/dark）只在 setTheme 时重建，
+                  // 切字体后必须重发射一次，否则开关在非动态配色下不生效。
+                  setTheme(defaultThemeColor == 'default'
+                      ? null
+                      : Color(int.parse(defaultThemeColor, radix: 16)));
+                  setState(() {});
+                },
+                title: Text('使用系统字体'),
+                description: Text('关闭时使用内置 MiSans（Kazumi 同款）'),
+                initialValue: useSystemFont,
               ),
             ],
           ),

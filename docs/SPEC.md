@@ -17,7 +17,7 @@
 | org / applicationId | `com.emoplay`（Android）/ linux `com.emoplay.EmoPlay` |
 | 版本 | 2.0.0-alpha |
 | 图标 | **占位图标**（程序生成的简单矢量风 PNG），**禁止使用 Kazumi 的 logo**（Yuquanaaa 版权，非自由素材） |
-| 字体 | 系统默认字体，**禁止捆绑 Mi Sans**；删除 Kazumi 的 fontFamily 全局覆写 |
+| 字体 | **默认跟随系统字体**（fontFamily=null + 显式 Noto Sans CJK 兜底，防 fontconfig 落到楷体）；设置→主题提供"使用系统字体"开关，关闭时使用内置 MiSans（Kazumi 同款，assets/fonts/MiSans-Regular.ttf） |
 | locale | 默认 zh，arb 结构预留 en（M1 只做 zh） |
 | 主题 | 保留 Kazumi 的 Material 3 + DynamicColor 机制，默认深色优先 |
 
