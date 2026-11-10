@@ -214,6 +214,13 @@ jobs:
       - name: Package Linux amd64 outputs
         run: ./.github/scripts/package-linux.sh amd64 x64 "${{ github.ref_name }}"
         shell: bash
+      # AppImage (linuxdeploy, auto-downloaded into build/appimage-tools/).
+      # amd64 is verified locally (2026-11-11, extract-and-run smoke test);
+      # arm64 uses linuxdeploy-aarch64.AppImage (URL reachable, verified
+      # 2026-11-11) but its packaging can only be exercised in CI.
+      - name: Package Linux amd64 AppImage
+        run: ./.github/scripts/package-appimage.sh amd64 x64 "${{ github.ref_name }}"
+        shell: bash
       - name: Upload Linux amd64 outputs
         uses: actions/upload-artifact@v4
         with:
@@ -221,6 +228,7 @@ jobs:
           path: |
             EmoPlay_linux_*_amd64.tar.gz
             EmoPlay_linux_*_amd64.deb
+            EmoPlay_linux_*_amd64.AppImage
 
   flutter-build-linux-arm64:
     name: "Release for Linux arm64"
@@ -244,6 +252,11 @@ jobs:
       - name: Package Linux arm64 outputs
         run: ./.github/scripts/package-linux.sh arm64 arm64 "${{ github.ref_name }}"
         shell: bash
+      # linuxdeploy ships a native aarch64 AppImage (URL verified 2026-11-11);
+      # not locally exercisable on this x86_64 container — CI-only until then.
+      - name: Package Linux arm64 AppImage
+        run: ./.github/scripts/package-appimage.sh arm64 arm64 "${{ github.ref_name }}"
+        shell: bash
       - name: Upload Linux arm64 outputs
         uses: actions/upload-artifact@v4
         with:
@@ -251,6 +264,7 @@ jobs:
           path: |
             EmoPlay_linux_*_arm64.tar.gz
             EmoPlay_linux_*_arm64.deb
+            EmoPlay_linux_*_arm64.AppImage
 
   # iOS build, kept for later (needs signing + a macOS runner budget):
   # flutter-build-ios:
@@ -325,5 +339,7 @@ jobs:
             macos_outputs/*.zip
             linux_amd64_outputs/*.tar.gz
             linux_amd64_outputs/*.deb
+            linux_amd64_outputs/*.AppImage
             linux_arm64_outputs/*.tar.gz
             linux_arm64_outputs/*.deb
+            linux_arm64_outputs/*.AppImage

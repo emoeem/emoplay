@@ -56,8 +56,9 @@ android/build/reports/problems/
 **/ios/Podfile.lock
 **/macos/Podfile.lock
 
-# packaging artifacts (package-linux.sh writes to cwd)
+# packaging artifacts (package-linux.sh / package-appimage.sh write to cwd)
 EmoPlay_linux_*/
 *.deb
+*.AppImage
 .v2c/
 .video_agent/
