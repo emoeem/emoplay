@@ -6,10 +6,73 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
-## [2.0.0-alpha] — 2026-11-10（未发布）
+## [Unreleased] - 2026-11-10（移动端播放修复轮）
 
-迁移工程 M1–M8 全部里程碑产物：Kazumi 骨架导入并剥离番剧业务，1.x 行为
-语义逐条平移，数据 schema 与 1.x 逐字段一致。
+### Fixed
+
+- **手机横屏播放左侧出现选项栏**：根因是壳层 `ScaffoldMenu` 在横屏切
+  NavigationRail，而播放页是五页签之一，横屏播放时 rail 常驻视频左侧。
+  现在全屏播放与手机横屏播放中时壳层切换为全出血（无导航条 / rail，
+  黑底 edge-to-edge，`menu.dart`）；竖屏保留 NavigationBar，音频播放时
+  仍可切页签。
+- **手机全屏按钮无效**：`PlayerPageController.toggleFullscreen` 原先只调
+  window_manager（桌面 API，安卓上空操作）。已拆平台分支：手机走
+  `DisplayModeService`（旋转锁定 landscape + 原生 `setSystemBarsHidden`
+  沉浸式；该 service 与 MainActivity 通道此前已实现但从未接线），桌面保持
+  window_manager。
+- **状态栏与播放控制重合**：`PlayerItemPanel` 原先完全没有安全区处理。
+  现在非全屏时顶栏垫 `viewPadding.top`（状态栏）、底栏垫
+  `viewPadding.bottom`（手势条），全屏（沉浸式）时归零；整面 0.35 黑
+  替换为 PiliPlus 式上下渐变遮罩。
+- **竖屏底部按钮行溢出**：手机传输行精简为 6 个紧凑按钮（播放 / 跳过片头 /
+  倍速 / 截图 / 更多 / 全屏），超分辨率、视频详情、定时关闭、锁定、画中画、
+  加载字幕移入「更多」底部面板；桌面保持全量内联。
+- **锁定控制无解锁入口**：锁定按钮改为带状态切换（lock/lock_open），
+  「更多」面板同步。
+- `PlayerItem.dispose` 补充兜底：路由被绕过拆除（页签快捷键等）时手机不再
+  残留沉浸式与横屏锁定。
+
+### Added
+
+- **手机旋转自动全屏**（PiliPlus 行为，`PlayerItem._syncOrientationFullscreen`）：
+  播放中物理旋转进入横屏即沉浸式全屏，转回竖屏自动退出；PiP 与锁定面板时
+  跳过，与手动全屏互为幂等不回环。
+- **手机本地媒体自动扫描**（`lib/services/platform/mobile_media_scanner.dart`）：
+  走既有 `download_directory` 通道申请「所有文件访问」（manifest 已声明
+  MANAGE_EXTERNAL_STORAGE，新增 `hasStorageAccess` 只查不弹页）；
+  `Isolate.run` 内枚举 `/storage` 各卷，探测标准媒体目录（Movies/DCIM/
+  Download/Music 等 10 项）+ 一级目录全扫（剔除 Android/data/obb），有媒体
+  的目录按标准目录优先、数量降序返回并加入媒体库（`addDirectory` 链式扫描）。
+  入口：媒体库页「扫描手机媒体」按钮 + 空态 CTA + 首次进库自动触发一次
+  （仅权限已授予时，绝不自动弹系统设置页；`mobileAutoScanDone` 一次性旗标）；
+  播放页空态新增「媒体库」跳转（手机）。
+
+### Changed
+
+- 播放面板视觉：上下渐变遮罩、紧凑图标按钮（40px 约束）、进度条与音量条
+  细轨化（trackHeight 3 / thumb 6）。
+- 首页：历史行改缩略图卡片（16:9 缩略图帧 + 进度条 + 圆角悬停卡，缩略图
+  复用 ThumbnailService）；不小于 720px 宽度时快捷动作与标题同行。
+- 媒体库：搜索框改胶囊填充样式；网格卡片悬停高亮描边。
+- Android 构建接入中国镜像（本机 `dl.google.com` / `storage.googleapis.com`
+  不可达）：settings.gradle / build.gradle 增加 `storage.flutter-io.cn`
+  （download.flutter.io 镜像）、腾讯云与阿里云 maven 前置，
+  google()/mavenCentral() 保留兜底。
+
+### 验证
+
+- `flutter analyze` 0 告警；`flutter test` 341 用例全绿（1 skip 维持）；
+  `flutter build linux --debug` 通过；`./gradlew assembleDebug` 通过
+  （`build/app/outputs/flutter-apk/app-debug.apk`）。模拟器视觉回归未跑
+  （本机无 emulator 系统镜像且 dl.google.com 不可达，装机受阻）。
+
+## [2.0.0-alpha] - 2026-11-10（已发布）
+
+迁移工程 M1-M8 全部里程碑产物：Kazumi 骨架导入并剥离番剧业务，1.x 行为
+语义逐条平移，数据 schema 与 1.x 逐字段一致。2026-11-10 08:13 CST 以 tag
+`v2.0.0-alpha` 触发全平台发布矩阵并公开 GitHub Release（9 资产：Linux
+amd64/arm64 的 deb 与 tar.gz、Android 三 ABI APK、Windows/macOS zip；
+产物对应提交 `bd36f70`，未含其后 R4 的测试与 i18n 提交）。
 
 ### Added
 
@@ -49,7 +112,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 - **交付（M8）**：双语 README、NOTICE.md（Kazumi / PiliPlus / Anime4K /
   1.x MIT→GPL-3.0 重授权声明）；SPEC §7 数据兼容测试
   （`test/data_compat_spec7_test.dart`，1.x 样例 JSON 喂入两个 store）；
-  CI 改造——push/PR 仅单 job Linux analyze+test+build，全平台打包矩阵
+  CI 改造 - push/PR 仅单 job Linux analyze+test+build，全平台打包矩阵
   （Windows/macOS/Android/Linux amd64+arm64）仅 `v*` tag 触发，删除全部
   dart-define 密钥注入与第三方签名服务，iOS 构建保留注释待接入。
 
@@ -71,14 +134,14 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   取自真实 UI 字符串并带出处注释）/ `app_en.arb`（结构预留）+ 生成的
   `AppLocalizations` 类（非 synthetic-package，生成文件提交）+
   `app_widget.dart` 装配；默认语言仍 zh-Hans-CN，页面字符串迁移为后续轮次）；
-  迁移路线图 `docs/UPGRADE_ROADMAP_2026-11-10.md`（M0–M8 ✅+提交哈希、
+  迁移路线图 `docs/UPGRADE_ROADMAP_2026-11-10.md`（M0-M8 ✅+提交哈希、
   R1/R2 收尾轮次、未做项 ☐ 清单、验收标准与贯穿约定）。
 
-- **红灯清零（R3）**：Linux deb `Depends` 从 2 项补到 17 项——GTK 运行库
+- **红灯清零（R3）**：Linux deb `Depends` 从 2 项补到 17 项 - GTK 运行库
   显式钉入（`libgtk-3-0t64`），不再依赖 tray 包侧链隐式捎带，音频输出 /
   硬解 / GL 视频输出运行库齐备（`7052260`；覆盖经 `apt-cache depends
   --recurse` 审计：bundle ldd 闭包的 104 个提供包全部落在 17 包递归闭包
-  251 包内，差集为空）；页签壳成为第一个接入 i18n 的页面——五个页签标签
+  251 包内，差集为空）；页签壳成为第一个接入 i18n 的页面 - 五个页签标签
   经 `menuTabLabels()` 单一来源分发（竖屏 NavigationBar 与横屏
   NavigationRail 同源，文案不可能漂移）、「再按一次退出应用」toast 换
   `AppLocalizations`，迁移链由 `test/menu_l10n_test.dart` 3 用例端到端
@@ -87,6 +150,23 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   结果保留、进度按节流步触发不逐文件刷屏、flock 实证缩略图至多一个 ffmpeg
   子进程，与 1.x 单 worker 线程形状一致；isolate 分片多开经评估不采，
   理由记录在测试文件头注释）。
+
+- **首绿发布（R4）**：CI 首绿达成（run 42718530280，`332 tests passed,
+  1 skipped`，与 R3 预期签名一致）后，`v2.0.0-alpha` tag 三次演练打穿真实
+  发布链并公开 GitHub Release（9 资产，见 Fixed 三盏红灯与死 include 的
+  修复）；1.x `tests/test_mpv_engine.cpp` 的 apply() 半边逐用例平移 - 
+  5 条真开 libmpv 的 live 用例进 `test/mpv_player_properties_test.dart`
+  （propertyRoundTripDispatch / applyPresetLandsOnLiveCore /
+  observedPropertySignalsAvailableAndUnavailable /
+  unavailableIdleCoreReadsClearedValues / commandErrorSurfacesThroughLogStream，
+  `initializeSmoke` 吸收进各 live 用例、`doubleInitializeRejected` 因 2.0
+  无引擎单例不移植，对账表在测试文件头注释）（`2598bc8`）；设置页音频类
+  接入 i18n（第二页）：app bar / 分区与瓦片标题 / 均衡器提示实时翻转 /
+  预设单一来源标签表 `audioEqualizerPresetLabels` / 十个频段行，默认语言
+  仍 zh-Hans-CN、中文界面零变化，迁移链由 `test/audio_settings_l10n_test.dart`
+  4 用例（zh+en，真实页面挂载）锁定（`2c6bf06`）；中英 README 增「发布
+  产物 / Release artifacts」节（平台×产物表、deb 直装建议、未签名提示）
+  与 Linux 源码构建的运行期依赖说明（`2c6bf06`）。
 
 ### Fixed
 
@@ -98,7 +178,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   将原生依赖安装步挪到 `flutter test` 之前并补装 `libva2 libva-drm2
   libva-x11-2 libva-wayland2 libvdpau1`（`release.yaml` 同步）。
 - CI 第二跑红灯（run 42712702494）：同一批用例报 `libpulse.so.0: cannot
-  open shared object file`——dlopen 每次只报第一个缺失依赖，R2 补的
+  open shared object file` - dlopen 每次只报第一个缺失依赖，R2 补的
   VA/VDPAU 只是直系依赖的第一层；`7debc83` 按 `readelf -d` 实测
   `libmpv.so.2` 全部直系 NEEDED 后向 pr.yaml / release.yaml 一次补装
   14 个运行库（`libpulse0 libxv1 libegl1 libgbm1 libdrm2 libunwind8
@@ -106,7 +186,24 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   libmpg123-0t64 libopus0 libogg0`；第二层编解码库交给发行版依赖图，
   不按随发行版变名的 soname 钉死），并把 pr.yaml 步序改为 构建 →
   `ldd libmpv.so.2 | grep 'not found'` 审计（任一缺失即红灯并列全清单）→
-  测试——依赖缺口从此一次列全，不再逐轮烧 CI 分钟数。
+  测试 - 依赖缺口从此一次列全，不再逐轮烧 CI 分钟数。
+- `v2.0.0-alpha` 发布演练第一跑三平台红灯（run 42720144705，`b9b3d2c` 一次
+  修复，第二跑验证）：macOS 打包 `ditto: Cannot get the real path for
+  source '.../EmoPlay.app'` - M1 品牌化改名漏了
+  `macos/Runner.xcodeproj/project.pbxproj`，构建产物仍是 `Kazumi.app`
+  （product 引用 / RunnerTests bundle id / TEST_HOST 全部改 EmoPlay）；
+  Windows 装环境 `yq not found` - flutter-action 的
+  `flutter-version-file` 解析在 windows-latest 需要 yq 且未预装（改钉
+  `flutter-version: '3.47.9'`，与 pubspec 同步手改）；Linux arm64 构建
+  `Could NOT find ALSA` - 自建 action 冷缓存走源码构建时装 Flutter 缺
+  ALSA 头文件（apt 清单补 `libasound2-dev` +
+  `libayatana-appindicator3-dev`）。
+- `v2.0.0-alpha` 发布演练第二跑 Windows 编译红灯（run 42722139024）：
+  `windows/runner/main.cpp` 残留已随 STRIP-LIST 剥离的 app_links 插件
+  include（`error C1083: Cannot open include file:
+  'app_links/app_links_plugin_c_api.h'`，头文件永远无法解析）；`bd36f70`
+  删除 include 与 `SendAppLink()` 调用（第二实例 `emoplay://` 唤起保留，
+  URL 内容转发为待做功能），第三跑 run 42724607274 全绿并完成发布。
 
 ### Changed
 

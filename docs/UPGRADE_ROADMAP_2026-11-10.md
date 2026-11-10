@@ -2,35 +2,36 @@
 
 | 项       | 值                                                                                     |
 | -------- | -------------------------------------------------------------------------------------- |
-| 状态     | 生效中（2026-11-10 R2 轮建立；R2/R3 文档轮先后修正滞后数字与轮次表）                     |
+| 状态     | 生效中（2026-11-10 R2 轮建立；R2/R3/R4 文档轮先后修正滞后数字与轮次表）                     |
 | 日期     | 2026-11-10（最后实质性更新）                                                             |
-| 适用版本 | git `c943414`（2.0.0-alpha+2000000，未发布；`pubspec.yaml:4`）                            |
-| 相关     | [SPEC.md](SPEC.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[HANDOVER.md](HANDOVER.md)、[R1 工作报告](reports/WORK_REPORT_2026-11-10_RECONCILIATION_CLOSEOUT.md)、[R2 工作报告](reports/WORK_REPORT_2026-11-10_TURN_GREEN_BACKFILL.md)、[R3 工作报告](reports/WORK_REPORT_2026-11-10_RED_LIGHT_ZEROING.md)、[CI run 42712702494](https://github.com/emoeem/emoplay/actions/runs/42712702494) |
+| 适用版本 | git `2c6bf06`（2.0.0-alpha+2000000，`pubspec.yaml:4`）；tag `v2.0.0-alpha` 已公开发布，产物对应 `bd36f70`                            |
+| 相关     | [SPEC.md](SPEC.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[HANDOVER.md](HANDOVER.md)、[R1 工作报告](reports/WORK_REPORT_2026-11-10_RECONCILIATION_CLOSEOUT.md)、[R2 工作报告](reports/WORK_REPORT_2026-11-10_TURN_GREEN_BACKFILL.md)、[R3 工作报告](reports/WORK_REPORT_2026-11-10_RED_LIGHT_ZEROING.md)、[R4 工作报告](reports/WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md)、[CI run 42718530280（首绿）](https://github.com/emoeem/emoplay/actions/runs/42718530280) |
 
 ## 一、当前基线（实测）
 
-结论：迁移主流程 M0–M8 与 R1/R2/R3 三轮收尾全部完成；本地门禁全绿（含
-release 构建与 deb 打包），唯一红灯在 CI——两层依赖缺口（VA/VDPAU →
-libpulse）均已定位修复，**首绿待 R3 提交推送后确认**。
+结论：迁移主流程 M0–M8 与 R1–R4 四轮收尾全部完成；**CI 首绿已达成**（run
+42718530280，签名与 R3 预期一字不差），**v2.0.0-alpha 已公开发布**（发布
+演练三次跑打穿，GitHub Release 9 资产）；本地门禁全绿且 build_runner 幂等、
+ldd 审计 0 缺失；唯一悬空项是 R4 后两个提交待推送（推送后预期 CI 签名
+341 passed / 1 skipped）。
 
 | 门禁       | 结果                                                              | 来源                                                                 |
 | ---------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 版本       | 2.0.0-alpha+2000000，git HEAD `c943414`（领先 origin/main 3 提交） | `git log -1`、`git log origin/main..HEAD`（2026-11-10 R3 文档轮实测） |
-| 静态检查   | **0 告警**（`No issues found! (ran in 2.3s)`）                    | `flutter analyze`（2026-11-10 R3 文档轮实测）                        |
-| 自动化测试 | **32 文件 / 332 通过 + 1 平台条件跳过，全绿**（`+332 ~1: All tests passed!`） | `flutter test`（2026-11-10 R3 文档轮实测；R1 28/313+1 → R2 30/326+1 → R3 +2 文件 / +6 用例） |
-| Linux 构建 | debug 与 release 构建通过；deb 打包通过（deb 17,045,202 字节 / tar.gz 20,743,844 字节，`package-linux.sh` 实跑） | `flutter build linux --debug` / `--release` / `bash .github/scripts/package-linux.sh amd64 x64 v2.0.0-alpha`（2026-11-10 R3 文档轮实测） |
-| CI         | **run 42712702494 failure**（2m53s，analyze ✓、Run tests ✗ 于 324 通过 / 2 失败 / 1 跳过） | `gh run list` / `gh run view 42712702494`（R3 本轮实测）             |
+| 版本       | 2.0.0-alpha+2000000，git HEAD `2c6bf06`（领先 origin/main 2 提交）；tag `v2.0.0-alpha` → `bd36f70` 已发布 | `git log -1`、`git log origin/main..HEAD`、`git rev-parse v2.0.0-alpha^{commit}`（2026-11-10 R4 文档轮实测） |
+| 静态检查   | **0 告警**（`No issues found! (ran in 3.0s)`）                    | `flutter analyze`（2026-11-10 R4 文档轮实测）                        |
+| 自动化测试 | **33 文件 / 341 通过 + 1 平台条件跳过，全绿**（`+341 ~1: All tests passed!`） | `flutter test`（2026-11-10 R4 文档轮实测；R1 28/313+1 → R2 30/326+1 → R3 32/332+1 → R4 +1 文件 / +9 用例） |
+| Linux 构建 | debug 构建通过；ldd 审计 0 缺失；发布产物由 CI 矩阵产出（amd64 deb 17,148,320 字节等 9 资产） | `flutter build linux --debug` / `ldd build/native_assets/linux/libmpv.so.2 \| grep -c 'not found'`（R4 文档轮实测）；`gh api .../releases`（R4 实测） |
+| CI         | main 三连绿：**42718530280 首绿**（4m12s，`🎉 332 tests passed, 1 skipped.`）→ 42722128694 → 42724596082；release 演练 42720144705 ✗ → 42722139024 ✗ → **42724607274 ✓（GitHub Release 已发布）** | `gh run list` / `gh run view`（R4 本轮实测）                         |
 
-CI 红灯两层洋葱（归因链全文见
-[R3 工作报告 §3.1](reports/WORK_REPORT_2026-11-10_RED_LIGHT_ZEROING.md)）：
-失败用例始终是 `test/equalizer_test.dart` 的 `equalizerAppliesToEngine`（:212）
-与 `equalizerDisableClearsChain`（:271）——全仓唯二真开 libmpv 核心的用例，
-报错随修复逐层下钻：第一层 `libva-drm.so.2`（run 42706655830，`3379d7a`
-补 VA/VDPAU）、第二层 `libpulse.so.0`（run 42712702494，`7debc83` 按
-`readelf -d` 实测直系 NEEDED 一次装全 14 包，并在 pr.yaml 加
-`ldd | grep 'not found'` 审计步，缺口以后一次列全）。两个 run 的标题都是
-文档提交（混合 push 触发、标题只显示头提交，HANDOVER 坑 2）。
-**首绿待 R3 提交推送后确认，预期签名 332 passed / 1 skipped**。
+CI 红灯历史（归因链全文见
+[R3 工作报告 §3.1](reports/WORK_REPORT_2026-11-10_RED_LIGHT_ZEROING.md) 与
+[R4 工作报告 §3.1](reports/WORK_REPORT_2026-11-10_FIRST_GREEN_RELEASE.md)）：
+main 侧两层依赖洋葱（`libva-drm.so.2` → `libpulse.so.0`，`3379d7a` /
+`7debc83` 修复）已由首绿 run 42718530280 收口；发布矩阵侧四盏红灯
+（macOS `Kazumi.app` 残留 / Windows 缺 `yq` / arm64 缺 ALSA / Windows 死
+include app_links）已由 `b9b3d2c` / `bd36f70` 修复并被 drill#3 全绿验证。
+混合 push 触发、run 标题只显示头提交的坑在 R2/R3/R4 三轮连续出现
+（HANDOVER 坑 2）。
 
 ## 二、阶段划分：M0–M8（✅ 全部完成）
 
