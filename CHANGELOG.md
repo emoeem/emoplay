@@ -6,6 +6,56 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
+## [Unreleased] - 2026-11-11（R7 性能实测与设置收尾轮）
+
+### Added
+
+- **设置 → 通用「恢复默认设置」**（`d971af0`）：1.x
+  `SettingsService::restoreDefaults` 的 UI 槽位落地，EmoDialog 危险样式
+  确认后 quality / behavior / music 三分区回 1.x schema 默认
+  （`lib/settings/emoplay_settings.dart:500`）；媒体库、观看历史与 mpv
+  配置导入决策不动（导入决策的重置在 mpv 配置页自有 tile）；恢复后把
+  新值推进会话控制器（`reloadFromSettings`）与
+  `LibraryStore.setScanOptions`，画质 / 音频 / 媒体库页即时刷新。
+  1.x 对账清单最后一项（`restoreDefaultsKeepsMediaAndHistory`）消账：
+  2.0 语义测试（`test/settings_service_semantics_test.dart:139`）seed
+  全部非默认值后断言真实 library.json / history.json 逐字节不变。
+- **性能基准资产**（`87b3760`）：`test/perf_scan_benchmark_test.dart`
+  （4 段，skip-if-fixture-missing，夹具缺失自动降级通过）+
+  `tools/gen_perf_fixture.sh`（2000 文件夹具生成器，幂等，只进 /tmp）。
+  2000 条目量级实测：worker isolate 热扫 125ms（16000 files/s）、进度
+  回调 63 次（32 步长节流）、library.json 装载 1.7-2.2ms（远低于 100ms
+  阻塞阈值，判定不改代码）、缩略图串行链 77-81ms/作业、并发重叠 0。
+  全部为容器 Isolate 计时（非宿主基线），数字全录
+  `docs/reports/WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md`。
+- **tag 发布 draft 制**（`0a3436c`）：release.yaml `Create release` 步
+  `draft: true`，alpha / 误打 tag 的产物先落草稿、不占公开 Latest 位
+  （draft 不能被设为 Latest）；人工核对后
+  `gh release edit <tag> --draft=false` 公开，流程新增
+  `docs/guides/BUILD_GUIDE.md` §四。主要失效模式：忘 publish。
+
+### Changed
+
+- **通用设置页 i18n 第三页**（`d971af0`）：页签壳（R3）、音频设置（R4）
+  之后，通用设置页整体迁移 AppLocalizations，zh / en 双语（含恢复默认
+  确认文案）；新增 `test/general_settings_l10n_test.dart` 5 用例
+  headless 挂真实页面，锁双语渲染、确认对话框取消不动分区、确认后
+  三分区复位且页面即时刷新。
+- **deb control 注释口径考证**（`0a3436c`）：依赖清单注释里互相矛盾的
+  库数（历史五口径 250/234/166/64/113 与原写「115」）改为审计 P2 实测
+  口径并写明统计范围：直连 NEEDED 并集 63 soname（64→63 对应 R6 移除
+  `screen_brightness_ohos`）、ldd 传递闭包 125 路径 = 9 内嵌 + 116 外部、
+  3 个 dlopen-only 内嵌库从不进 ldd。注释级修复，无行为变化。
+
+### 验证
+
+- `flutter analyze` 0 告警（`No issues found! (ran in 8.3s)`）；
+  `flutter test` 37 文件 **355 通过 + 1 skipped** 全绿（2026-11-11 03:40
+  CST 文档收网窗口实测，夹具在场基准段真跑；上轮 35 文件 / 345 + 1）。
+  CI 本窗口不可测：`gh run list` EOF（03:41 CST，api.github.com 不可达）；
+  `87b3760` / `d971af0` / `0a3436c` 三提交未推送，推送后预期签名
+  **355 passed / 1 skipped**（CI 无 /tmp 夹具时基准段 skip 降级，计数不变）。
+
 ## [Unreleased] - 2026-11-11（R6 卫生与交付形态轮）
 
 ### Added

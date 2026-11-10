@@ -33,6 +33,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [RELEASE_2026-11-10_FIRST_GREEN_RELEASE.md](releases/RELEASE_2026-11-10_FIRST_GREEN_RELEASE.md) | 首绿发布 R4：CI 首绿达成（332/1 与预期一致）、v2.0.0-alpha 发布演练三跑打穿（macOS Kazumi.app 残留 / Windows 缺 yq / arm64 缺 ALSA / Windows 死 include 四红灯修复）、GitHub Release 公开 9 资产、mpv apply 半边 5 条 live 用例、音频设置页 i18n 第二页；33 文件 341 用例全绿 |
 | [RELEASE_2026-11-10_PANEL_LOOK.md](releases/RELEASE_2026-11-10_PANEL_LOOK.md) | 面板观感 R5：播放页两处整页失效修复（快捷键焦点门禁 / Observer 短路）、字体定案（系统字体默认 + 显式 CJK 兜底 + 设置开关）、播放面板按 Kazumi 逐槽位重组、发布矩阵 9 job 超时 + Windows 版本单一来源；34 文件 342 用例全绿，CI 本窗口不可测 |
 | [RELEASE_2026-11-10_HYGIENE_DELIVERY.md](releases/RELEASE_2026-11-10_HYGIENE_DELIVERY.md) | 卫生与交付形态 R6：AppImage 打包落地（linuxdeploy；amd64 产物与 runtime 本机实测，arm64 仅 CI 可验）、web 残留 / any×3 / screen_brightness_ohos 清账（审计 P2 卫生批次）、Kazumi 空态按钮 / 徽章 / 许可证 tile 样式对齐 + 3 守护用例、README 对账与截图占位；35 文件 345 用例全绿，CI 不可测、6 提交待推送 |
+| [RELEASE_2026-11-10_PERF_AND_SETTINGS.md](releases/RELEASE_2026-11-10_PERF_AND_SETTINGS.md) | 性能实测与设置收尾 R7：设置 → 通用「恢复默认设置」落地（1.x 对账最后一项消账，库 / 历史 / 导入决策不动）、性能定量实测 ☐→✅（容器口径：热扫 125ms / 装载 1.7-2.2ms，判定不改代码）、tag 发布 draft 制 + BUILD_GUIDE §四流程、deb 注释库数口径考证；37 文件 355 用例全绿，CI 不可测、3 提交待推送 |
 
 ## 工作报告（reports/，读者是维护者与接手者）
 
@@ -45,6 +46,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [WORK_REPORT_2026-11-10_PANEL_LOOK.md](reports/WORK_REPORT_2026-11-10_PANEL_LOOK.md) | R5 面板观感：两处整页失效根因链（焦点门禁永假 / Observer && 短路）、楷体事故归因（M1 删字体 + fontconfig 猜错）、面板单文件重组（402 插入 / 485 删除）、门禁实测（34 文件 342 用例全绿 / analyze 0 / ldd 0 / 音频探针真跑）、CI 不可测窗口记录 |
 | [WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md](reports/WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md) | R6 卫生与交付形态：审计 P2 卫生批次三项逐条对账、AppImage 产物与 runtime 实测（35,584,504 B / static-pie / help exit 0 / gitignore 覆盖）、门禁实测（35 文件 345+1 全绿 / analyze 0，与施工轮两次同数）、守护测试注释与 CI 现实不符项挂账（hardcoded-color grep 不存在）、CHANGELOG 一轮一节结构修复 |
 | [WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md](reports/WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md) | R7 性能定量实测：路线图 §4.1「性能实测」☐→✅（容器环境实测）。2000 文件夹具扫描吞吐（worker 热扫 125ms / 16000 files/s，直连遍历冷 160-179ms，进度回调实数 63 次）、首帧同步 IO 静态清单 + 2000 条目 library.json 装载 1.7-2.2ms（远低于 100ms 阈值，不改代码）、缩略图串行链 77-81ms/作业（并发重叠 0）；基准 skip-if-fixture-missing；**容器 Isolate 计时，非宿主基线**，GUI 首帧墙钟与真 ffmpeg 速率仍归 SPEC §9；门禁实测（36 文件 349+1 全绿 / analyze 0） |
+| [WORK_REPORT_2026-11-10_PERF_AND_SETTINGS.md](reports/WORK_REPORT_2026-11-10_PERF_AND_SETTINGS.md) | R7 性能实测与设置收尾（轮级收网）：三施工提交逐项对账（路线图 §4.1 ✅、1.x 对账最后一项消账、draft 制全验待 tag run）、门禁实测（37 文件 355+1 全绿 / analyze 0，夹具在场基准段真跑）、路线图勾选滞后三处挂账、确认无问题清单（数据安全契约测试体核实 / CHANGELOG 一轮一节 / draft 制三处口径一致）、下一步建议 5 条 |
 
 ## 审计（audits/）
 

@@ -2,24 +2,63 @@
 
 | 项     | 值                                                                          |
 | ------ | --------------------------------------------------------------------------- |
-| 状态   | 生效中（2026-11-11 R6 卫生与交付形态轮之后）                                 |
+| 状态   | 生效中（2026-11-11 R7 性能实测与设置收尾轮之后）                             |
 | 日期   | 2026-11-11（最后实质性更新）                                                 |
-| 适用版本 | git `b0e1a06`（`d446bb8` 起六个提交未推送；origin/main 停在 `63d9f59`）   |
+| 适用版本 | git `0a3436c`（`87b3760` 起三个提交未推送；origin/main 停在 `e1db680`）   |
 | 相关   | [SPEC.md](SPEC.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md) |
 
 ## 现状一句话
 
-M1-M8 迁移主流程、R1-R4 四轮收尾、R5 两小轮（移动端播放修复 / 面板观感）
-与 R6 卫生与交付形态轮（仓库卫生清账 / AppImage 打包 / Kazumi 空态与徽章
-对齐 / README 对账）全部完成：Kazumi 骨架上重建的 Flutter/mpv 本地播放器
+M1-M8 迁移主流程、R1-R4 四轮收尾、R5 两小轮（移动端播放修复 / 面板观感）、
+R6 卫生与交付形态轮（仓库卫生清账 / AppImage 打包 / Kazumi 空态与徽章
+对齐 / README 对账）与 R7 性能实测与设置收尾轮（性能定量实测 / 恢复默认
+设置 / draft 发布制）全部完成：Kazumi 骨架上重建的 Flutter/mpv 本地播放器
 功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv 兼容导入 / 画质引擎 / 插件
 / 11 类设置 / 更新检查），**CI 首绿已达成**（run 42718530280，
 `332 tests passed, 1 skipped`），**v2.0.0-alpha 已公开发布**（tag 指向
-`bd36f70`，GitHub Release 9 资产）；本地 35 个测试文件 345 用例全绿
-（R6 施工轮与文档收网轮两次独立实测同数，含 3 个新 Kazumi 对齐守护用例）、
-analyze 0 告警；origin/main 停在 `63d9f59`，`d446bb8` / `8ed84c4` /
-`1dc5d14` / `988122f` / `e1a2df0` / `b0e1a06` 六个提交待推送（推送后预期
-CI 签名 **345 passed / 1 skipped**），版本仍是 2.0.0-alpha。
+`bd36f70`，GitHub Release 9 资产；R7 起后续 tag 发布改 draft 制，人工
+核对 publish 才公开）；路线图「性能实测」已 ✅（容器 Isolate 计时口径，
+宿主基线归 SPEC §9），1.x 对账最后一项（恢复默认设置）已消账；本地
+37 个测试文件 355 用例 + 1 跳过全绿（R7 文档窗口实测，夹具在场基准段
+真跑）、analyze 0 告警；origin/main 跟踪引用停在 `e1db680`（最后一次
+fetch/push 时点远端已含 R5/R6 六提交，当前远端状态因 gh EOF 不可复核），
+`87b3760` / `d971af0` / `0a3436c` 三个提交待推送（推送后预期 CI 签名
+**355 passed / 1 skipped**），版本仍是 2.0.0-alpha。
+
+## 最近实质性变更（R7·性能实测与设置收尾，2026-11-11 02:55-03:37 CST 施工 + 文档收网）
+
+三个提交（`87b3760` 性能实测、`d971af0` 恢复默认设置、`0a3436c` draft 制
+与打包注记）+ 本轮文档收网。细节与证据见
+[发布说明](releases/RELEASE_2026-11-10_PERF_AND_SETTINGS.md)、
+[轮级工作报告](reports/WORK_REPORT_2026-11-10_PERF_AND_SETTINGS.md) 与
+性能定量专报
+[WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md](reports/WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md)。
+
+- 性能实测（`87b3760`）：路线图 §4.1 ☐→✅（容器环境实测口径）。2000 文件
+  夹具扫描 worker 生产路径热扫 125ms（16000 files/s）、2000 条目
+  library.json 装载 1.7-2.2ms（远低于 100ms 阻塞阈值，判定不改代码）、
+  缩略图串行链 77-81ms/作业、并发重叠 0。基准
+  `test/perf_scan_benchmark_test.dart` skip-if-fixture-missing（夹具
+  `/tmp/emoplay-perf-lib` 由 `tools/gen_perf_fixture.sh` 生成，只在 /tmp，
+  CI 无夹具时自动降级通过）。**容器 Isolate 计时，非宿主基线**。
+- 恢复默认设置（`d971af0`）：设置 → 通用新增「恢复默认设置」操作项，
+  EmoDialog 危险样式确认后 quality / behavior / music 三分区回 1.x schema
+  默认（`lib/settings/emoplay_settings.dart:500`）；媒体库、观看历史与
+  mpv 配置导入决策不动，恢复后各设置页经会话控制器 `reloadFromSettings`
+  即时刷新。1.x 对账最后一项消账；通用设置页 i18n 第三页；新增 5 + 1
+  守护用例（l10n 挂真实页面 + 语义测试断言库 / 历史文件逐字节不变）。
+- draft 发布制（`0a3436c`）：release.yaml `Create release` 步
+  `draft: true`，跑完是草稿，人工核对后 `gh release edit <tag>
+  --draft=false` 公开（流程 BUILD_GUIDE §四，坑 8(d)）；**忘 publish 是
+  新流程主要失效模式**。deb control 注释补库数口径考证（「115」孤例 →
+  63 直连 NEEDED / 125 ldd 闭包 / 116 外部 / 3 个 dlopen-only）。
+- 本轮文档收网：R7 发布说明 + 轮级工作报告 + 本文件刷新 +
+  docs/README.md 索引 + CHANGELOG 补 R7 节。路线图勾选滞后三处挂账
+  （AppImage ☐ 已落地 / i18n 清单缺通用设置页 / 对账残余 ☐ 已消账），
+  本轮按惯例不动路线图，见[工作报告 §5](reports/WORK_REPORT_2026-11-10_PERF_AND_SETTINGS.md)。
+- 门禁实测（03:40-03:41 CST 文档窗口）：analyze 0 告警（8.3s）；37 文件
+  **355 通过 / 1 skipped** 全绿（夹具在场，基准段真跑）；CI 不可测
+  （`gh run list` EOF）。
 
 ## 最近实质性变更（R6·卫生与交付形态，2026-11-11）
 
@@ -194,18 +233,20 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
 ## 接手第一步清单
 
 1. `source /opt/emoplay-env.sh && cd /home/emo/code/emoplay && flutter analyze && flutter test`
-    - 预期 0 告警 + 345 通过 / 1 skipped（35 文件，R6 实测底数），达不到先查环境再查代码。
+    - 预期 0 告警 + 355 通过 / 1 skipped（37 文件，R7 实测底数；
+      /tmp/emoplay-perf-lib 夹具在场时 4 段基准真跑，缺失时 skip 打印
+      降级同样全绿），达不到先查环境再查代码。
 2. `git fetch origin && git log origin/main..HEAD --oneline` 与
    `gh run list -R emoeem/emoplay --limit 5`（gh 需要外网，收网窗口内
-   api.github.com 不可达） - 确认 `d446bb8` / `8ed84c4` / `1dc5d14` /
-   `988122f` / `e1a2df0` / `b0e1a06` 与本轮文档是否已推送、推送后 CI 是否
-   **345 passed / 1 skipped**；红灯按坑 2 的归因链处理。
+   api.github.com 不可达） - 确认 `87b3760` / `d971af0` / `0a3436c`
+   与本轮文档是否已推送、推送后 CI 是否
+   **355 passed / 1 skipped**；红灯按坑 2 的归因链处理。
 3. 通读 [SPEC.md](SPEC.md) §4 不变量与 [PORT-MAP.md](PORT-MAP.md) 头部铁律。
 4. 待办从 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) §四
-   未做项清单取（发布产物实体机验证 → prerelease 语义 → i18n 第三页 →
-   签名/公证 → 性能实测；其中 AppImage 打包已在 R6 `e1a2df0` 落地，
-   路线图 §四-108 与 R3-R6 轮次表的勾选态以路线图下次收网为准），以及
-   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md)
+   未做项清单取（发布产物实体机验证 → prerelease 语义 → i18n 其余设置页
+   → 签名/公证；性能实测已 R7 ✅、AppImage 打包已 R6 `e1a2df0` 落地，
+   路线图 §四 与 R3-R7 轮次表的勾选态以路线图下次收网为准），以及
+   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_PERF_AND_SETTINGS.md)
    的优先级建议。
 5. 改完代码跑 SPEC §9 gate（build_runner → analyze → test → build linux）。
 
