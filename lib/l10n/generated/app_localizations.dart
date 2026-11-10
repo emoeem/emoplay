@@ -139,6 +139,90 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'再按一次退出应用'**
   String get doubleBackToExit;
+
+  /// 设置中心「音频」分类页标题（lib/pages/settings/audio_settings.dart SettingsDetailScaffold，SPEC §6 category 4）。
+  ///
+  /// In zh, this message translates to:
+  /// **'音频'**
+  String get audioTitle;
+
+  /// 音频页均衡器分组标题（audio_settings.dart SettingsSection）。
+  ///
+  /// In zh, this message translates to:
+  /// **'均衡器'**
+  String get equalizerSection;
+
+  /// 音频页分组脚注：EQ 开启时的 af 链状态说明（audio_settings.dart bottomInfo）。
+  ///
+  /// In zh, this message translates to:
+  /// **'已应用于 mpv 音频滤镜链（整链写入；关闭时恢复变速基线）'**
+  String get equalizerEnabledInfo;
+
+  /// 音频页分组脚注：EQ 关闭时的 af 链状态说明（audio_settings.dart bottomInfo）。
+  ///
+  /// In zh, this message translates to:
+  /// **'已停用 — mpv 音频滤镜链保持不动'**
+  String get equalizerDisabledInfo;
+
+  /// 音频页 EQ 开关瓦片标题（audio_settings.dart SettingsTile.switchTile）。
+  ///
+  /// In zh, this message translates to:
+  /// **'启用均衡器'**
+  String get equalizerEnableTitle;
+
+  /// 音频页 EQ 开关瓦片描述（audio_settings.dart SettingsTile.switchTile）。
+  ///
+  /// In zh, this message translates to:
+  /// **'10 段 ISO 倍频程均衡，写入 mpv af 链'**
+  String get equalizerEnableDescription;
+
+  /// 音频页预设下拉标题（audio_settings.dart SettingsDropdownTile）。
+  ///
+  /// In zh, this message translates to:
+  /// **'预设'**
+  String get equalizerPresetTitle;
+
+  /// 音频页预设下拉描述：用户移动过频段后（equalizerPreset == 'custom'）。
+  ///
+  /// In zh, this message translates to:
+  /// **'已手动调整 — 当前为自定义曲线'**
+  String get equalizerPresetCustomInfo;
+
+  /// 音频页预设下拉描述：未移动频段时的默认提示。
+  ///
+  /// In zh, this message translates to:
+  /// **'选择一个内置曲线'**
+  String get equalizerPresetPickInfo;
+
+  /// 均衡器预设 flat 的显示名（audioEqualizerPresetLabels，键对齐 music/equalizer.dart 的 kPresetNames）。
+  ///
+  /// In zh, this message translates to:
+  /// **'平坦'**
+  String get presetFlat;
+
+  /// 均衡器预设 bass 的显示名（audioEqualizerPresetLabels）。
+  ///
+  /// In zh, this message translates to:
+  /// **'低音增强'**
+  String get presetBass;
+
+  /// 均衡器预设 vocal 的显示名（audioEqualizerPresetLabels）。
+  ///
+  /// In zh, this message translates to:
+  /// **'人声'**
+  String get presetVocal;
+
+  /// 均衡器预设 live 的显示名（audioEqualizerPresetLabels）。
+  ///
+  /// In zh, this message translates to:
+  /// **'现场'**
+  String get presetLive;
+
+  /// 音频页频段增益分组标题（audio_settings.dart 第二个 SettingsSection；频点数值与 Hz/dB 为通用记号，不进 arb）。
+  ///
+  /// In zh, this message translates to:
+  /// **'频段增益（dB）'**
+  String get equalizerGainSection;
 }
 
 class _AppLocalizationsDelegate

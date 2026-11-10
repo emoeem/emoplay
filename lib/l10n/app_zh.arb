@@ -1,6 +1,6 @@
 {
   "@@locale": "zh",
-  "@@comment": "EmoPlay zh 模板（SPEC §1：默认 zh）。键值取自真实 UI 字符串；R3 起页面逐页迁移（页签壳 menu.dart 已迁移，其余页面见路线图 ☐）。",
+  "@@comment": "EmoPlay zh 模板（SPEC §1：默认 zh）。键值取自真实 UI 字符串；R3 起页面逐页迁移（页签壳 menu.dart、音频设置页 audio_settings.dart 已迁移，其余页面见路线图 ☐）。",
   "appTitle": "EmoPlay",
   "@appTitle": {
     "description": "应用名，与 lib/utils/constants.dart 的 appName 常量一致（1.x 约定：应用名不翻译）。"
@@ -28,5 +28,61 @@
   "doubleBackToExit": "再按一次退出应用",
   "@doubleBackToExit": {
     "description": "页签壳上连按两次返回退出时的提示 toast（lib/pages/menu/menu.dart _handleSystemBack）。"
+  },
+  "audioTitle": "音频",
+  "@audioTitle": {
+    "description": "设置中心「音频」分类页标题（lib/pages/settings/audio_settings.dart SettingsDetailScaffold，SPEC §6 category 4）。"
+  },
+  "equalizerSection": "均衡器",
+  "@equalizerSection": {
+    "description": "音频页均衡器分组标题（audio_settings.dart SettingsSection）。"
+  },
+  "equalizerEnabledInfo": "已应用于 mpv 音频滤镜链（整链写入；关闭时恢复变速基线）",
+  "@equalizerEnabledInfo": {
+    "description": "音频页分组脚注：EQ 开启时的 af 链状态说明（audio_settings.dart bottomInfo）。"
+  },
+  "equalizerDisabledInfo": "已停用 — mpv 音频滤镜链保持不动",
+  "@equalizerDisabledInfo": {
+    "description": "音频页分组脚注：EQ 关闭时的 af 链状态说明（audio_settings.dart bottomInfo）。"
+  },
+  "equalizerEnableTitle": "启用均衡器",
+  "@equalizerEnableTitle": {
+    "description": "音频页 EQ 开关瓦片标题（audio_settings.dart SettingsTile.switchTile）。"
+  },
+  "equalizerEnableDescription": "10 段 ISO 倍频程均衡，写入 mpv af 链",
+  "@equalizerEnableDescription": {
+    "description": "音频页 EQ 开关瓦片描述（audio_settings.dart SettingsTile.switchTile）。"
+  },
+  "equalizerPresetTitle": "预设",
+  "@equalizerPresetTitle": {
+    "description": "音频页预设下拉标题（audio_settings.dart SettingsDropdownTile）。"
+  },
+  "equalizerPresetCustomInfo": "已手动调整 — 当前为自定义曲线",
+  "@equalizerPresetCustomInfo": {
+    "description": "音频页预设下拉描述：用户移动过频段后（equalizerPreset == 'custom'）。"
+  },
+  "equalizerPresetPickInfo": "选择一个内置曲线",
+  "@equalizerPresetPickInfo": {
+    "description": "音频页预设下拉描述：未移动频段时的默认提示。"
+  },
+  "presetFlat": "平坦",
+  "@presetFlat": {
+    "description": "均衡器预设 flat 的显示名（audioEqualizerPresetLabels，键对齐 music/equalizer.dart 的 kPresetNames）。"
+  },
+  "presetBass": "低音增强",
+  "@presetBass": {
+    "description": "均衡器预设 bass 的显示名（audioEqualizerPresetLabels）。"
+  },
+  "presetVocal": "人声",
+  "@presetVocal": {
+    "description": "均衡器预设 vocal 的显示名（audioEqualizerPresetLabels）。"
+  },
+  "presetLive": "现场",
+  "@presetLive": {
+    "description": "均衡器预设 live 的显示名（audioEqualizerPresetLabels）。"
+  },
+  "equalizerGainSection": "频段增益（dB）",
+  "@equalizerGainSection": {
+    "description": "音频页频段增益分组标题（audio_settings.dart 第二个 SettingsSection；频点数值与 Hz/dB 为通用记号，不进 arb）。"
   }
 }

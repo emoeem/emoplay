@@ -28,5 +28,61 @@
   "doubleBackToExit": "Press back again to exit",
   "@doubleBackToExit": {
     "description": "Toast shown when back is pressed twice in a row on the tab shell (lib/pages/menu/menu.dart _handleSystemBack)."
+  },
+  "audioTitle": "Audio",
+  "@audioTitle": {
+    "description": "Audio category page title in the settings center (lib/pages/settings/audio_settings.dart SettingsDetailScaffold, SPEC §6 category 4)."
+  },
+  "equalizerSection": "Equalizer",
+  "@equalizerSection": {
+    "description": "Equalizer group title on the audio page (audio_settings.dart SettingsSection)."
+  },
+  "equalizerEnabledInfo": "Applied to the mpv audio filter chain (whole-chain write; disabling restores the speed-change baseline)",
+  "@equalizerEnabledInfo": {
+    "description": "Audio page group footer: af-chain state while the EQ is on (audio_settings.dart bottomInfo)."
+  },
+  "equalizerDisabledInfo": "Disabled — the mpv audio filter chain is left untouched",
+  "@equalizerDisabledInfo": {
+    "description": "Audio page group footer: af-chain state while the EQ is off (audio_settings.dart bottomInfo)."
+  },
+  "equalizerEnableTitle": "Enable equalizer",
+  "@equalizerEnableTitle": {
+    "description": "EQ switch tile title on the audio page (audio_settings.dart SettingsTile.switchTile)."
+  },
+  "equalizerEnableDescription": "10-band ISO octave equalizer, written to the mpv af chain",
+  "@equalizerEnableDescription": {
+    "description": "EQ switch tile description on the audio page (audio_settings.dart SettingsTile.switchTile)."
+  },
+  "equalizerPresetTitle": "Preset",
+  "@equalizerPresetTitle": {
+    "description": "Preset dropdown title on the audio page (audio_settings.dart SettingsDropdownTile)."
+  },
+  "equalizerPresetCustomInfo": "Manually adjusted — currently a custom curve",
+  "@equalizerPresetCustomInfo": {
+    "description": "Preset dropdown description once the user moved a band (equalizerPreset == 'custom')."
+  },
+  "equalizerPresetPickInfo": "Pick a built-in curve",
+  "@equalizerPresetPickInfo": {
+    "description": "Preset dropdown description before any band was moved."
+  },
+  "presetFlat": "Flat",
+  "@presetFlat": {
+    "description": "Display name for the flat equalizer preset (audioEqualizerPresetLabels; keys align with kPresetNames in music/equalizer.dart)."
+  },
+  "presetBass": "Bass boost",
+  "@presetBass": {
+    "description": "Display name for the bass equalizer preset (audioEqualizerPresetLabels)."
+  },
+  "presetVocal": "Vocal",
+  "@presetVocal": {
+    "description": "Display name for the vocal equalizer preset (audioEqualizerPresetLabels)."
+  },
+  "presetLive": "Live",
+  "@presetLive": {
+    "description": "Display name for the live equalizer preset (audioEqualizerPresetLabels)."
+  },
+  "equalizerGainSection": "Band gains (dB)",
+  "@equalizerGainSection": {
+    "description": "Band-gains group title on the audio page (second SettingsSection; band numbers and the Hz/dB units are universal notation and stay out of the arb)."
   }
 }

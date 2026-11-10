@@ -33,7 +33,9 @@ libmpv 预编译包），界面为 Flutter/Material 3，并把 [EmoPlay 1.x](htt
 - **断点续播**：进度按 path 去重置顶（上限 50 条），resume seek 挂起到下一次
   file-loaded 才执行，与 1.x 语义一致。
 
-当前版本 **2.0.0-alpha**：迁移工程按里程碑推进（骨架 → 播放 → 本地媒体 → 媒体库/历史 → mpv 兼容 → 画质 → 插件/设置/音乐），全部里程碑已完成，正在做整体验收。
+当前版本 **2.0.0-alpha**：迁移工程已按里程碑全部完成（骨架 → 播放 → 本地媒体 →
+媒体库/历史 → mpv 兼容 → 画质 → 插件/设置/音乐），CI 门禁全绿，`v2.0.0-alpha`
+全平台发布矩阵已在 GitHub Actions 演练通过（产物见下方[发布产物](#发布产物)）。
 
 ## 功能清单
 
@@ -74,6 +76,25 @@ flutter build apk --release --split-per-abi
 运行时说明：libmpv 由 media-kit 的预编译包提供（锁 commit
 `83b7ca6…`，见 `pubspec.yaml`），无需系统安装 mpv；缩略图与帧插值分别
 依赖系统 PATH 中的 `ffmpeg` / VapourSynth，缺失时对应功能自动降级，不影响播放。
+从源码构建 Linux 时，除上列构建工具外，运行期还需 libmpv 的依赖闭包
+（libva / libvdpau / libpulse 等，完整清单见 `.github/workflows/pr.yaml`
+的 "Install native build tools" 步）。
+
+### 发布产物
+
+`v2.0.0-alpha` 起，`v*` tag 触发全平台发布矩阵（`.github/workflows/release.yaml`），
+产物直接挂到 GitHub Release：
+
+| 平台 | 产物 |
+|---|---|
+| Linux | `EmoPlay_linux_*_amd64.deb` / `_arm64.deb`、同名 `tar.gz` |
+| Android | `app-*-release.apk`（arm64-v8a / armeabi-v7a / x86_64） |
+| Windows | `EmoPlay_windows_*.zip` |
+| macOS | `EmoPlay_macos_*.zip` |
+
+Linux 建议直接安装 deb（`sudo apt install ./EmoPlay_linux_*_amd64.deb`）：
+依赖闭包已审计钉入 `Depends`，最小系统可直装。APK 与 Windows 产物目前
+**未签名**（详见 `CHANGELOG.md`「已知限制」）。
 
 CI（GitHub Actions，见 `.github/workflows/`）：push/PR 只跑单 job 的
 Linux analyze + test + build；Windows/macOS/Android/Linux arm64 全平台打包
@@ -135,7 +156,9 @@ field-for-field:
 
 Current version **2.0.0-alpha**: the milestone migration (skeleton → player →
 local files → library/history → mpv compat → quality → plugins/settings/music)
-is complete and under final acceptance.
+is complete, the CI gate is green, and the `v2.0.0-alpha` full-platform release
+matrix has been exercised on GitHub Actions (artifacts under
+[Release artifacts](#release-artifacts)).
 
 ### Features
 
@@ -176,7 +199,29 @@ flutter build apk --release --split-per-abi
 Runtime notes: libmpv ships prebuilt through media-kit (pinned commit
 `83b7ca6…`, see `pubspec.yaml`) — no system mpv needed. Thumbnails and frame
 interpolation use `ffmpeg` / VapourSynth from PATH when available and degrade
-gracefully without them; playback is unaffected.
+gracefully without them; playback is unaffected. Building Linux from source
+also needs libmpv's runtime dependency closure beyond the build tools listed
+above (libva / libvdpau / libpulse etc.; the full list lives in the
+"Install native build tools" step of `.github/workflows/pr.yaml`).
+
+### Release artifacts
+
+From `v2.0.0-alpha` on, a `v*` tag triggers the full-platform release matrix
+(`.github/workflows/release.yaml`); artifacts are attached to the GitHub
+Release:
+
+| Platform | Artifacts |
+|---|---|
+| Linux | `EmoPlay_linux_*_amd64.deb` / `_arm64.deb` plus matching `tar.gz` |
+| Android | `app-*-release.apk` (arm64-v8a / armeabi-v7a / x86_64) |
+| Windows | `EmoPlay_windows_*.zip` |
+| macOS | `EmoPlay_macos_*.zip` |
+
+On Linux prefer the deb (`sudo apt install ./EmoPlay_linux_*_amd64.deb`):
+the dependency closure has been audited and pinned into `Depends`, so it
+installs on a minimal system. APK and Windows builds are currently
+**unsigned** (see the 已知限制 / known-limitations section of
+`CHANGELOG.md`).
 
 CI (GitHub Actions, see `.github/workflows/`): pushes/PRs run a single-job
 Linux analyze + test + build gate; the Windows/macOS/Android/Linux arm64

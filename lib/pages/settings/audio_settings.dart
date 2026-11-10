@@ -2,11 +2,19 @@
 // 滑块。驱动的是 M7 音乐层 MusicController（挂在当前播放器上的同一个实
 // 例），每次改动既持久化 settings.json 的 music 段也实时重挂 mpv af 链
 // （1.x MusicController 契约）。链式考证见 music/equalizer.dart 文件头。
+//
+// R4 i18n：第二个迁移到 AppLocalizations 的页面（R3 建议 3「从设置页挑
+// 一类」的执行件；生成链已由 R3 c943414 在页签壳验证）。预设标签表收敛
+// 为顶层 [audioEqualizerPresetLabels]（menuTabLabels 同款约定：下拉与
+// l10n 链测试共用单一来源）；频点数值与 Hz/dB 是通用记号，不进 arb。
+// [music] 注入参数只服务测试：生产路径保持 MediaStores 单例（测试直建
+// store 的约定见 media_stores.dart 头注释）。
 import 'package:flutter/material.dart';
 
 import 'package:emoplay/bean/settings/settings_detail_scaffold.dart';
 import 'package:emoplay/bean/settings/settings_dropdown_tile.dart';
 import 'package:emoplay/bean/settings/settings_list.dart';
+import 'package:emoplay/l10n/generated/app_localizations.dart';
 import 'package:emoplay/media/media_stores.dart';
 import 'package:emoplay/music/equalizer.dart';
 import 'package:emoplay/music/music_controller.dart';
@@ -16,64 +24,74 @@ const List<String> _bandLabels = <String>[
   '31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', //
 ];
 
-const Map<String, String> _presetLabels = <String, String>{
-  'flat': '平坦',
-  'bass': '低音增强',
-  'vocal': '人声',
-  'live': '现场',
-};
+/// 预设下拉的标签表：键 = settings.json `music.equalizerPreset` 的持久化
+/// 值（对齐 music/equalizer.dart 的 kPresetNames），值 = 当前语言显示名。
+Map<String, String> audioEqualizerPresetLabels(AppLocalizations l10n) =>
+    <String, String>{
+      'flat': l10n.presetFlat,
+      'bass': l10n.presetBass,
+      'vocal': l10n.presetVocal,
+      'live': l10n.presetLive,
+    };
 
 class AudioSettingsPage extends StatelessWidget {
-  const AudioSettingsPage({super.key});
+  const AudioSettingsPage({super.key, this.music});
+
+  /// 生产路径取 MediaStores 单例；测试注入裸 MusicController()（无
+  /// settings、无 player：均衡器改动只留内存，见 music_controller.dart
+  /// 构造器注释；af 写入在未挂 player 时是带守卫的 no-op）。
+  final MusicController? music;
 
   @override
   Widget build(BuildContext context) {
-    final music = MediaStores.instance.music;
+    final l10n = AppLocalizations.of(context);
+    final controller = music ?? MediaStores.instance.music;
     return SettingsDetailScaffold(
-      title: const Text('音频'),
+      title: Text(l10n.audioTitle),
       body: ListenableBuilder(
-        listenable: music,
+        listenable: controller,
         builder: (context, _) {
-          final gains = music.equalizerGains;
+          final gains = controller.equalizerGains;
           return SettingsList(
             sections: [
               SettingsSection(
-                title: const Text('均衡器'),
-                bottomInfo: Text(music.equalizerEnabled
-                    ? '已应用于 mpv 音频滤镜链（整链写入；关闭时恢复变速基线）'
-                    : '已停用 — mpv 音频滤镜链保持不动'),
+                title: Text(l10n.equalizerSection),
+                bottomInfo: Text(controller.equalizerEnabled
+                    ? l10n.equalizerEnabledInfo
+                    : l10n.equalizerDisabledInfo),
                 tiles: [
                   SettingsTile.switchTile(
                     leading: Icons.equalizer_rounded,
-                    title: const Text('启用均衡器'),
-                    description: const Text('10 段 ISO 倍频程均衡，写入 mpv af 链'),
-                    initialValue: music.equalizerEnabled,
-                    onToggle: (value) =>
-                        music.setEqualizerEnabled(value ?? !music.equalizerEnabled),
+                    title: Text(l10n.equalizerEnableTitle),
+                    description: Text(l10n.equalizerEnableDescription),
+                    initialValue: controller.equalizerEnabled,
+                    onToggle: (value) => controller.setEqualizerEnabled(
+                        value ?? !controller.equalizerEnabled),
                   ),
                   SettingsDropdownTile<String>(
                     leading: Icons.tune_rounded,
-                    title: const Text('预设'),
-                    description: Text(music.equalizerPreset == 'custom'
-                        ? '已手动调整 — 当前为自定义曲线'
-                        : '选择一个内置曲线'),
-                    value: kPresetNames.contains(music.equalizerPreset)
-                        ? music.equalizerPreset
+                    title: Text(l10n.equalizerPresetTitle),
+                    description: Text(controller.equalizerPreset == 'custom'
+                        ? l10n.equalizerPresetCustomInfo
+                        : l10n.equalizerPresetPickInfo),
+                    value: kPresetNames.contains(controller.equalizerPreset)
+                        ? controller.equalizerPreset
                         : 'flat',
-                    options: _presetLabels,
-                    enabled: music.equalizerEnabled,
-                    onChanged: (preset) => music.applyEqualizerPreset(preset),
+                    options: audioEqualizerPresetLabels(l10n),
+                    enabled: controller.equalizerEnabled,
+                    onChanged: (preset) =>
+                        controller.applyEqualizerPreset(preset),
                   ),
                 ],
               ),
               SettingsSection(
-                title: const Text('频段增益（dB）'),
+                title: Text(l10n.equalizerGainSection),
                 tiles: [
                   for (var band = 0; band < MusicController.bandCount; ++band)
                     IgnorePointer(
-                      ignoring: !music.equalizerEnabled,
+                      ignoring: !controller.equalizerEnabled,
                       child: Opacity(
-                        opacity: music.equalizerEnabled ? 1.0 : 0.5,
+                        opacity: controller.equalizerEnabled ? 1.0 : 0.5,
                         child: SettingsSliderTile(
                           leading: Icons.graphic_eq_rounded,
                           title: Text('${_bandLabels[band]} Hz'),
@@ -86,7 +104,7 @@ class AudioSettingsPage extends StatelessWidget {
                           valueLabel:
                               '${gains.length > band ? gains[band].round() : 0} dB',
                           onChanged: (value) =>
-                              music.setEqualizerBand(band, value),
+                              controller.setEqualizerBand(band, value),
                         ),
                       ),
                     ),
