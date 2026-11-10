@@ -137,6 +137,15 @@ class _AppWidgetState extends State<AppWidget>
   }) {
     return ThemeData(
       useMaterial3: true,
+      // Kazumi 同款全局字体（MiSans）：仅删字体后 Flutter 的 Roboto 兜底经
+      // fontconfig 落到楷体（fc-match sans → LXGW ZhenKai），中文观感明显
+      // 不对——恢复 Kazumi 内置的 MiSans-Regular，CJK/拉丁统一走同一族。
+      fontFamily: 'MI_Sans_Regular',
+      fontFamilyFallback: const [
+        'Noto Sans CJK SC',
+        'Noto Sans SC',
+        'sans-serif',
+      ],
       brightness: brightness,
       colorSchemeSeed: color,
       colorScheme: colorScheme,

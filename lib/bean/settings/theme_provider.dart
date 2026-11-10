@@ -3,8 +3,9 @@ import 'package:flutter/scheduler.dart';
 
 /// Application theme state.
 ///
-/// EmoPlay 2.0 uses the platform default font: the Kazumi global fontFamily
-/// override (Mi Sans) was removed per docs/SPEC.md §1.
+/// Font: Kazumi's bundled MiSans is restored (docs/SPEC.md §1 updated to
+/// match — the "platform default" experiment fell back to a kaiti-style font
+/// through fontconfig and read as broken).
 class ThemeProvider extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   bool useDynamicColor = false;
