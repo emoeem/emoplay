@@ -36,6 +36,7 @@ jobs:
   linux-ci:
     name: "Linux analyze + test + build"
     runs-on: "ubuntu-latest"
+    timeout-minutes: 20
     steps:
       - name: Clone repository
         uses: actions/checkout@v4

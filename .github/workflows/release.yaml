@@ -21,6 +21,7 @@ permissions:
 jobs:
   flutter-test:
     runs-on: "ubuntu-latest"
+    timeout-minutes: 15
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -55,6 +56,7 @@ jobs:
 
   flutter-analyze:
     runs-on: "ubuntu-latest"
+    timeout-minutes: 15
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -75,6 +77,7 @@ jobs:
     name: "Release for Android"
     needs: [flutter-test, flutter-analyze]
     runs-on: "ubuntu-latest"
+    timeout-minutes: 40
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -112,20 +115,25 @@ jobs:
     name: "Release for Windows"
     needs: [flutter-test, flutter-analyze]
     runs-on: "windows-latest"
+    timeout-minutes: 45
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
       - name: Enable Git longpaths
         run: git config --system core.longpaths true
+      # flutter-version-file shells out to `yq`, which windows runners do not
+      # preinstall (run 42720144705 "yq not found") — install it first, same
+      # as Kazumi's release workflow (choco install yq before flutter-action).
+      - name: Install yq
+        run: choco install yq
+        shell: pwsh
       - name: Set up Flutter
         uses: subosito/flutter-action@v2.16.0
         with:
           channel: stable
-          # Pinned instead of flutter-version-file: on windows-latest the
-          # action needs `yq` to parse the version file and yq is not
-          # preinstalled (run 42720144705 "yq not found"). Keep in sync with
-          # pubspec.yaml environment.flutter.
-          flutter-version: '3.47.9'
+          # Single-sourced from pubspec.yaml environment.flutter (currently
+          # 3.47.9), matching every other job in this file.
+          flutter-version-file: pubspec.yaml
       - name: Get Flutter dependencies
         run: flutter pub get
         shell: pwsh
@@ -152,6 +160,7 @@ jobs:
     name: "Release for macOS"
     needs: [flutter-test, flutter-analyze]
     runs-on: "macos-latest"
+    timeout-minutes: 45
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -180,6 +189,7 @@ jobs:
     name: "Release for Linux amd64"
     needs: [flutter-test, flutter-analyze]
     runs-on: "ubuntu-latest"
+    timeout-minutes: 40
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -216,6 +226,7 @@ jobs:
     name: "Release for Linux arm64"
     needs: [flutter-test, flutter-analyze]
     runs-on: ${{ vars.LINUX_ARM64_RUNNER || 'ubuntu-24.04-arm' }}
+    timeout-minutes: 40
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -273,6 +284,7 @@ jobs:
   release:
     name: "GitHub Release"
     runs-on: "ubuntu-latest"
+    timeout-minutes: 15
     needs: [flutter-build-android, flutter-build-windows, flutter-build-macos,
             flutter-build-linux-amd64, flutter-build-linux-arm64]
     permissions:
