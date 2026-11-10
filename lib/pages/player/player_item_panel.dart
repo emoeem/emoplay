@@ -1,15 +1,24 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
+import 'package:emoplay/bean/appbar/drag_to_move_bar.dart';
 import 'package:emoplay/bean/dialog/adaptive_bottom_sheet.dart';
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/emo_menu.dart';
+import 'package:emoplay/bean/widget/embedded_native_control_area.dart';
+import 'package:emoplay/bean/widget/play_pause_icon.dart';
 import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/pages/player/player_panel_hold.dart';
+import 'package:emoplay/pages/player/player_progress_bar.dart';
+import 'package:emoplay/pages/player/player_screenshot_controls.dart';
+import 'package:emoplay/pages/player/player_transport_bar.dart';
+import 'package:emoplay/pages/player/controller/player_aspect_ratio.dart';
 import 'package:emoplay/pages/player/controller/player_page_controller.dart';
 import 'package:emoplay/pages/player/controller/player_super_resolution.dart';
+import 'package:emoplay/services/player/pip_utils.dart';
 import 'package:emoplay/services/player/timed_shutdown_service.dart';
 import 'package:emoplay/utils/constants.dart';
 import 'package:emoplay/utils/device.dart';
@@ -17,14 +26,16 @@ import 'package:emoplay/utils/format.dart';
 
 /// Player control panel for EmoPlay.
 ///
-/// M1 rebuild of the Kazumi panel without the danmaku/syncplay feature set:
-/// transport bar, playlist, speed/volume, screenshots, super resolution,
-/// window fullscreen and (Android) picture in picture.
-///
-/// Layout follows the PiliPlus video page: gradient scrims behind the two
-/// bars (never a full-surface dim), bars padded by the system insets while
-/// the window is not fullscreen, and on phones the secondary actions move
-/// into a "more" sheet so the transport row never overflows.
+/// The two bars copy the Kazumi composition slot by slot
+/// (Kazumi@7265274 player_item_panel.dart `_buildBottomControls` /
+/// `_buildTopControls`): the bottom bar is a [PlayerPanelHoldMouseRegion]
+/// around a [PlayerTransportBar] (play/pause with [PlayPauseIcon], next
+/// item, an [Observer]-scoped [PlayerProgressBar] with the seek-drag trio,
+/// a tabular-figures time label, the wide controls and fullscreen), and the
+/// top bar is back / drag-to-move title / forward / screenshots / PiP / a
+/// "more" menu anchor. Danmaku and syncplay entries do not exist in
+/// EmoPlay and are intentionally absent; our controller readings replace
+/// the Kazumi ones everywhere.
 class PlayerItemPanel extends StatefulWidget {
   const PlayerItemPanel({
     super.key,
@@ -89,8 +100,6 @@ class PlayerItemPanel extends StatefulWidget {
 }
 
 class _PlayerItemPanelState extends State<PlayerItemPanel> {
-  static const _iconColor = Colors.white;
-
   bool get _fullscreen => widget.playerPageController.isFullscreen;
 
   /// System insets while the bars are visible. Fullscreen playback runs
@@ -100,7 +109,13 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
       _fullscreen ? EdgeInsets.zero : MediaQuery.viewPaddingOf(context);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) => _buildPanel(
+          constraints.maxWidth < MediaQuery.textScalerOf(context).scale(600),
+        ),
+      );
+
+  Widget _buildPanel(bool compact) {
     return FadeTransition(
       opacity: widget.panelVisibilityController,
       child: Observer(builder: (context) {
@@ -110,8 +125,8 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _topBar(context),
-              _bottomBar(context),
+              _buildTopControls(compact),
+              _buildBottomControls(compact),
             ],
           ),
         );
@@ -119,486 +134,423 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
     );
   }
 
-  /// Compact icon button: PiliPlus bottom controls are 30-42px, so a phone
-  /// transport row fits without spilling.
-  Widget _iconButton(
-    BuildContext context,
-    Widget icon,
-    String tooltip,
-    VoidCallback? onPressed, {
-    bool compact = false,
-    double? iconSize,
-  }) {
+  // ---- bottom bar (Kazumi _buildBottomControls) ---------------------------
+
+  Widget _buildBottomControls(bool compact) => Container(
+        // Bottom scrim (Kazumi _buildScrim uses Colors.black45).
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.transparent, Colors.black45],
+          ),
+        ),
+        // Our app draws edge-to-edge; Kazumi reaches the same effect with a
+        // SafeArea on `!compact && fillsWindow` edges.
+        padding: EdgeInsets.only(bottom: _systemInsets.bottom),
+        child: PlayerPanelHoldMouseRegion(
+          acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
+          cursor: (_fullscreen &&
+                  !widget.playerController.panel.showVideoController)
+              ? SystemMouseCursors.none
+              : SystemMouseCursors.basic,
+          child: PlayerTransportBar(
+            compact: compact,
+            timePlacement: PlayerTimeLabelPlacement.forViewport(
+              MediaQuery.sizeOf(context),
+              desktop: isDesktop(),
+            ),
+            playPause: IconButton(
+              tooltip: widget.playerController.playback.playing ? '暂停' : '播放',
+              onPressed: () => widget.playerController.playOrPause(),
+              icon: PlayPauseIcon(
+                iconColor: Colors.white,
+                playing: widget.playerController.playback.playing,
+              ),
+            ),
+            nextEpisode: IconButton(
+              color: Colors.white,
+              icon: const Icon(Icons.skip_next_rounded),
+              tooltip: '下一集',
+              onPressed: widget.onNextItem,
+            ),
+            // Playback ticks only rebuild the progress bar and its time labels.
+            progressBuilder: ({required sideLabels}) => Observer(
+                builder: (context) => PlayerProgressBar(
+                      sideLabels: sideLabels,
+                      progress: widget.playerController.playback.currentPosition,
+                      buffered: widget.playerController.playback.buffer,
+                      total: widget.playerController.playback.duration,
+                      onDragStart: widget.handleProgressBarDragStart,
+                      onDragUpdate: (position) => widget
+                          .playerController.seeking
+                          .updateInteractiveSeek(position),
+                      onDragEnd: widget.handleProgressBarDragEnd,
+                      onSeek: widget.playerController.seek,
+                    )),
+            timeLabel: Observer(
+                builder: (context) => Text(
+                      '${compact ? '    ' : ''}${durationToString(widget.playerController.playback.currentPosition)} / ${durationToString(widget.playerController.playback.duration)}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: !compact && isDesktop() ? 16 : 12,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    )),
+            controls: compact ? const SizedBox.shrink() : _wideControls,
+            fullscreen: _buildFullscreenButton(compact),
+          ),
+        ),
+      );
+
+  Widget _buildFullscreenButton(bool compact) {
+    if (widget.playerPageController.isPip) {
+      return compact ? const Text('    ') : const SizedBox.shrink();
+    }
+    if (!isDesktop() &&
+        widget.fillsWindow &&
+        !widget.playerPageController.isFullscreen) {
+      return const SizedBox.shrink();
+    }
     return IconButton(
-      icon: icon,
-      color: _iconColor,
-      tooltip: tooltip,
-      iconSize: iconSize,
-      constraints: compact
-          ? const BoxConstraints(minWidth: 40, minHeight: 40)
-          : null,
-      padding: EdgeInsets.zero,
-      visualDensity: compact ? VisualDensity.compact : null,
-      onPressed: onPressed,
+      color: Colors.white,
+      icon: Icon(widget.playerPageController.isFullscreen
+          ? Icons.fullscreen_exit_rounded
+          : Icons.fullscreen_rounded),
+      tooltip: widget.playerPageController.isFullscreen ? '退出全屏' : '全屏',
+      onPressed: widget.handleFullscreen,
     );
   }
 
-  Widget _topBar(BuildContext context) {
-    final title = widget.playerController.mediaTitle;
-    final insets = _systemInsets;
+  // ---- top bar (Kazumi _buildTopControls) ---------------------------------
+
+  Widget _buildTopControls(bool compact) {
     return Container(
-      // Top scrim (PiliPlus app_bar_ani): readable title over any frame,
-      // without dimming the whole picture.
-      decoration: BoxDecoration(
+      // Top scrim (Kazumi _buildScrim uses Colors.black45).
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.black.withValues(alpha: 0.72), Colors.transparent],
+          colors: [Colors.black45, Colors.transparent],
         ),
       ),
-      padding: EdgeInsets.fromLTRB(4, insets.top + 4, 4, 14),
-      child: Row(
-        children: [
-          _iconButton(
-            context,
-            const Icon(Icons.arrow_back),
-            '返回',
-            widget.onBackPressed,
-            compact: true,
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(color: _iconColor, fontSize: 16),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-          ),
-          _iconButton(
-            context,
-            const Icon(Icons.chevron_left),
-            '上一个',
-            widget.onPrevItem,
-            compact: true,
-          ),
-          _iconButton(
-            context,
-            const Icon(Icons.chevron_right),
-            '下一个',
-            widget.onNextItem,
-            compact: true,
-          ),
-          if (isDesktop())
-            _iconButton(
-              context,
-              const Icon(Icons.subtitles_outlined),
-              '加载字幕',
-              widget.onLoadSubtitle,
-            ),
-          _iconButton(
-            context,
-            const Icon(Icons.video_library_rounded),
-            '播放列表',
-            () => _openMenu(_showPlaylistSheet),
-            compact: true,
-          ),
-          if (widget.onToggleSidePanel != null)
-            _iconButton(
-              context,
-              const Icon(Icons.view_sidebar_outlined),
-              '信息面板',
-              widget.onToggleSidePanel,
-              compact: true,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _bottomBar(BuildContext context) {
-    final playback = widget.playerController.playback;
-    final insets = _systemInsets;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [Colors.black.withValues(alpha: 0.72), Colors.transparent],
-        ),
-      ),
-      padding: EdgeInsets.only(bottom: insets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _progressRow(context),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(2, 0, 6, 4),
-            child: Row(
-              children: [
-                Observer(builder: (context) {
-                  return _iconButton(
-                    context,
-                    Icon(playback.playing
-                        ? Icons.pause_circle_outline_rounded
-                        : Icons.play_arrow_rounded),
-                    playback.playing ? '暂停' : '播放',
-                    () => widget.playerController.playOrPause(),
-                    compact: true,
-                  );
-                }),
-                _iconButton(
-                  context,
-                  Image.asset(
-                    'assets/images/forward_80.png',
-                    width: 22,
-                    height: 22,
-                    color: _iconColor,
-                  ),
-                  '跳过片头',
-                  widget.skipOP,
-                  compact: true,
+      padding: EdgeInsets.only(top: _systemInsets.top),
+      child: EmbeddedNativeControlArea(
+        requireOffset: compact || !_fullscreen,
+        child: PlayerPanelHoldMouseRegion(
+          acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
+          cursor: (_fullscreen &&
+                  !widget.playerController.panel.showVideoController)
+              ? SystemMouseCursors.none
+              : SystemMouseCursors.basic,
+          child: Row(
+            children: [
+              IconButton(
+                color: Colors.white,
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: '返回',
+                onPressed: widget.onBackPressed,
+              ),
+              Expanded(
+                child: DragToMoveArea(
+                  child: compact
+                      ? const SizedBox(height: 40)
+                      : Text(
+                          ' ${widget.playerController.mediaTitle}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: Theme.of(context)
+                                .textTheme
+                                .titleMedium!
+                                .fontSize,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                 ),
-                _speedButton(context),
-                if (isDesktop()) ...[
-                  _volumeButton(context),
-                  _superResolutionButton(context),
-                  _iconButton(
-                    context,
-                    const Icon(Icons.photo_camera_outlined),
-                    '截图',
-                    widget.handleScreenShot,
-                  ),
-                  _iconButton(
-                    context,
-                    const Icon(Icons.photo_library_outlined),
-                    '挑选截图',
-                    widget.showScreenshotCandidates,
-                  ),
-                  _iconButton(
-                    context,
-                    const Icon(Icons.info_outline),
-                    '视频详情',
-                    widget.showVideoInfo,
-                  ),
-                  _iconButton(
-                    context,
-                    const Icon(Icons.timer_outlined),
-                    '定时关闭',
-                    () => _openMenu(_showSleepTimerSheet),
-                  ),
-                  if (Platform.isAndroid)
-                    _iconButton(
-                      context,
-                      const Icon(Icons.picture_in_picture_alt),
-                      '画中画',
-                      () => widget.enterAndroidPictureInPicture(),
-                    ),
-                ] else
-                  _iconButton(
-                    context,
-                    const Icon(Icons.photo_camera_outlined),
-                    '截图',
-                    widget.handleScreenShot,
-                    compact: true,
-                  ),
-                const Spacer(),
-                if (!isDesktop())
-                  _iconButton(
-                    context,
-                    const Icon(Icons.more_vert_rounded),
-                    '更多',
-                    () => _openMenu(_showMoreSheet),
-                    compact: true,
-                  ),
-                _lockButton(context),
-                Observer(builder: (context) {
-                  return _iconButton(
-                    context,
-                    Icon(widget.playerPageController.isFullscreen
-                        ? Icons.fullscreen_exit
-                        : Icons.fullscreen),
-                    '全屏',
-                    widget.handleFullscreen,
-                    compact: true,
-                  );
-                }),
-              ],
-            ),
+              ),
+              _forwardButton(),
+              if (isDesktop())
+                PlayerScreenshotControls(
+                  controller: widget.playerController.screenshots,
+                  onCapture: widget.handleScreenShot,
+                  onReview: widget.showScreenshotCandidates,
+                ),
+              if ((isDesktop() && (compact || !_fullscreen)) ||
+                  Platform.isAndroid)
+                _pipButton(),
+              _menuButton(
+                child: const Icon(
+                  Icons.more_vert,
+                  color: Colors.white,
+                ),
+                tooltip: '更多选项',
+                items: _moreMenuItems(compact),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  /// 锁定控制: a toggle with visible state — the previous lock-only button had
-  /// no unlock affordance (fullscreen change resets the lock implicitly).
-  Widget _lockButton(BuildContext context) {
-    return Observer(builder: (context) {
-      final locked = widget.playerController.panel.lockPanel;
-      return _iconButton(
-        context,
-        Icon(locked ? Icons.lock_rounded : Icons.lock_outline),
-        locked ? '解除锁定' : '锁定控制',
-        () {
-          widget.playerController.panel.lockPanel = !locked;
-        },
-        compact: true,
+  Widget _pipButton() {
+    return IconButton(
+      onPressed: () async {
+        if (isDesktop()) {
+          if (widget.playerPageController.isPip) {
+            await PipUtils.exitDesktopPIPWindow();
+          } else {
+            await PipUtils.enterDesktopPIPWindow(
+              width: widget.playerController.debug.playerWidth,
+              height: widget.playerController.debug.playerHeight,
+            );
+          }
+          widget.playerPageController
+              .setPip(!widget.playerPageController.isPip);
+          return;
+        }
+        await widget.enterAndroidPictureInPicture();
+      },
+      tooltip: '画中画',
+      icon: const Icon(
+        Icons.picture_in_picture,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  Widget _forwardButton() {
+    return Tooltip(
+      message:
+          '快进${widget.playerController.playback.buttonSkipTime}秒，长按修改时间',
+      child: GestureDetector(
+        onLongPress: _showForwardChange,
+        child: IconButton(
+          icon: Image.asset(
+            'assets/images/forward_80.png',
+            color: Colors.white,
+            height: 24,
+          ),
+          onPressed: widget.skipOP,
+        ),
+      ),
+    );
+  }
+
+  void _showForwardChange() {
+    EmoDialog.show(builder: (context) {
+      var input = '';
+      return AlertDialog(
+        title: const Text('跳过秒数'),
+        content: TextField(
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+          ],
+          decoration: InputDecoration(
+            floatingLabelBehavior: FloatingLabelBehavior.never,
+            labelText:
+                widget.playerController.playback.buttonSkipTime.toString(),
+          ),
+          onChanged: (value) {
+            input = value;
+          },
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => EmoDialog.dismiss(),
+            child: Text(
+              '取消',
+              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              if (input.isNotEmpty) {
+                widget.playerController.setButtonForwardTime(int.parse(input));
+              }
+              EmoDialog.dismiss();
+            },
+            child: const Text('确定'),
+          ),
+        ],
       );
     });
   }
 
-  Widget _progressRow(BuildContext context) {
-    final playback = widget.playerController.playback;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Observer(builder: (context) {
-              final duration = playback.duration;
-              final position = playback.currentPosition;
-              final maxMs =
-                  duration.inMilliseconds == 0 ? 1 : duration.inMilliseconds;
-              return Row(
-                children: [
-                  SizedBox(
-                    width: 46,
-                    child: Text(
-                      durationToString(position),
-                      style:
-                          const TextStyle(color: _iconColor, fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Expanded(
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 3,
-                        thumbShape:
-                            const RoundSliderThumbShape(enabledThumbRadius: 6),
-                        overlayShape:
-                            const RoundSliderOverlayShape(overlayRadius: 12),
-                      ),
-                      child: Slider(
-                        value: position.inMilliseconds
-                            .clamp(0, maxMs)
-                            .toDouble(),
-                        max: maxMs.toDouble(),
-                        onChangeStart: (_) =>
-                            widget.handleProgressBarDragStart(),
-                        onChanged: (value) {
-                          playback.currentPosition =
-                              Duration(milliseconds: value.round());
-                        },
-                        onChangeEnd: (value) {
-                          widget.playerController
-                              .seek(Duration(milliseconds: value.round()));
-                          widget.handleProgressBarDragEnd(false);
-                        },
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 46,
-                    child: Text(
-                      durationToString(duration),
-                      style:
-                          const TextStyle(color: _iconColor, fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              );
-            }),
+  // ---- wide controls (Kazumi _wideControls, danmaku slots removed) --------
+
+  Widget get _wideControls => Row(children: [
+        // Kazumi centers its desktop danmaku controls in this slot; without
+        // danmaku the spacer keeps the menus on the right, next to fullscreen.
+        const Spacer(),
+        _menuButton(
+          child: const Text('超分辨率', style: TextStyle(color: Colors.white)),
+          items: _superResolutionItems,
+        ),
+        _menuButton(
+          child: Text(
+              widget.playerController.playback.playerSpeed == 1
+                  ? '倍速'
+                  : '${widget.playerController.playback.playerSpeed}x',
+              style: const TextStyle(color: Colors.white)),
+          items: _speedItems,
+        ),
+        _menuButton(
+          child: const Icon(Icons.aspect_ratio_rounded, color: Colors.white),
+          tooltip: '视频比例',
+          items: _aspectRatioItems,
+        ),
+        if (widget.onToggleSidePanel != null)
+          IconButton(
+            color: Colors.white,
+            icon: const Icon(Icons.menu_open_rounded),
+            tooltip: '选集面板',
+            onPressed: widget.onToggleSidePanel,
           ),
-        ],
+      ]);
+
+  List<Widget> _choiceItems<T>(
+    Iterable<T> values, {
+    required String Function(T) label,
+    required bool Function(T) selected,
+    required void Function(T) onSelected,
+  }) =>
+      [
+        for (final value in values)
+          EmoMenuItem(
+            onPressed: () => onSelected(value),
+            label: label(value),
+            selected: selected(value),
+          ),
+      ];
+
+  List<Widget> get _aspectRatioItems => _choiceItems(
+        PlayerAspectRatio.values,
+        label: (value) => value.label,
+        selected: (value) =>
+            value == widget.playerController.panel.aspectRatioMode,
+        onSelected: (value) =>
+            widget.playerController.panel.aspectRatioMode = value,
+      );
+
+  List<Widget> get _speedItems => _choiceItems(
+        defaultPlaySpeedList,
+        label: (value) => '${value}x',
+        selected: (value) =>
+            value == widget.playerController.playback.playerSpeed,
+        onSelected: widget.setPlaybackSpeed,
+      );
+
+  List<Widget> get _superResolutionItems => _choiceItems(
+        SuperResolutionMode.values,
+        label: (value) => value.label,
+        selected: (value) =>
+            value == widget.playerController.playback.superResolutionMode,
+        onSelected: widget.handleSuperResolutionChange,
+      );
+
+  Widget _menuButton(
+          {required Widget child,
+          required List<Widget> items,
+          String? tooltip}) =>
+      PlayerPanelHoldMenuAnchor(
+        acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
+        onVisibilityChanged: widget.onMenuVisibilityChanged,
+        builder: (context, toggle) => tooltip == null
+            ? TextButton(onPressed: toggle, child: child)
+            : IconButton(onPressed: toggle, icon: child, tooltip: tooltip),
+        menuChildren: items,
+      );
+
+  // ---- "more" menu (Kazumi menuChildren minus danmaku/syncplay, plus our
+  // local entries: playlist / prev item / subtitle / mobile screenshots / lock)
+  List<Widget> _moreMenuItems(bool compact) {
+    final panel = widget.playerController.panel;
+    return [
+      if (compact) ...[
+        SubmenuButton(menuChildren: _aspectRatioItems, child: const Text('视频比例')),
+        SubmenuButton(menuChildren: _speedItems, child: const Text('倍速')),
+        SubmenuButton(
+            menuChildren: _superResolutionItems, child: const Text('超分辨率')),
+      ],
+      if (widget.onLoadSubtitle != null)
+        EmoMenuItem(
+          onPressed: widget.onLoadSubtitle,
+          label: '加载字幕',
+        ),
+      EmoMenuItem(
+        onPressed: () => _openMenu(_showPlaylistSheet),
+        label: '播放列表',
+      ),
+      EmoMenuItem(
+        onPressed: widget.onPrevItem,
+        label: '上一集',
+      ),
+      EmoMenuItem(
+        onPressed: widget.showVideoInfo,
+        label: '视频详情',
+      ),
+      if (!isDesktop()) ...[
+        EmoMenuItem(
+          onPressed: widget.handleScreenShot,
+          label: '截图',
+        ),
+        EmoMenuItem(
+          onPressed: widget.showScreenshotCandidates,
+          label: '挑选截图',
+        ),
+      ],
+      EmoMenuItem(
+        onPressed: () {
+          panel.lockPanel = !panel.lockPanel;
+        },
+        label: panel.lockPanel ? '解除锁定' : '锁定控制',
+      ),
+      _timedShutdownSubmenu(),
+    ];
+  }
+
+  Widget _timedShutdownSubmenu() {
+    return SubmenuButton(
+      menuChildren: [
+        EmoMenuItem(
+          onPressed: TimedShutdownService().cancel,
+          label: '不开启',
+          selected: !TimedShutdownService().isActive,
+        ),
+        for (final int minutes in [15, 30, 60])
+          EmoMenuItem(
+            onPressed: () {
+              TimedShutdownService().start(minutes,
+                  onExpired: widget.pauseForTimedShutdown);
+              EmoDialog.showToast(
+                  message:
+                      '已设置 ${TimedShutdownService().formatMinutesToDisplay(minutes)} 后定时关闭');
+            },
+            label: '$minutes 分钟',
+            selected: TimedShutdownService().setMinutes == minutes,
+          ),
+        EmoMenuItem(
+          onPressed: () {
+            TimedShutdownService.showCustomTimerDialog(
+              onExpired: widget.pauseForTimedShutdown,
+            );
+          },
+          label: '自定义',
+        ),
+      ],
+      child: ValueListenableBuilder<int>(
+        valueListenable: TimedShutdownService().remainingSecondsNotifier,
+        builder: (context, remainingSeconds, _) => Text(
+          remainingSeconds > 0
+              ? "定时关闭 (${TimedShutdownService().formatRemainingTime()})"
+              : "定时关闭",
+        ),
       ),
     );
   }
 
-  Widget _volumeButton(BuildContext context) {
-    return PlayerPanelHoldMouseRegion(
-      acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
-      child: Observer(builder: (context) {
-        return SizedBox(
-          width: 120,
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 3,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-            ),
-            child: Slider(
-              value: widget.playerController.playback.volume
-                  .clamp(0.0, 100.0)
-                  .toDouble(),
-              max: 100,
-              onChanged: (value) {
-                widget.playerController.setVolumeDuringGesture(value);
-              },
-              onChangeEnd: (value) {
-                widget.playerController.finishVolumeGesture();
-              },
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _speedButton(BuildContext context) {
-    return PlayerPanelHoldMenuAnchor(
-      acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
-      onVisibilityChanged: widget.onMenuVisibilityChanged,
-      builder: (context, showMenu) {
-        return _iconButton(
-          context,
-          const Icon(Icons.speed_rounded),
-          '倍速',
-          showMenu,
-          compact: true,
-        );
-      },
-      menuChildren: [
-        for (final speed in defaultPlaySpeedList)
-          EmoMenuItem(
-            label: '${speed}x',
-            onPressed: () {
-              EmoDialog.dismiss();
-              widget.setPlaybackSpeed(speed);
-            },
-          ),
-      ],
-    );
-  }
-
-  Widget _superResolutionButton(BuildContext context) {
-    return PlayerPanelHoldMenuAnchor(
-      acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
-      onVisibilityChanged: widget.onMenuVisibilityChanged,
-      builder: (context, showMenu) {
-        return Observer(builder: (context) {
-          final mode = widget.playerController.playback.superResolutionMode;
-          return _iconButton(
-            context,
-            Icon(
-              Icons.auto_awesome,
-              color: mode == SuperResolutionMode.off ? _iconColor : Colors.lightBlue,
-            ),
-            '超分辨率',
-            showMenu,
-          );
-        });
-      },
-      menuChildren: [
-        for (final mode in SuperResolutionMode.values)
-          EmoMenuItem(
-            label: mode.label,
-            onPressed: () {
-              EmoDialog.dismiss();
-              widget.handleSuperResolutionChange(mode);
-            },
-          ),
-      ],
-    );
-  }
-
-  // ---- mobile "more" sheet ------------------------------------------------
-
-  /// Phone transport row keeps six controls (PiliPlus budget); everything
-  /// else lives here.
-  Future<void> _showMoreSheet() {
-    final playback = widget.playerController.playback;
-    return showAdaptiveBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Observer(
-            builder: (context) {
-              final mode = playback.superResolutionMode;
-              Widget tile(
-                IconData icon,
-                String label,
-                VoidCallback onTap, {
-                bool selected = false,
-              }) {
-                return ListTile(
-                  leading: Icon(icon),
-                  title: Text(label),
-                  trailing: selected
-                      ? Icon(
-                          Icons.check_rounded,
-                          color: Theme.of(context).colorScheme.primary,
-                        )
-                      : null,
-                  onTap: () {
-                    EmoDialog.dismiss();
-                    onTap();
-                  },
-                );
-              }
-
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (widget.onLoadSubtitle != null)
-                    tile(
-                      Icons.subtitles_outlined,
-                      '加载字幕',
-                      widget.onLoadSubtitle!,
-                    ),
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '超分辨率',
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-                    ),
-                  ),
-                  for (final candidate in SuperResolutionMode.values)
-                    tile(
-                      Icons.auto_awesome,
-                      candidate.label,
-                      () => widget.handleSuperResolutionChange(candidate),
-                      selected: mode == candidate,
-                    ),
-                  const Divider(height: 1),
-                  tile(Icons.info_outline, '视频详情', widget.showVideoInfo),
-                  tile(
-                    Icons.timer_outlined,
-                    '定时关闭',
-                    () => _openMenu(_showSleepTimerSheet),
-                  ),
-                  tile(
-                    widget.playerController.panel.lockPanel
-                        ? Icons.lock_open_rounded
-                        : Icons.lock_outline,
-                    widget.playerController.panel.lockPanel
-                        ? '解除锁定'
-                        : '锁定控制',
-                    () {
-                      widget.playerController.panel.lockPanel =
-                          !widget.playerController.panel.lockPanel;
-                    },
-                  ),
-                  if (Platform.isAndroid)
-                    tile(
-                      Icons.picture_in_picture_alt,
-                      '画中画',
-                      () => widget.enterAndroidPictureInPicture(),
-                    ),
-                ],
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
+  // ---- sheets --------------------------------------------------------------
 
   Future<void> _openMenu(Future<void> Function() sheet) async {
     widget.onMenuVisibilityChanged(true);
@@ -655,40 +607,5 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
         );
       },
     );
-  }
-
-  Future<void> _showSleepTimerSheet() {
-    return showAdaptiveBottomSheet<void>(
-      context: context,
-      builder: (context) {
-        Widget tile(String label, VoidCallback onTap) {
-          return ListTile(
-            title: Text(label),
-            onTap: () {
-              EmoDialog.dismiss();
-              onTap();
-            },
-          );
-        }
-
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              tile('取消定时关闭', () => TimedShutdownService().cancel()),
-              tile('15 分钟后暂停', () => _startSleepTimer(15)),
-              tile('30 分钟后暂停', () => _startSleepTimer(30)),
-              tile('60 分钟后暂停', () => _startSleepTimer(60)),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _startSleepTimer(int minutes) {
-    TimedShutdownService()
-        .start(minutes, onExpired: widget.pauseForTimedShutdown);
-    EmoDialog.showToast(message: '将在 $minutes 分钟后暂停播放');
   }
 }
