@@ -197,11 +197,15 @@ class _PluginsPageState extends State<PluginsPage> {
                     ),
                   ),
                 ),
-              const Text(
+              // Kazumi 次要文案 idiom：bodySmall + onSurfaceVariant 弱化，
+              // 提示行不再与卡片标题抢对比度。
+              Text(
                 '本地定制永不覆盖：check 模式插件只比较远端 HEAD 与 baseline；'
                 'replace 模式更新在检测到本地改动时会被拒绝。启用的插件在下次启动时'
                 '追加进 scripts 选项。',
-                style: TextStyle(fontSize: 12),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 12),
               _RemoteSourcesSection(
@@ -319,7 +323,13 @@ class _RemoteSourcesSectionState extends State<_RemoteSourcesSection> {
               style: const TextStyle(fontSize: 12),
             ),
             trailing: row['isDefault'] == true
-                ? const Text('默认', style: TextStyle(fontSize: 11))
+                ? Text(
+                    '默认',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  )
                 : TextButton(
                     onPressed: source.refreshing
                         ? null
@@ -350,11 +360,13 @@ class _RemoteSourcesSectionState extends State<_RemoteSourcesSection> {
                 manager.checkForUpdate(entry['name']! as String),
           ),
         if (source.entries.isEmpty)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: Text(
               '暂无在线条目 — 刷新以拉取清单源。',
-              style: TextStyle(fontSize: 12),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ),
       ],
@@ -432,10 +444,19 @@ class _PluginCardBody extends StatelessWidget {
                 color: entry['mode'] == 'replace'
                     ? colors.tertiaryContainer
                     : colors.secondaryContainer,
+                foregroundColor: entry['mode'] == 'replace'
+                    ? colors.onTertiaryContainer
+                    : colors.onSecondaryContainer,
               ),
               if (entry['locallyModified'] == true) ...[
                 const SizedBox(width: 6),
-                const _Badge(label: '已定制', color: Color(0xFF5a3d1e)),
+                // 主题化警示色（旧实现是硬编码深棕底 + 继承前景，两个主题
+                // 下都读不清）；Kazumi 徽章一律取 colorScheme 容器对。
+                _Badge(
+                  label: '已定制',
+                  color: colors.errorContainer,
+                  foregroundColor: colors.onErrorContainer,
+                ),
               ],
               const Spacer(),
               Text(
@@ -526,10 +547,18 @@ class _PluginCardBody extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.label, required this.color});
+  const _Badge({
+    required this.label,
+    required this.color,
+    required this.foregroundColor,
+  });
 
   final String label;
   final Color color;
+
+  /// Pair of [color] — badges previously used a hardcoded dark brown with
+  /// the inherited text color, which went unreadable in both themes.
+  final Color foregroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -539,7 +568,10 @@ class _Badge extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 10)),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, color: foregroundColor),
+      ),
     );
   }
 }

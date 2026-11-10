@@ -65,6 +65,8 @@ dependencies:
 dev_dependencies:
   path_provider_platform_interface: ^2.1.2
   plugin_platform_interface: ^2.1.8
+  # Test seam for the about-page license link guard (kazumi_alignment_ui_test).
+  url_launcher_platform_interface: ^2.3.2
   flutter_test:
     sdk: flutter
 

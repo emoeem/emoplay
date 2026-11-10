@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 
 import 'package:emoplay/bean/widget/empty_state_widget.dart';
+import 'package:emoplay/bean/widget/state_presentation.dart';
 import 'package:emoplay/bean/widget/tonal_card.dart';
 import 'package:emoplay/media/history_store.dart';
 import 'package:emoplay/media/media_classifier.dart';
@@ -245,11 +246,12 @@ class _HomePageState extends State<HomePage> {
                             icon: Icons.movie_outlined,
                             title: '播放过的媒体会出现在这里',
                             actions: [
-                              FilledButton.tonalIcon(
+                              // Kazumi 空态按钮 idiom（StateActionButton，
+                              // 48px 药丸），普通 FilledButton 观感偏小。
+                              StateActionButton.tonal(
                                 onPressed: _pickMediaFile,
-                                icon: const Icon(Icons.open_in_new_rounded,
-                                    size: 18),
-                                label: const Text('选择媒体文件'),
+                                icon: Icons.open_in_new_rounded,
+                                text: '选择媒体文件',
                               ),
                             ],
                           )

@@ -37,6 +37,12 @@ libmpv 预编译包），界面为 Flutter/Material 3，并把 [EmoPlay 1.x](htt
 媒体库/历史 → mpv 兼容 → 画质 → 插件/设置/音乐），CI 门禁全绿，`v2.0.0-alpha`
 全平台发布矩阵已在 GitHub Actions 演练通过（产物见下方[发布产物](#发布产物)）。
 
+## 截图
+
+> **占位说明**：GUI 截图待桌面空闲窗口补拍（本轮在无显示器的构建环境内收尾，
+> 不产占位假图）。五个页签（首页 / 媒体库 / 播放 / 插件 / 设置）与播放面板的
+> 实拍图将补充到这里。
+
 ## 功能清单
 
 | | |
@@ -47,7 +53,7 @@ libmpv 预编译包），界面为 Flutter/Material 3，并把 [EmoPlay 1.x](htt
 | 🎵 **音乐模式** | 纯音频识别、.lrc 歌词逐行高亮、10 段均衡器 + 预设（flat/bass/vocal/live/custom） |
 | 📜 **历史与首页** | 最近播放、继续观看、媒体统计；5s 心跳刷新进度，暂停时不写盘 |
 | 🧩 **插件系统** | manager.json 清单、内置 6 插件（uosc / uosc_danmaku / anime4k / file_browser / hdr-toys / trakt_scrobble）+ 在线源、git 安装/更新/删除、三段确认、**本地改动永不覆盖** |
-| ⚙️ **设置中心** | 11 类：常规 / 播放 / 视频与画质 / 音频 / mpv 配置（导入审计）/ 着色器管理 / 外观 / 快捷键 / 存储 / 诊断 / 关于 |
+| ⚙️ **设置中心** | 11 类：常规 / 播放 / 视频与画质 / 音频 / mpv 配置（导入审计）/ 着色器管理 / 外观 / 快捷键 / 存储 / 诊断 / 关于（含应用内更新检查） |
 
 五个页签：首页 · 媒体库 · 播放 · 插件 · 设置；竖屏 NavigationBar / 横屏
 NavigationRail，`Ctrl+1..5` 直达。
@@ -56,7 +62,9 @@ NavigationRail，`Ctrl+1..5` 直达。
 
 依赖：[Flutter SDK **3.47.9**](https://docs.flutter.dev/)（版本锁定见
 `pubspec.yaml` 的 `environment.flutter`）、Linux 桌面构建需要
-`clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev`。
+`clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev
+libasound2-dev`（ALSA 头文件缺失时冷缓存从源码编译会失败，与 CI 的
+"Install native build tools" 步一致）。
 
 ```bash
 git clone https://github.com/emoeem/emoplay.git
@@ -87,13 +95,16 @@ flutter build apk --release --split-per-abi
 
 | 平台 | 产物 |
 |---|---|
-| Linux | `EmoPlay_linux_*_amd64.deb` / `_arm64.deb`、同名 `tar.gz` |
+| Linux | `EmoPlay_linux_*_amd64.deb` / `_arm64.deb`、同名 `tar.gz`、同名 `.AppImage` |
 | Android | `app-*-release.apk`（arm64-v8a / armeabi-v7a / x86_64） |
 | Windows | `EmoPlay_windows_*.zip` |
 | macOS | `EmoPlay_macos_*.zip` |
 
-Linux 建议直接安装 deb（`sudo apt install ./EmoPlay_linux_*_amd64.deb`）：
-依赖闭包已审计钉入 `Depends`，最小系统可直装。APK 与 Windows 产物目前
+Linux 三种安装方式任选：deb（`sudo apt install ./EmoPlay_linux_*_amd64.deb`，
+依赖闭包已审计钉入 `Depends`，最小系统可直装）、免安装的
+AppImage（由 linuxdeploy 打包，应用本体与 libmpv 内嵌；GTK/VA-API 等系统库
+仍取自发行版，策略与 deb 的 `Depends` 一致，FUSE 不可用时加
+`--appimage-extract-and-run` 运行）、或解包 `tar.gz`。APK 与 Windows 产物目前
 **未签名**（详见 `CHANGELOG.md`「已知限制」）。
 
 CI（GitHub Actions，见 `.github/workflows/`）：push/PR 只跑单 job 的
@@ -160,6 +171,13 @@ is complete, the CI gate is green, and the `v2.0.0-alpha` full-platform release
 matrix has been exercised on GitHub Actions (artifacts under
 [Release artifacts](#release-artifacts)).
 
+### Screenshots
+
+> **Placeholder note**: GUI screenshots are pending a desktop session
+> (this round was closed out in a display-less build environment, so no
+> stand-in images are faked). Captures of the five tabs (Home / Library /
+> Player / Plugins / Settings) and the player panel will be added here.
+
 ### Features
 
 | | |
@@ -170,7 +188,7 @@ matrix has been exercised on GitHub Actions (artifacts under
 | 🎵 **Music mode** | audio-only detection, .lrc lyric highlighting, 10-band equalizer with presets (flat/bass/vocal/live/custom) |
 | 📜 **History & home** | recent plays, continue watching, library stats; a 5 s heartbeat refreshes position and skips writes while paused |
 | 🧩 **Plugins** | manager.json manifests, 6 builtin plugins (uosc / uosc_danmaku / anime4k / file_browser / hdr-toys / trakt_scrobble) plus online sources, git-based install/update/remove with a three-step confirm, **local modifications are never overwritten** |
-| ⚙️ **Settings** | 11 categories: general / playback / video & quality / audio / mpv config (import audit) / shader management / appearance / shortcuts / storage / diagnostics / about |
+| ⚙️ **Settings** | 11 categories: general / playback / video & quality / audio / mpv config (import audit) / shader management / appearance / shortcuts / storage / diagnostics / about (with in-app update check) |
 
 Five tabs: Home · Library · Player · Plugins · Settings; NavigationBar in
 portrait, NavigationRail in landscape, `Ctrl+1..5` jumps straight to a tab.
@@ -179,7 +197,9 @@ portrait, NavigationRail in landscape, `Ctrl+1..5` jumps straight to a tab.
 
 Requirements: [Flutter SDK **3.47.9**](https://docs.flutter.dev/) (pinned in
 `pubspec.yaml` under `environment.flutter`); Linux desktop additionally needs
-`clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev`.
+`clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev
+libasound2-dev` (without the ALSA headers a cold-cache source build fails,
+matching the "Install native build tools" step of CI).
 
 ```bash
 git clone https://github.com/emoeem/emoplay.git
@@ -212,16 +232,20 @@ Release:
 
 | Platform | Artifacts |
 |---|---|
-| Linux | `EmoPlay_linux_*_amd64.deb` / `_arm64.deb` plus matching `tar.gz` |
+| Linux | `EmoPlay_linux_*_amd64.deb` / `_arm64.deb`, matching `tar.gz`, and matching `.AppImage` |
 | Android | `app-*-release.apk` (arm64-v8a / armeabi-v7a / x86_64) |
 | Windows | `EmoPlay_windows_*.zip` |
 | macOS | `EmoPlay_macos_*.zip` |
 
-On Linux prefer the deb (`sudo apt install ./EmoPlay_linux_*_amd64.deb`):
-the dependency closure has been audited and pinned into `Depends`, so it
-installs on a minimal system. APK and Windows builds are currently
-**unsigned** (see the 已知限制 / known-limitations section of
-`CHANGELOG.md`).
+On Linux pick any of the three: the deb (`sudo apt install
+./EmoPlay_linux_*_amd64.deb`; the dependency closure has been audited and
+pinned into `Depends`, so it installs on a minimal system), the portable
+AppImage (packaged with linuxdeploy; the app bundle and libmpv are embedded
+while GTK/VA-API and other system libraries still come from the distro, the
+same policy as the deb `Depends`; on FUSE-less systems run it with
+`--appimage-extract-and-run`), or the unpacked `tar.gz`. APK and Windows
+builds are currently **unsigned** (see the 已知限制 / known-limitations
+section of `CHANGELOG.md`).
 
 CI (GitHub Actions, see `.github/workflows/`): pushes/PRs run a single-job
 Linux analyze + test + build gate; the Windows/macOS/Android/Linux arm64

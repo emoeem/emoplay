@@ -8,6 +8,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/empty_state_widget.dart';
+import 'package:emoplay/bean/widget/state_presentation.dart';
 import 'package:emoplay/media/media_classifier.dart';
 import 'package:emoplay/models/playback_args.dart';
 import 'package:emoplay/pages/player/player_controller.dart';
@@ -388,30 +389,33 @@ class _PlayerPageState extends State<PlayerPage> {
                         child: GeneralEmptyState(
                           icon: Icons.play_circle_outline_rounded,
                           title: '选择要播放的本地媒体',
+                          // Kazumi 空态按钮 idiom（StateActionButton，48px
+                          // 药丸）；主操作实心、次操作 tonal，与 Kazumi
+                          // 空态的主次关系一致。
                           actions: [
-                            FilledButton.icon(
+                            StateActionButton(
                               onPressed: _openFiles,
-                              icon: const Icon(Icons.video_file_rounded),
-                              label: const Text('打开文件'),
+                              icon: Icons.video_file_rounded,
+                              text: '打开文件',
                             ),
-                            FilledButton.tonalIcon(
+                            StateActionButton.tonal(
                               onPressed: _openFolder,
-                              icon: const Icon(Icons.folder_open_rounded),
-                              label: const Text('打开文件夹'),
+                              icon: Icons.folder_open_rounded,
+                              text: '打开文件夹',
                             ),
-                            FilledButton.tonalIcon(
+                            StateActionButton.tonal(
                               onPressed: _openUrl,
-                              icon: const Icon(Icons.link_rounded),
-                              label: const Text('打开 URL'),
+                              icon: Icons.link_rounded,
+                              text: '打开 URL',
                             ),
                             // Phones pick folders poorly; the library tab is
                             // where the storage auto-scan lives.
                             if (!isDesktop())
-                              FilledButton.tonalIcon(
+                              StateActionButton.tonal(
                                 onPressed: () =>
                                     context.navigate('/tab/library/'),
-                                icon: const Icon(Icons.video_library_rounded),
-                                label: const Text('媒体库'),
+                                icon: Icons.video_library_rounded,
+                                text: '媒体库',
                               ),
                           ],
                         ),

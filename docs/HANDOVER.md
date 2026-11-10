@@ -2,22 +2,47 @@
 
 | 项     | 值                                                                          |
 | ------ | --------------------------------------------------------------------------- |
-| 状态   | 生效中（2026-11-11 凌晨 R5 面板观感轮之后）                                  |
+| 状态   | 生效中（2026-11-11 R6 打磨轮之后）                                           |
 | 日期   | 2026-11-11（最后实质性更新）                                                 |
-| 适用版本 | git `8ed84c4`（origin/main 停在 `63d9f59`，`d446bb8` / `8ed84c4` 待推送）  |
+| 适用版本 | git `e1a2df0` + R6 打磨工作区改动（`988122f` / `e1a2df0` 与打磨改动均未推送；origin/main 停在 `63d9f59`） |
 | 相关   | [SPEC.md](SPEC.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md) |
 
 ## 现状一句话
 
-M1-M8 迁移主流程、R1-R4 四轮收尾与 R5 两小轮（移动端播放修复 / 面板观感）
-全部完成：Kazumi 骨架上重建的 Flutter/mpv 本地播放器功能对等（播放 / 本地
+M1-M8 迁移主流程、R1-R4 四轮收尾、R5 两小轮（移动端播放修复 / 面板观感）
+与 R6 打磨轮（AppImage 打包 / Kazumi 空态与徽章对齐 / README 对账）全部
+完成：Kazumi 骨架上重建的 Flutter/mpv 本地播放器功能对等（播放 / 本地
 媒体 / 媒体库 / 历史 / mpv 兼容导入 / 画质引擎 / 插件 / 11 类设置 / 更新
 检查），**CI 首绿已达成**（run 42718530280，`332 tests passed, 1 skipped`），
 **v2.0.0-alpha 已公开发布**（tag 指向 `bd36f70`，GitHub Release 9 资产）；
-本地 34 个测试文件 342 用例全绿、analyze 0 告警、debug 构建与 ldd 审计实测
-通过；origin/main 停在 `63d9f59`，`d446bb8` / `8ed84c4` 待推送（本窗口
-api.github.com 不可达，推送后预期 CI 签名 **342 passed / 1 skipped**），
-版本仍是 2.0.0-alpha。
+本地 35 个测试文件 345 用例全绿（R6 实测，含 3 个新 Kazumi 对齐守护用例）、
+analyze 0 告警；origin/main 停在 `63d9f59`，`d446bb8` / `8ed84c4` /
+`988122f` / `e1a2df0` 与打磨改动待推送（推送后预期 CI 签名
+**345 passed / 1 skipped**），版本仍是 2.0.0-alpha。
+
+## 最近实质性变更（R6·打磨，2026-11-11）
+
+两个已提交（`988122f` 卫生与依赖收敛、`e1a2df0` AppImage 打包）+ 本轮
+UI 打磨与 README 对账（工作区改动，随工作流统一 checkpoint 提交）。
+
+- AppImage 打包（`e1a2df0`）：`.github/scripts/package-appimage.sh`
+  （linuxdeploy；amd64 extract-and-run 冒烟实测通过，arm64 仅 CI 可验），
+  release.yaml 挂 `*.AppImage`。
+- Kazumi 对齐（仅样式层）：关于页「GPL-3.0 许可证」tile 从 Kazumi 仓库
+  LICENSE 改指本项目（`about_page.dart`，Kazumi 同槽位本就链自家仓库）；
+  首页 / 播放页 / 媒体库空态按钮从裸 `FilledButton` 换成已平移的
+  `StateActionButton(.tonal)`（64×48 药丸，`state_presentation.dart`）；
+  插件页「已定制」徽章改 `errorContainer` 容器对（旧硬编码深棕两主题下
+  不可读）、次要文案改 `bodySmall + onSurfaceVariant` 弱化。
+- 新增守护测试 `test/kazumi_alignment_ui_test.dart`（3 用例：许可证 tile
+  真链接断言经 UrlLauncherPlatform 假体捕获、首页 / 媒体库空态按钮 idiom）。
+- README 对账：功能清单与实际对齐（设置行补更新检查）、构建依赖补
+  `libasound2-dev`（ALSA 头，与 pr.yaml 装步一致）、发布产物表补 AppImage、
+  新增「截图」占位说明（GUI 截图待桌面空闲窗口，不产占位假图）、上游
+  声明逐项核实（Kazumi `7265274` / media-kit `83b7ca6…` / Anime4K MIT）。
+- 门禁实测（R6）：`flutter analyze` 0 告警；`flutter test` 35 文件
+  **345 通过 / 1 skipped** 全绿。Linux debug 构建未在本轮重跑（纯样式 +
+  文档改动，工作流收尾会跑完整 gate）。
 
 ## 最近实质性变更（R5·面板观感，2026-11-11 00:19-01:11 CST）
 
@@ -142,16 +167,17 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
 ## 接手第一步清单
 
 1. `source /opt/emoplay-env.sh && cd /home/emo/code/emoplay && flutter analyze && flutter test`
-    - 预期 0 告警 + 342 通过 / 1 skipped（34 文件），达不到先查环境再查代码。
+    - 预期 0 告警 + 345 通过 / 1 skipped（35 文件，R6 实测底数），达不到先查环境再查代码。
 2. `git fetch origin && git log origin/main..HEAD --oneline` 与
-   `gh run list -R emoeem/emoplay --limit 5`（gh 需要外网，R5 收网窗口内
-   api.github.com 不可达） - 确认 `d446bb8` / `8ed84c4` 与本轮文档是否已
-   推送、推送后 CI 是否 **342 passed / 1 skipped**；红灯按坑 2 的归因链
-   处理。
+   `gh run list -R emoeem/emoplay --limit 5`（gh 需要外网，收网窗口内
+   api.github.com 不可达） - 确认 `d446bb8` / `8ed84c4` / `988122f` /
+   `e1a2df0` 与本轮打磨改动是否已推送、推送后 CI 是否
+   **345 passed / 1 skipped**；红灯按坑 2 的归因链处理。
 3. 通读 [SPEC.md](SPEC.md) §4 不变量与 [PORT-MAP.md](PORT-MAP.md) 头部铁律。
 4. 待办从 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) §四
    未做项清单取（发布产物实体机验证 → prerelease 语义 → i18n 第三页 →
-   AppImage/签名 → 性能实测），以及
+   签名/公证 → 性能实测；其中 AppImage 打包已在 R6 `e1a2df0` 落地，
+   路线图 §四-108 的勾选态以路线图下次收网为准），以及
    [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_PANEL_LOOK.md)
    的优先级建议。
 5. 改完代码跑 SPEC §9 gate（build_runner → analyze → test → build linux）。

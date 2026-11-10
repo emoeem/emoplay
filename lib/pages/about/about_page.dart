@@ -32,11 +32,14 @@ class AboutPage extends StatelessWidget {
                       title: '上游声明（NOTICE）',
                       route: '/settings/about/notice',
                     ),
+                    // Kazumi 同款槽位指向本项目自己的 LICENSE（Kazumi 的
+                    // 关于页也是链到自己仓库的 LICENSE）；Kazumi 的许可
+                    // 归「致谢 / 上游声明」管，不占许可证位。
                     AboutLinkTile(
                       icon: Icons.balance_rounded,
                       title: 'GPL-3.0 许可证',
                       url:
-                          'https://github.com/Predidit/Kazumi/blob/main/LICENSE',
+                          'https://github.com/emoeem/emoplay/blob/main/LICENSE',
                     ),
                     AboutLinkTile.route(
                       icon: Icons.description_outlined,

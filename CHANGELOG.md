@@ -6,7 +6,32 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
-## [Unreleased] - 2026-11-10（面板观感轮）
+## [Unreleased] - 2026-11-11（R6 打磨轮）
+
+### Added
+
+- **Linux AppImage 打磨**（`e1a2df0`）：`.github/scripts/package-appimage.sh`
+  经 linuxdeploy 打包（amd64 实测 extract-and-run 冒烟通过；arm64 走
+  linuxdeploy-aarch64，仅 CI 可验），release.yaml 挂 `*.AppImage` 资产；
+  系统库（GTK/VA-API 等）按 deb `Depends` 同款策略不内嵌。README 增补
+  AppImage 产物行与截图占位说明。
+- **Kazumi 对齐守护测试** `test/kazumi_alignment_ui_test.dart`（3 用例，
+  headless 挂载真实页面）：关于页许可证 tile 指向本项目 LICENSE（曾误指
+  Kazumi 仓库）；首页 / 媒体库空态按钮走 Kazumi `StateActionButton` idiom
+  （64×48 药丸样式断言）。
+
+### Changed
+
+- **空态按钮对齐 Kazumi idiom**：首页「选择媒体文件」、播放页
+  「打开文件/文件夹/URL/媒体库」、媒体库空态按钮从裸 `FilledButton` 换成
+  已平移的 `StateActionButton(.tonal)`（`lib/bean/widget/state_presentation.dart`
+  与 Kazumi 逐字节一致，此前只在错误页使用）；仅样式层，回调不动。
+- **插件页徽章与次要文案主题化**：「已定制」徽章从硬编码深棕
+  （`Color(0xFF5a3d1e)`，两个主题下前景不可读）改为 `errorContainer` 容器对；
+  模式徽章补 `onSecondary/onTertiaryContainer` 前景；「本地定制永不覆盖」
+  说明与「暂无在线条目」提示改为 `bodySmall + onSurfaceVariant` 弱化
+  （Kazumi 次要文案 idiom）。
+
 
 ### Fixed
 

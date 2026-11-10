@@ -6,6 +6,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/empty_state_widget.dart';
+import 'package:emoplay/bean/widget/state_presentation.dart';
 import 'package:emoplay/bean/widget/tonal_card.dart';
 import 'package:emoplay/media/library_model.dart';
 import 'package:emoplay/media/library_store.dart';
@@ -387,31 +388,30 @@ class _LibraryPageState extends State<LibraryPage> {
       title: noDirectories
           ? '媒体库还是空的'
           : (filtered ? '没有匹配的媒体' : '还没有索引到媒体文件'),
+      // Kazumi 空态按钮 idiom（StateActionButton，48px 药丸）。
       actions: [
         if (noDirectories && MobileMediaScanner.isSupported)
-          FilledButton.icon(
+          StateActionButton(
             onPressed: _mobileScanning ? null : () => _scanPhoneMedia(),
-            icon: const Icon(Icons.smartphone_rounded),
-            label: const Text('扫描手机媒体'),
+            icon: Icons.smartphone_rounded,
+            text: '扫描手机媒体',
           ),
-        FilledButton.icon(
+        StateActionButton(
           onPressed: noDirectories && !MobileMediaScanner.isSupported
               ? _addFolder
               : () => store.requestScan(),
-          icon: Icon(
-            noDirectories && !MobileMediaScanner.isSupported
-                ? Icons.add_rounded
-                : Icons.refresh_rounded,
-          ),
-          label: Text(noDirectories && !MobileMediaScanner.isSupported
+          icon: noDirectories && !MobileMediaScanner.isSupported
+              ? Icons.add_rounded
+              : Icons.refresh_rounded,
+          text: noDirectories && !MobileMediaScanner.isSupported
               ? '添加媒体文件夹'
-              : '重新扫描'),
+              : '重新扫描',
         ),
         if (noDirectories && MobileMediaScanner.isSupported)
-          FilledButton.tonalIcon(
+          StateActionButton.tonal(
             onPressed: _addFolder,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('添加媒体文件夹'),
+            icon: Icons.add_rounded,
+            text: '添加媒体文件夹',
           ),
       ],
     );
