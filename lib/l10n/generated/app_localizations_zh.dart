@@ -72,6 +72,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get equalizerGainSection => '频段增益（dB）';
 
   @override
+  String get audioPropertiesSection => '音频属性';
+
+  @override
+  String get audioReplaygainTitle => 'ReplayGain 响度均衡';
+
+  @override
+  String get audioReplaygainDescription =>
+      '按文件内 ReplayGain 标签自动调整增益（mpv replaygain 属性）';
+
+  @override
+  String get replaygainOff => '关闭';
+
+  @override
+  String get replaygainTrack => '按音轨';
+
+  @override
+  String get replaygainAlbum => '按专辑';
+
+  @override
   String get generalTitle => '常规';
 
   @override

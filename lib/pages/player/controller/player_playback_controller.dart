@@ -330,7 +330,9 @@ abstract class _PlayerPlaybackController with Store {
       // 内置默认 → compat 选项；下方播放器细化对同名键保持优先，例如
       // demuxer-cache-dir 指向 EmoPlay 自有的播放缓存目录，同样不写用户
       // mpv 目录）。预置在 MediaStores.init 组装一次：compat 选项 →
-      // 插件 scripts 追加 → 播放器初始化。
+      // 插件 scripts 追加 → 播放器初始化；M5-T2 起音频属性（replaygain/
+      // gapless-audio）随设置切换经 MediaStores.rebuildStartupMpvProperties
+      // 重排，后续每个 Player 在此处拿到当前值。
       await MpvPlayerProperties.apply(
         pp,
         MediaStores.isReady

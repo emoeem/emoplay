@@ -76,6 +76,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get equalizerGainSection => 'Band gains (dB)';
 
   @override
+  String get audioPropertiesSection => 'Audio properties';
+
+  @override
+  String get audioReplaygainTitle => 'ReplayGain';
+
+  @override
+  String get audioReplaygainDescription =>
+      'Adjust gain from the ReplayGain tags stored in each file (mpv replaygain property)';
+
+  @override
+  String get replaygainOff => 'Off';
+
+  @override
+  String get replaygainTrack => 'Per track';
+
+  @override
+  String get replaygainAlbum => 'Per album';
+
+  @override
   String get generalTitle => 'General';
 
   @override

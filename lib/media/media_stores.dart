@@ -115,9 +115,13 @@ class MediaStores {
 
   // The assembled mpv property preset applied at player creation:
   // compat options -> plugin scripts appended -> player initialization
-  // (1.x main.cpp assembly order). Computed once here — a wizard choice
-  // made mid-session applies on the NEXT launch, exactly like 1.x.
-  final Map<String, String> startupMpvProperties;
+  // (1.x main.cpp assembly order). Computed once at init for the compat
+  // options — a wizard choice made mid-session applies on the NEXT launch,
+  // exactly like 1.x — but REBUILT by [rebuildStartupMpvProperties] when
+  // the M5-T2 audio properties change (the audio settings page owns that
+  // call), so the audit table (mpv_settings.dart) and every subsequent
+  // Player see the current values without waiting for a relaunch.
+  Map<String, String> startupMpvProperties;
 
   // The grid/list view over the library store with the thumbnail wiring.
   late final LibraryModel libraryModel;
@@ -172,15 +176,11 @@ class MediaStores {
     );
 
     try {
-      final compatOptions = compat.startupOptions();
-      // Plugin script options are APPENDED here (1.x
-      // PluginManager.appendScriptOptions; the store keeps this exact
-      // insertion point): enabled+installed script plugins join the scripts
-      // option after whatever the compat layer assembled.
-      startupMpvProperties = MpvPlayerProperties.build(
-        compatOptions: compatOptions,
+      startupMpvProperties = _assembleStartupMpvProperties(
+        compat: compat,
+        plugins: plugins,
         appDataDir: dir.path,
-        pluginScripts: plugins.scriptOptions(),
+        replaygain: settings.audioReplaygain,
       );
     } catch (e) {
       EmoLogger().e('compat: startup options failed', error: e);
@@ -254,5 +254,49 @@ class MediaStores {
       diagnostics: diagnostics,
       startupMpvProperties: startupMpvProperties,
     );
+  }
+
+  // The single assembly point of the startup preset. Plugin script options
+  // are APPENDED inside MpvPlayerProperties.build (1.x
+  // PluginManager.appendScriptOptions; the store keeps this exact insertion
+  // point): enabled+installed script plugins join the scripts option after
+  // whatever the compat layer assembled. The M5-T2 audio properties ride
+  // the same build() call so the preset can never disagree with settings.
+  static Map<String, String> _assembleStartupMpvProperties({
+    required CompatController compat,
+    required PluginManager plugins,
+    required String appDataDir,
+    required String replaygain,
+  }) {
+    return MpvPlayerProperties.build(
+      compatOptions: compat.startupOptions(),
+      appDataDir: appDataDir,
+      pluginScripts: plugins.scriptOptions(),
+      replaygain: replaygain,
+    );
+  }
+
+  /// M5-T2 音频属性切换后的预置重排：审计表（mpv_settings.dart 读
+  /// startupMpvProperties）与后续每个 Player（player_playback_controller
+  /// 创建时 apply 预置）立即看到当前值，无需重启。对存活的当前 Player 的
+  /// 即时下发由设置页经 MpvPlayerProperties.applyReplaygain 完成。
+  ///
+  /// 契约：调用方必须先 settings.save() —— compat.startupOptions() 内部
+  /// 会重新 load() settings.json，未落盘的内存改动会被磁盘旧值冲掉。
+  /// 失败降级与 init 相同：日志 + 空表（纯 EmoPlay 默认 + 重定向），绝不
+  /// 阻塞设置动线。
+  void rebuildStartupMpvProperties() {
+    var rebuilt = const <String, String>{};
+    try {
+      rebuilt = _assembleStartupMpvProperties(
+        compat: compat,
+        plugins: plugins,
+        appDataDir: compat.appDataDir,
+        replaygain: settings.audioReplaygain,
+      );
+    } catch (e) {
+      EmoLogger().e('compat: startup options failed', error: e);
+    }
+    startupMpvProperties = rebuilt;
   }
 }

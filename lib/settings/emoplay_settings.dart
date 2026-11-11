@@ -5,6 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:emoplay/music/music_queue.dart';
+// audio.replaygain 的取值域与 mpv 映射单一来源（同 music_queue.dart 的
+// QueueLoopMode 先例：词汇定义在映射层，存储层引用）。Dart 循环 import
+// 合法——mpv_player_properties → compat_controller → 本文件构成环。
+import 'package:emoplay/mpv/config/mpv_player_properties.dart';
 
 // Persisted application settings (settings.json in the application support
 // directory).
@@ -50,6 +54,15 @@ import 'package:emoplay/music/music_queue.dart';
 //   - equalizerEnabled (10-band EQ wired to mpv's af chain, default false)
 //   - equalizerPreset ("flat"/"bass"/"vocal"/"live"/"custom", default "flat")
 //   - equalizerGains (per-band gains in dB, up to 10 doubles, default all 0)
+//  - the M5-T2 audio playback properties in a nested "audio" section (NEW
+//   section, same §四红线 sanctioned append: 1.x readers ignore unknown
+//   keys; defaults + round-trip asserted in test/emoplay_settings_test.dart):
+//   - replaygain ("off"/"track"/"album", default "off" — 1.x never touched
+//     the mpv replaygain property, so "off" preserves that behavior; the
+//     mpv-side mapping lives in MpvPlayerProperties.replaygainMpvValue).
+//     Unlike the music section this applies to ALL audio playback, which is
+//     why it gets its own section mirroring the settings-center 音频
+//     category (SPEC §6 category 4) instead of joining "music".
 //
 // Storage is a single JSON document written atomically (temp file + rename,
 // the QSaveFile pattern), mirroring HistoryStore/LibraryStore. The file path
@@ -98,6 +111,13 @@ class EmoPlaySettings extends ChangeNotifier {
   static const String _kMusicEqualizerEnabled = 'equalizerEnabled';
   static const String _kMusicEqualizerPreset = 'equalizerPreset';
   static const String _kMusicEqualizerGains = 'equalizerGains';
+  // M5-T2 音频属性段（roadmap §四红线：settings.json 新增键允许追加，
+  // 1.x 读取方忽略未知键；每追加一键必须在 test/emoplay_settings_test.dart
+  // 补默认值与往返用例）。取值域见 MpvPlayerProperties.replaygainValues
+  // （'off' | 'track' | 'album'），默认 'off' 保持 1.x 现状（mpv
+  // replaygain 属性从未被写过）。
+  static const String _kAudio = 'audio';
+  static const String _kAudioReplaygain = 'replaygain';
 
   // Path of the backing JSON document (shown in the settings UI so the
   // user can find / back it up).
@@ -326,6 +346,25 @@ class EmoPlaySettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  // M5-T2 音频属性段（audio）。读取方：mpv_player_properties.build（经
+  // MediaStores 组装 startupMpvProperties，每个 Player 创建时下发）与
+  // 音频设置页（切换时保存 + 重排预置 + 对存活 Player 即时下发）。
+  // 改值只动内存并通知，落盘仍由调用方 save()（与全类同一契约）。
+  String get audioReplaygain => _audioReplaygain;
+  String _audioReplaygain = MpvPlayerProperties.replaygainOff;
+  set audioReplaygain(String value) {
+    // 词汇白名单（off/track/album）：未知值不进内存，维持现值——加载侧
+    // 同样按白名单回落，臆测档位比拒绝更危险。
+    if (!MpvPlayerProperties.replaygainValues.contains(value)) {
+      return;
+    }
+    if (_audioReplaygain == value) {
+      return;
+    }
+    _audioReplaygain = value;
+    notifyListeners();
+  }
+
   // Reads the file. Missing or corrupt files reset to defaults and return
   // false; a valid file returns true. Never throws.
   bool load() {
@@ -351,6 +390,7 @@ class EmoPlaySettings extends ChangeNotifier {
     _musicEqualizerEnabled = false;
     _musicEqualizerPreset = 'flat';
     _musicEqualizerGains.clear();
+    _audioReplaygain = MpvPlayerProperties.replaygainOff;
 
     String text;
     try {
@@ -440,6 +480,17 @@ class EmoPlaySettings extends ChangeNotifier {
             value is num ? value.toDouble() : 0.0,
         ]);
     }
+
+    // M5-T2：audio.replaygain 按词汇白名单回落——未知值/错误类型一律
+    // 'off'（1.x 行为），绝不臆测一个增益档（MpvPlayerProperties
+    // .replaygainMpvValue 的同一契约）。
+    final audio = _mapOr(obj, _kAudio);
+    final storedReplaygain = _stringOr(
+        audio, _kAudioReplaygain, MpvPlayerProperties.replaygainOff);
+    _audioReplaygain = MpvPlayerProperties.replaygainValues
+            .contains(storedReplaygain)
+        ? storedReplaygain
+        : MpvPlayerProperties.replaygainOff;
     return true;
   }
 
@@ -468,6 +519,10 @@ class EmoPlaySettings extends ChangeNotifier {
       _kMusicEqualizerGains: List<double>.of(_musicEqualizerGains),
     };
 
+    final audio = <String, Object?>{
+      _kAudioReplaygain: _audioReplaygain,
+    };
+
     final behavior = <String, Object?>{
       _kResumeOnReopen: _resumeOnReopen,
       _kLibraryMaxDepth: _libraryMaxDepth,
@@ -484,6 +539,7 @@ class EmoPlaySettings extends ChangeNotifier {
       _kBehavior: behavior,
       _kQuality: quality,
       _kMusic: music,
+      _kAudio: audio,
     };
 
     // Atomic write via temp file + rename: a crash mid-write leaves the
@@ -506,8 +562,8 @@ class EmoPlaySettings extends ChangeNotifier {
     }
   }
 
-  // Restores the three persisted preference sections ("quality",
-  // "behavior", "music") to their constructor defaults and notifies
+  // Restores the persisted preference sections ("quality", "behavior",
+  // "music", "audio") to their constructor defaults and notifies
   // listeners once.
   //
   // 1.x contract (src/settings/SettingsService.cpp restoreDefaults +
@@ -548,6 +604,8 @@ class EmoPlaySettings extends ChangeNotifier {
     _musicEqualizerEnabled = false;
     _musicEqualizerPreset = 'flat';
     _musicEqualizerGains.clear();
+    // audio section (M5-T2)：off = 1.x 现状。
+    _audioReplaygain = MpvPlayerProperties.replaygainOff;
     notifyListeners();
   }
 

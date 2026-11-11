@@ -224,6 +224,42 @@ abstract class AppLocalizations {
   /// **'频段增益（dB）'**
   String get equalizerGainSection;
 
+  /// 音频页 replaygain 等全局播放属性分组标题（audio_settings.dart M5-T2 新增 SettingsSection）。
+  ///
+  /// In zh, this message translates to:
+  /// **'音频属性'**
+  String get audioPropertiesSection;
+
+  /// replaygain 下拉瓦片标题（audio_settings.dart；ReplayGain 为 mpv 选项与音乐软件通用专有名词，保留原文）。
+  ///
+  /// In zh, this message translates to:
+  /// **'ReplayGain 响度均衡'**
+  String get audioReplaygainTitle;
+
+  /// replaygain 下拉瓦片描述（audio_settings.dart）。
+  ///
+  /// In zh, this message translates to:
+  /// **'按文件内 ReplayGain 标签自动调整增益（mpv replaygain 属性）'**
+  String get audioReplaygainDescription;
+
+  /// replaygain=off 的显示名（audioReplaygainLabels；mpv 侧映射为 no，映射考证见 mpv_player_properties.dart 文件头）。
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭'**
+  String get replaygainOff;
+
+  /// replaygain=track 的显示名（audioReplaygainLabels；按单曲增益标签调整）。
+  ///
+  /// In zh, this message translates to:
+  /// **'按音轨'**
+  String get replaygainTrack;
+
+  /// replaygain=album 的显示名（audioReplaygainLabels；优先专辑增益标签，缺标签时 mpv 回落音轨增益）。
+  ///
+  /// In zh, this message translates to:
+  /// **'按专辑'**
+  String get replaygainAlbum;
+
   /// 设置中心「常规」分类页标题（lib/pages/settings/general_settings.dart SettingsDetailScaffold，SPEC §6 category 1）。
   ///
   /// In zh, this message translates to:

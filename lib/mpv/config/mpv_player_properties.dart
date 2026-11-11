@@ -51,6 +51,46 @@
 //     redundant video decoding"，VideoController attach 时才恢复 auto），
 //     headless 测试里只有视频轨的文件会 "No video or audio streams
 //     selected" 直接卸载——live 夹具须带音频轨（或显式 vid=auto）。
+//
+// M5-T2 音频属性考证（2026-11-12，同一 libmpv + fork 源码，read-only）：
+// replaygain 与 gapless-audio 都是 mpv 的常规 runtime 选项（mpv v0.41.0
+// 手册 DOCS/man/options.rst 本地留档核验）：
+//   * replaygain=<no|track|album>，默认 no。no=不调整；track=按音轨增益；
+//     album=优先专辑增益、文件缺专辑标签时回落音轨增益。
+//   * gapless-audio=<no|yes|weak>，默认 weak。weak=通常保持音频设备开启，
+//     解码输出格式变化时才关闭重开——同参数编码的连播无缝，且不会像 yes
+//     档那样把首个文件的输出参数锁死给后续文件（音质陷阱），是 mpv 自己
+//     选定的折中默认。
+//   * runtime 下发以 shipped libmpv 实测为准（2026-11-12，mpv
+//     v0.41.0-11-gf011d73d5-dirty，live 用例见
+//     mpv_player_properties_test.dart）：idle core 上 setProperty 被接受
+//     且回读一致，untouched 默认回读 replaygain='no'、gapless-audio=
+//     'weak'。options.rst 对二者均无 "applied only during (lib)mpv
+//     initialization" 标记（手册对 init-only 选项的明示方式，如
+//     config-dir）；但按 load-scripts 的同一教训保持克制：接受 + 回读一
+//     致不等于行为层已重读，增益/无缝的听感生效属 mpv 选项自身契约，留
+//     待 SPEC §9 人工验收。
+//   * fork（real.dart `_create`，83b7ca6）的 pre-init options 与 post-init
+//     属性表都不含 replaygain / gapless-audio——2.0 改造前的实际行为就是
+//     上述 mpv 默认值。
+//   * 1.x 从未实现二者：grep mpv-emo 的 src/ qml/ mpv.md 两词零命中；引擎
+//     内置默认表（MpvEngine::initialize）只有 terminal/osc/vo/hwdec/
+//     keep-open/load-scripts；gapless 是 1.x 明文遗留项（mpv-emo
+//     docs/roadmap.md「遗留项：…gapless/loop 行为」、docs/architecture.md
+//     音乐模式小节、docs/execution-log.md P7 已知限制；docs/
+//     nativeization-plan.md 曾计划以 gapless-audio=weak 配合音乐模式无缝
+//     切歌，但未落地）。
+//   * replaygain 为 2.0 新增音频偏好（roadmap M5-T2「设置落音频类」）：
+//     设置词汇 off/track/album（"off" 风格对齐 §7 qualityTier/debandMode
+//     的 2.0 取值域），经 [replaygainMpvValue] 映射到 mpv 的 no/track/
+//     album。默认 off 仍显式钉 'no'：与 load-scripts 同理让生效选项表
+//     （mpv_settings 审计页）陈述意图，行为与 1.x 现状逐位一致；导入的
+//     用户 mpv.conf 显式项依旧后写者胜（compatOptions 在 build() 里最后
+//     addAll）。
+//   * gapless-audio=weak 钉为全局预置项、不随音乐形态条件化：mpv 默认已是
+//     weak（实测），钉住=行为与现状完全一致、意图可见、并防 fork 默认漂
+//     移；为它加形态条件逻辑只会引入无行为差异的复杂度。1.x 音乐模式的无
+//     缝切歌意图（nativeization-plan.md:67）由此以最小面落地。
 
 import 'package:media_kit/media_kit.dart';
 
@@ -60,6 +100,34 @@ import 'package:emoplay/services/logging/logger.dart';
 
 class MpvPlayerProperties {
   MpvPlayerProperties._();
+
+  /// settings.json `audio.replaygain` 的持久化词汇（M5-T2，§四红线允许的
+  /// 键追加）。"off" 风格对齐 §7 qualityTier/debandMode 的 2.0 取值域；
+  /// mpv 侧的对应值由 [replaygainMpvValue] 映射（off→no）。
+  static const String replaygainOff = 'off';
+  static const String replaygainTrack = 'track';
+  static const String replaygainAlbum = 'album';
+
+  /// 三个设置词汇的表，供设置页与测试枚举（单一事实来源）。
+  static const List<String> replaygainValues = <String>[
+    replaygainOff,
+    replaygainTrack,
+    replaygainAlbum,
+  ];
+
+  /// 设置词汇 → mpv replaygain 属性值：off→no、track→track、album→album；
+  /// 未知值回落 'no'（1.x 行为）——与 QueueLoopMode.fromStorageValue 的
+  /// 存储契约同型：手改/损坏的取值永远落回不启用，绝不臆测一个增益档。
+  static String replaygainMpvValue(String setting) {
+    switch (setting) {
+      case replaygainTrack:
+        return 'track';
+      case replaygainAlbum:
+        return 'album';
+      default:
+        return 'no';
+    }
+  }
 
   /// The 1.x engine built-in defaults that survive the media_kit port.
   ///
@@ -83,6 +151,9 @@ class MpvPlayerProperties {
     required Map<String, String> compatOptions,
     required String appDataDir,
     List<String> pluginScripts = const [],
+    // M5-T2：settings.json `audio.replaygain`（off/track/album）。默认 off
+    // = 1.x 现状（从未写过该属性）；MediaStores 组装预置时传入当前设置值。
+    String replaygain = replaygainOff,
   }) {
     final properties = <String, String>{};
 
@@ -105,6 +176,19 @@ class MpvPlayerProperties {
     // is EmoPlay-owned storage too, so the invariant "never write the user's
     // mpv directory" still holds.
     properties.addAll(MpvImportRules.redirectTargetsFor(appDataDir));
+
+    // M5-T2 audio properties (考证见文件头 M5-T2 块)。post-init setProperty
+    // 被接受且回读一致（live 用例实测；行为层听感留待人工验收）。放在默
+    // 认半区：用户导入的 mpv.conf 显式项在下方 addAll(compatOptions) 里
+    // 后写者胜。
+    //
+    // gapless-audio=weak：钉住 mpv 自身的默认（实测 idle core 回读 weak）
+    // ——行为与改造前逐位一致，意图进审计表，防 fork 默认漂移；1.x 明文
+    // 遗留的音乐模式无缝切歌意图以最小面兑现。
+    properties['gapless-audio'] = 'weak';
+    // replaygain：设置词汇 off/track/album 映射为 mpv 的 no/track/album；
+    // off 钉 'no'（等价 1.x 现状，审计表陈述意图）。
+    properties['replaygain'] = replaygainMpvValue(replaygain);
 
     // Compat options (imported user options + the input-conf pin from
     // CompatController.startupOptions) win over the defaults above: an
@@ -161,5 +245,15 @@ class MpvPlayerProperties {
         );
       }
     }
+  }
+
+  /// M5-T2 音频设置页切换动线的即时下发（对存活的当前 Player）：单键走同
+  /// 一个 [apply] 通道，逐键失败日志的语义原样保留。下一 Player 由预置覆
+  /// 盖（MediaStores 在设置保存后重排 startupMpvProperties）。
+  static Future<void> applyReplaygain(NativePlayer player, String setting) {
+    return apply(
+      player,
+      <String, String>{'replaygain': replaygainMpvValue(setting)},
+    );
   }
 }

@@ -26,6 +26,7 @@ import 'package:emoplay/bean/settings/settings_detail_scaffold.dart';
 import 'package:emoplay/l10n/generated/app_localizations.dart';
 import 'package:emoplay/l10n/generated/app_localizations_en.dart';
 import 'package:emoplay/l10n/generated/app_localizations_zh.dart';
+import 'package:emoplay/mpv/config/mpv_player_properties.dart';
 import 'package:emoplay/music/music_controller.dart';
 import 'package:emoplay/pages/settings/audio_settings.dart';
 
@@ -127,5 +128,24 @@ void main() {
     expect(enLabels['bass'], 'Bass boost');
     expect(enLabels['vocal'], 'Vocal');
     expect(enLabels['live'], 'Live');
+  });
+
+  test('replaygainLabelMapCoversPersistedVocabularyBothLocales', () {
+    // M5-T2 replaygain 下拉与该断言共用 audioReplaygainLabels 单一来源；
+    // 键集必须与 settings.json audio.replaygain 的持久化词汇（即
+    // MpvPlayerProperties.replaygainValues，off/track/album）对齐，并与
+    // build() 预置里 replaygainMpvValue 的映射（off→no）语义一致。
+    final zh = AppLocalizationsZh();
+    final en = AppLocalizationsEn();
+    final zhLabels = audioReplaygainLabels(zh);
+    final enLabels = audioReplaygainLabels(en);
+    expect(zhLabels.keys.toList(), MpvPlayerProperties.replaygainValues);
+    expect(enLabels.keys.toList(), zhLabels.keys.toList());
+    expect(zhLabels['off'], '关闭');
+    expect(zhLabels['track'], '按音轨');
+    expect(zhLabels['album'], '按专辑');
+    expect(enLabels['off'], 'Off');
+    expect(enLabels['track'], 'Per track');
+    expect(enLabels['album'], 'Per album');
   });
 }

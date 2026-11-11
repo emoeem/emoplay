@@ -138,6 +138,61 @@ void main() {
     expect(untouched.containsKey('scripts'), isFalse);
   });
 
+  test('replaygainMappingAndPresetPlacement', () {
+    // M5-T2（纯逻辑半）：设置词汇 off/track/album → mpv replaygain 属性值
+    // no/track/album 的映射（考证见 mpv_player_properties.dart 文件头
+    // M5-T2 块：mpv v0.41.0 options.rst 手册 + shipped libmpv live 回读）。
+    expect(MpvPlayerProperties.replaygainValues, ['off', 'track', 'album']);
+    expect(
+      MpvPlayerProperties
+          .replaygainMpvValue(MpvPlayerProperties.replaygainOff),
+      'no',
+    );
+    expect(
+      MpvPlayerProperties
+          .replaygainMpvValue(MpvPlayerProperties.replaygainTrack),
+      'track',
+    );
+    expect(
+      MpvPlayerProperties
+          .replaygainMpvValue(MpvPlayerProperties.replaygainAlbum),
+      'album',
+    );
+    // 未知值回落 'no'（1.x 行为）：与 QueueLoopMode.fromStorageValue 同型
+    // 的存储契约——臆测一个增益档比拒绝更危险。
+    expect(MpvPlayerProperties.replaygainMpvValue('bogus-gain'), 'no');
+
+    // 预置位置：默认 build() 钉 replaygain='no'（1.x 现状，审计表陈述意
+    // 图）与 gapless-audio='weak'（mpv 自身默认的显式钉，考证注释随行：
+    // 行为与改造前逐位一致，见文件头）。
+    final defaults = MpvPlayerProperties.build(
+      compatOptions: const {},
+      appDataDir: appData.path,
+    );
+    expect(defaults['replaygain'], 'no');
+    expect(defaults['gapless-audio'], 'weak');
+
+    // 用户词汇透传到预置。
+    final track = MpvPlayerProperties.build(
+      compatOptions: const {},
+      appDataDir: appData.path,
+      replaygain: MpvPlayerProperties.replaygainTrack,
+    );
+    expect(track['replaygain'], 'track');
+
+    // 导入的用户 mpv.conf 显式项后写者胜（与 load-scripts 等默认项同一优
+    // 先级）：compat 层的同名键覆盖预置默认。
+    final compatWins = MpvPlayerProperties.build(
+      compatOptions: const {
+        'replaygain': 'album',
+        'gapless-audio': 'no',
+      },
+      appDataDir: appData.path,
+    );
+    expect(compatWins['replaygain'], 'album');
+    expect(compatWins['gapless-audio'], 'no');
+  });
+
   // ---------------------------------------------------------------------------
   // apply() half — a real (idle) libmpv core per test, same pattern as
   // test/equalizer_test.dart. Every readback below was probed against the
@@ -387,5 +442,56 @@ void main() {
       errorLogs.where((line) => line.startsWith('media_kit:')),
       isNotEmpty,
     );
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('replaygainThreeStatesAndGaplessApplyToLiveCore', () async {
+    // M5-T2 live 半（本文件 apply() 半的同一先例：真实 idle libmpv，无渲
+    // 染面）。两件事：
+    //   1. replaygain 三态经 apply 通道下发后逐态被核心接受且回读一致
+    //      （行为层的增益听感属 mpv 选项自身契约，留待人工验收，见
+    //      mpv_player_properties.dart 文件头 M5-T2 考证块的克制声明）。
+    //   2. gapless 注释与行为一致：untouched core 回读 'weak'（mpv 默认，
+    //      probed 2026-11-12；options.rst "Default: weak"）——预置把
+    //      'weak' 钉出来只是显式化默认，行为与改造前逐位一致；apply 后回
+    //      读不变。
+    MediaKit.ensureInitialized();
+    final player = Player();
+    addTearDown(player.dispose);
+    final native = player.platform as NativePlayer;
+    await native.waitForPlayerInitialization;
+
+    // Untouched-core defaults（probe）: replaygain 'no'（options.rst:
+    // "With --replaygain=no (the default), perform no adjustment"）、
+    // gapless-audio 'weak'。
+    expect(await native.getProperty('replaygain'), 'no');
+    expect(await native.getProperty('gapless-audio'), 'weak');
+
+    // 三态 apply：off→no、track→track、album→album 逐态下发 + 回读。
+    final states = <String, String>{
+      MpvPlayerProperties.replaygainOff: 'no',
+      MpvPlayerProperties.replaygainTrack: 'track',
+      MpvPlayerProperties.replaygainAlbum: 'album',
+    };
+    for (final state in states.entries) {
+      final properties = MpvPlayerProperties.build(
+        compatOptions: const {},
+        appDataDir: appData.path,
+        replaygain: state.key,
+      );
+      await MpvPlayerProperties.apply(native, properties);
+      expect(
+        await native.getProperty('replaygain'),
+        state.value,
+        reason: 'replaygain=${state.key} must land as ${state.value}',
+      );
+    }
+    // gapless 钉在整轮 apply 之后依旧 'weak'（注释与行为一致）。
+    expect(await native.getProperty('gapless-audio'), 'weak');
+
+    // 设置页切换动线用的单键通道（applyReplaygain）同样落核——它就是
+    // apply() 的单键形态，失败走同一逐键日志。
+    await MpvPlayerProperties.applyReplaygain(
+        native, MpvPlayerProperties.replaygainTrack);
+    expect(await native.getProperty('replaygain'), 'track');
   }, timeout: const Timeout(Duration(seconds: 60)));
 }

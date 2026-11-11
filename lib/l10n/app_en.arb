@@ -82,6 +82,30 @@
     "description": "Display name for the live equalizer preset (audioEqualizerPresetLabels)."
   },
   "equalizerGainSection": "Band gains (dB)",
+  "audioPropertiesSection": "Audio properties",
+  "@audioPropertiesSection": {
+    "description": "Audio page group title for global playback properties such as replaygain (audio_settings.dart, new M5-T2 SettingsSection)."
+  },
+  "audioReplaygainTitle": "ReplayGain",
+  "@audioReplaygainTitle": {
+    "description": "Replaygain dropdown tile title (audio_settings.dart; ReplayGain is the proper noun used by mpv and audio software)."
+  },
+  "audioReplaygainDescription": "Adjust gain from the ReplayGain tags stored in each file (mpv replaygain property)",
+  "@audioReplaygainDescription": {
+    "description": "Replaygain dropdown tile description (audio_settings.dart)."
+  },
+  "replaygainOff": "Off",
+  "@replaygainOff": {
+    "description": "Display name for replaygain=off (audioReplaygainLabels; mapped to mpv's no — see the M5-T2 header block in mpv_player_properties.dart)."
+  },
+  "replaygainTrack": "Per track",
+  "@replaygainTrack": {
+    "description": "Display name for replaygain=track (audioReplaygainLabels; per-track gain tags)."
+  },
+  "replaygainAlbum": "Per album",
+  "@replaygainAlbum": {
+    "description": "Display name for replaygain=album (audioReplaygainLabels; album gain tags first, mpv falls back to track gain when absent)."
+  },
   "generalTitle": "General",
   "@generalTitle": {
     "description": "Settings category 1 page title (lib/pages/settings/general_settings.dart, SPEC §6)."

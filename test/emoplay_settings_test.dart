@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
+import 'package:emoplay/mpv/config/mpv_player_properties.dart';
 import 'package:emoplay/music/music_queue.dart';
 import 'package:emoplay/settings/emoplay_settings.dart';
 
@@ -404,6 +405,96 @@ void main() {
     settings.playlistMode = QueueLoopMode.single;
     settings.restoreDefaults();
     expect(settings.playlistMode, QueueLoopMode.none);
+  });
+
+  test('audioReplaygainDefaultsWhenMissing', () {
+    // M5-T2 键追加契约（roadmap §四红线）：audio 段写于 M5-T2 之前的文件
+    // （无 audio 键）按默认 off 加载，且既有 music/behavior 字段不受影
+    // 响。默认 off = 1.x 现状（1.x 从未写过 mpv replaygain 属性，grep
+    // mpv-emo src/qml/mpv.md 零命中）。
+    final path = file('pre-m5t2.json');
+    {
+      final settings = EmoPlaySettings(path);
+      settings.musicEqualizerEnabled = true;
+      settings.libraryMaxDepth = 4;
+      expect(settings.save(), isTrue);
+    }
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.audioReplaygain, MpvPlayerProperties.replaygainOff);
+    expect(settings.musicEqualizerEnabled, isTrue);
+    expect(settings.libraryMaxDepth, 4);
+  });
+
+  test('audioSectionRoundTrips', () {
+    // M5-T2 新段（settings.json `audio`）的往返用例：off → track → album
+    // 跨实例往返，并与 music/behavior 段在同一文档中共存。
+    final path = file('audio.json');
+    {
+      final settings = EmoPlaySettings(path);
+      expect(
+          settings.audioReplaygain, MpvPlayerProperties.replaygainOff); // 默认
+      settings.audioReplaygain = MpvPlayerProperties.replaygainTrack;
+      expect(settings.save(), isTrue);
+    }
+    {
+      final settings = EmoPlaySettings(path);
+      expect(settings.load(), isTrue);
+      expect(settings.audioReplaygain, MpvPlayerProperties.replaygainTrack);
+      settings.audioReplaygain = MpvPlayerProperties.replaygainAlbum;
+      settings.librarySkipHidden = false;
+      expect(settings.save(), isTrue);
+    }
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.audioReplaygain, MpvPlayerProperties.replaygainAlbum);
+    expect(settings.librarySkipHidden, isFalse);
+    // 再改回 off，确认三态都可写入并可读回。
+    settings.audioReplaygain = MpvPlayerProperties.replaygainOff;
+    expect(settings.save(), isTrue);
+    final reloaded = EmoPlaySettings(path);
+    expect(reloaded.load(), isTrue);
+    expect(reloaded.audioReplaygain, MpvPlayerProperties.replaygainOff);
+  });
+
+  test('audioReplaygainSurvivesWrongTypes', () async {
+    // 手改文件：未知值与错误类型一律回落默认 off（MpvPlayerProperties
+    // .replaygainValues 白名单契约，与 QueueLoopMode.fromStorageValue 同
+    // 型），不崩溃、绝不臆测一个增益档喂给播放器。
+    final path = file('audio-wrong-types.json');
+    await File(path).writeAsString('''
+{
+    "audio": {
+        "replaygain": 42
+    }
+}
+''');
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.audioReplaygain, MpvPlayerProperties.replaygainOff);
+
+    await File(path).writeAsString('''
+{
+    "audio": {"replaygain": "bogus-gain"}
+}
+''');
+    final settings2 = EmoPlaySettings(path);
+    expect(settings2.load(), isTrue);
+    expect(settings2.audioReplaygain, MpvPlayerProperties.replaygainOff);
+
+    // 守卫 setter 同契约：未知值不进内存、维持现值。
+    settings2.audioReplaygain = 'bogus-gain';
+    expect(settings2.audioReplaygain, MpvPlayerProperties.replaygainOff);
+  });
+
+  test('restoreDefaultsResetsAudioReplaygain', () {
+    // 恢复默认（quality/behavior/music/audio 全段范围，施工件 B 扩展同款）
+    // 也覆盖 M5-T2 新键。
+    final path = file('restore-audio-replaygain.json');
+    final settings = EmoPlaySettings(path);
+    settings.audioReplaygain = MpvPlayerProperties.replaygainAlbum;
+    settings.restoreDefaults();
+    expect(settings.audioReplaygain, MpvPlayerProperties.replaygainOff);
   });
 
   test('behaviorSectionRoundTrips', () {
