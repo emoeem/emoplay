@@ -6,13 +6,88 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
-## [Unreleased] - 2026-11-12（R9 M3 播放器交互轮）
+## [2.1.0-alpha] - 2026-11-12（已发布）
+
+R5–R9 施工收口（tag `v2.1.0-alpha`；`pubspec.yaml` version
+`2.0.0-alpha+2000000` → `2.1.0-alpha+2010000`）。R8（`3dcfb6a`，2026-11-11）
+为纯文档轮（3.0 路线图 / 跨平台验证矩阵 / fork 治理三件套），无用户可感知
+变化。本轮要点（全部实测取证，分轮明细见下方五节）：
+
+### Added
+
+- **章节导航**（R9，`f2b7754`）：mpv `chapter-list` / `chapter` 属性读取
+  （fork `readNativeString` 回读，JSON 形态逐条实测，非该形态降级空表不
+  崩）+ 底板章节面板（当前章高亮，无章节文件优雅隐藏）+ Page Up /
+  Page Down 跳章快捷键。M3-T2 验收面的进度条章节刻度 / hover 章节标题 /
+  中键跳章未做（记录于
+  `docs/releases/RELEASE_2026-11-10_M3_PLAYER_INTERACTION.md` §五）。
+- **字幕管理**（R9，`a8cb844`）：字幕轨道切换面板、外挂字幕加载
+  （srt/ass/ssa/vtt/sub）、关闭字幕、字幕延迟 ±0.5s 步进（±0.5 重复累加
+  的二进制小数漂移以一位小数舍入兜住）；选轨真相源是 mpv `sid` 属性
+  （fork `Player.state.track.subtitle` 在裸 `sub-add` 后保持 stale，fork
+  实测探针记录于
+  `lib/pages/player/controller/player_subtitles_controller.dart:13`）。
+- **A-B 循环与逐帧步进**（R9，`2e5d73d`）：A-B 循环三态（设 A → 设 B →
+  清除，B 点 ≤ A 点客户端拒绝），键位 L；`frame-step` / `frame-back-step`
+  （键位 `.` / `,`，暂停态控制条显示上一帧 / 下一帧按钮；fork 命令表
+  strings 实测可用，frame-back-step 需 mpv ≥0.38，fork 降级须复检）。
+- **设置 → 通用「恢复默认设置」**（R7，`d971af0`）：quality / behavior /
+  music 三分区回 1.x schema 默认，媒体库、观看历史与 mpv 配置导入决策
+  不动（`test/settings_service_semantics_test.dart:139` 逐字节不变语义
+  测试锁定）；通用设置页 zh / en 双语 i18n 第三页。
+- **性能实测**（R7，`87b3760`）：2000 条目夹具、容器 Isolate 计时——
+  worker isolate 热扫 125ms（≈16000 files/s）、进度回调 63 次（32 步长
+  节流）、library.json 装载 1.7–2.2ms（远低于 100ms 阻塞阈值，判定不改
+  代码）、缩略图串行链 77–81ms/作业、并发重叠 0；数字全录
+  `docs/reports/WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md`。
+- **Linux AppImage 产物**（R6，`e1a2df0`）：linuxdeploy 打包接入
+  release.yaml（amd64 本地 extract-and-run 冒烟实测通过；arm64 走
+  linuxdeploy-aarch64，仅 CI 可验）；依赖收敛与 web/ 模板目录清理
+  （`988122f`）。
+- **tag 发布 draft 制**（R7，`0a3436c`）：release 产物先落草稿、不占公开
+  Latest 位，人工核对产物集后 `gh release edit <tag> --draft=false` 公开
+  （本节即按此流程发布）。
+
+### Fixed
+
+- **播放中快捷键全部失效**（R5，`ec1c91e`）：键盘处理器把「是否处理」门
+  在 primaryFocus 位于面板自建 `keyboardFocus` 内的永假条件上；改为
+  「当前路由 isCurrent + 焦点不在任何 EditableText」（PiliPlus
+  player_focus 语义，`player_keyboard_shortcuts.dart`）。
+- **播放页导航浮层残留**（R5，`ec1c91e`）：壳层 `menu.dart` 在 Observer
+  builder 内用 `&&` 短路读状态，observable 未被订阅，导航条 / rail 该
+  隐藏时不隐藏；现 observable 无条件读取 + `pageCurrent`
+  （`ModalRoute.isCurrent` 驱动）派生全出血与页签高亮。
+- **CJK 落楷体（LXGW ZhenKai）**（R5）：恢复 Kazumi 内置 MiSans-Regular
+  （8,122,324 字节，`aeda939`）+ 设置 → 主题「使用系统字体」开关（默认
+  开，关闭后切内置 MiSans，`63d9f59`）；两条路径显式携带 CJK 兜底，
+  不再信任 fontconfig 猜字体。
+- **播放面板按 Kazumi@`7265274` 逐槽位重组**（R5，`d446bb8`，402 插入 /
+  485 删除）：手机与桌面共用一套槽位（底条 = 播放/暂停、下一集、进度+
+  时间、全屏；宽控件进顶部「更多」菜单），取代 PiliPlus 式组合；渐变
+  遮罩与安全区 insets 保留，播放 tick 只重建进度条与时间标签。
+- **library_store_test 扫描静止态竞态**（R9，`a8cb844`）：链式扫描管线
+  排干前断言静止态偶发红灯，补 `pumpUntil(() => !store.isScanning)` 排水
+  等待，产品代码零改动。
+
+### 验证
+
+- 本地门（R9 收网窗口 2026-11-12 实测，两遍同数）：`flutter analyze`
+  0 告警；`flutter test` 44 文件 **411 通过 + 1 平台条件跳过**（1 skip =
+  Windows-only 探针 `mpv_profile_scanner_test.dart:217`，按设计跳过）。
+  分轮验证数字见下方各轮「验证」小节。
+- 发布门：release.yaml 矩阵（flutter-test / flutter-analyze 前置，Android
+  split-per-abi ×3、Windows zip+msix、macOS zip、Linux amd64 / arm64
+  tar.gz+deb+AppImage）全绿后产物落 draft，人工核对产物集后
+  `gh release edit v2.1.0-alpha --draft=false` 公开。
+
+### R9 · M3 播放器交互轮（2026-11-12）
 
 > 3.0 路线图（`docs/EMOPLAY-3.0-ROADMAP.md`）M3 阶段的第一批施工。上一轮
 > R8（`3dcfb6a`，2026-11-11）为纯文档轮（3.0 路线图 / 跨平台验证矩阵 /
 > fork 治理三件套），无用户可感知变化，故不设独立小节。
 
-### Added
+#### Added
 
 - **章节导航**（`f2b7754`）：读取 mpv `chapter-list` / `chapter` 属性
   （fork 经 `readNativeString` 回读，JSON 形态逐条实测，非该形态降级为
@@ -40,14 +115,14 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   底部控制条暂停态显示上一帧 / 下一帧按钮（mpv OSC 惯例位，播放态
   不占位）。
 
-### Fixed
+#### Fixed
 
 - **library_store_test 扫描静止态竞态**（`a8cb844`）：链式扫描管线
   （worker 握手慢时第一趟已覆盖全部文件夹、第二趟随后串接）排干前断言
   静止态偶发红灯；`test/library_store_test.dart:364` 补
   `pumpUntil(() => !store.isScanning)` 排水等待，产品代码零改动。
 
-### 验证
+#### 验证
 
 - `flutter analyze` 0 告警（`No issues found! (ran in 5.7s)`）；
   `flutter test` 44 文件 **411 通过 + 1 平台条件跳过**全绿（2026-11-12
@@ -60,9 +135,9 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   （api.github.com 不可达）；R9 三提交未推送（本地 ahead 3），推送后
   预期签名 **411 passed / 1 skipped**。
 
-## [Unreleased] - 2026-11-11（R7 性能实测与设置收尾轮）
+### R7 · 性能实测与设置收尾轮（2026-11-11）
 
-### Added
+#### Added
 
 - **设置 → 通用「恢复默认设置」**（`d971af0`）：1.x
   `SettingsService::restoreDefaults` 的 UI 槽位落地，EmoDialog 危险样式
@@ -88,7 +163,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   `gh release edit <tag> --draft=false` 公开，流程新增
   `docs/guides/BUILD_GUIDE.md` §四。主要失效模式：忘 publish。
 
-### Changed
+#### Changed
 
 - **通用设置页 i18n 第三页**（`d971af0`）：页签壳（R3）、音频设置（R4）
   之后，通用设置页整体迁移 AppLocalizations，zh / en 双语（含恢复默认
@@ -101,7 +176,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   `screen_brightness_ohos`）、ldd 传递闭包 125 路径 = 9 内嵌 + 116 外部、
   3 个 dlopen-only 内嵌库从不进 ldd。注释级修复，无行为变化。
 
-### 验证
+#### 验证
 
 - `flutter analyze` 0 告警（`No issues found! (ran in 8.3s)`）；
   `flutter test` 37 文件 **355 通过 + 1 skipped** 全绿（2026-11-11 03:40
@@ -110,9 +185,9 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   `87b3760` / `d971af0` / `0a3436c` 三提交未推送，推送后预期签名
   **355 passed / 1 skipped**（CI 无 /tmp 夹具时基准段 skip 降级，计数不变）。
 
-## [Unreleased] - 2026-11-11（R6 卫生与交付形态轮）
+### R6 · 卫生与交付形态轮（2026-11-11）
 
-### Added
+#### Added
 
 - **Linux AppImage 打磨**（`e1a2df0`）：`.github/scripts/package-appimage.sh`
   经 linuxdeploy 打包（amd64 实测 extract-and-run 冒烟通过；arm64 走
@@ -125,7 +200,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   （64×48 药丸样式断言）；`url_launcher_platform_interface` 以
   dev_dependency `^2.3.2` 作启动捕获测试缝（`pubspec.yaml:69`）。
 
-### Changed
+#### Changed
 
 - **空态按钮对齐 Kazumi idiom**：首页「选择媒体文件」、播放页
   「打开文件/文件夹/URL/媒体库」、媒体库空态按钮从裸 `FilledButton` 换成
@@ -141,7 +216,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   path `^1.9.1`，审计 P2「any×3」）；`analysis_options.yaml` 删掉
   `lib/bbcode/generated/**` 与 `web/**` 两条指向已不存在路径的死排除。
 
-### Removed
+#### Removed
 
 - **web/ Flutter 模板目录**（`988122f`）：`index.html` / `manifest.json` /
   favicon / 4 张 icon（111 行 + 5 图）整体删除，理由：目标平台只有桌面与
@@ -150,7 +225,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   （审计 P2「依赖必要性存疑」项；`screen_brightness_android/ios/
   platform_interface` 保留在用）。
 
-### 验证
+#### 验证
 
 - `flutter analyze` 0 告警（`No issues found! (ran in 5.3s)`）；
   `flutter test` 35 文件 **345 通过 + 1 skipped** 全绿（1 skip 维持：
@@ -166,9 +241,9 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   `e1a2df0` / `b0e1a06` 六个提交未推送，推送后预期签名
   **345 passed / 1 skipped**。
 
-## [Unreleased] - 2026-11-10（面板观感轮）
+### R5 · 面板观感轮（2026-11-10）
 
-### Fixed
+#### Fixed
 
 - **播放中快捷键全部失效**：早期键盘处理器把「是否处理」门在 primaryFocus
   位于面板自建 `keyboardFocus` 内，而没有任何交互会让它成为 primaryFocus，
@@ -184,7 +259,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   两层修复：恢复 Kazumi 的 MiSans-Regular（`assets/fonts/`，8,122,324
   字节）+ 按 Kazumi useSystemFont 设计端到端落地（见下）。
 
-### Added
+#### Added
 
 - **设置 → 主题「使用系统字体」开关**（默认开，`useSystemFont`）：关闭后
   切换到内置 MiSans（Kazumi 同款）；两条路径都显式携带 CJK 兜底
@@ -195,7 +270,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   存在才真跑（runner 上缺失即早退通过）；双趟探测 default ao 与 pinned
   ao=pulse。本轮实测 pinned 趟 `AO: [pulse] 44100Hz stereo 2ch float`。
 
-### Changed
+#### Changed
 
 - **播放面板按 Kazumi@`7265274` 逐槽位重组**（`player_item_panel.dart`
   单文件，402 插入 / 485 删除）：取代上轮「手机 6 键传输行 + 底部更多
@@ -210,7 +285,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   `choco install yq`，flutter-action 恢复 `flutter-version-file:
   pubspec.yaml`（取代 R4 钉死 `flutter-version: '3.47.9'` 的权宜）。
 
-### 验证
+#### 验证
 
 - `flutter analyze` 0 告警；`flutter test` 34 文件 342 用例全绿（1 skip
   维持：Windows-only probe）；`flutter build linux --debug` 通过；ldd
@@ -218,9 +293,9 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 - CI 结论本窗口不可测：`gh run list` 两次连接 EOF（api.github.com 不可达）；
   `d446bb8` / `8ed84c4` 未推送，推送后预期签名 342 passed / 1 skipped。
 
-## [Unreleased] - 2026-11-10（移动端播放修复轮）
+### R5 · 移动端播放修复轮（2026-11-10）
 
-### Fixed
+#### Fixed
 
 - **手机横屏播放左侧出现选项栏**：根因是壳层 `ScaffoldMenu` 在横屏切
   NavigationRail，而播放页是五页签之一，横屏播放时 rail 常驻视频左侧。
@@ -244,7 +319,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 - `PlayerItem.dispose` 补充兜底：路由被绕过拆除（页签快捷键等）时手机不再
   残留沉浸式与横屏锁定。
 
-### Added
+#### Added
 
 - **手机旋转自动全屏**（PiliPlus 行为，`PlayerItem._syncOrientationFullscreen`）：
   播放中物理旋转进入横屏即沉浸式全屏，转回竖屏自动退出；PiP 与锁定面板时
@@ -259,7 +334,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   （仅权限已授予时，绝不自动弹系统设置页；`mobileAutoScanDone` 一次性旗标）；
   播放页空态新增「媒体库」跳转（手机）。
 
-### Changed
+#### Changed
 
 - 播放面板视觉：上下渐变遮罩、紧凑图标按钮（40px 约束）、进度条与音量条
   细轨化（trackHeight 3 / thumb 6）。
@@ -271,7 +346,7 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   （download.flutter.io 镜像）、腾讯云与阿里云 maven 前置，
   google()/mavenCentral() 保留兜底。
 
-### 验证
+#### 验证
 
 - `flutter analyze` 0 告警；`flutter test` 341 用例全绿（1 skip 维持）；
   `flutter build linux --debug` 通过；`./gradlew assembleDebug` 通过
