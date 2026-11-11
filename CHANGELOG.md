@@ -6,7 +6,13 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
-## [Unreleased] - R11（M5 音乐与在线元数据兜底）
+## [2.3.0-alpha] - 2026-11-12（已发布）
+
+R11 施工收口（tag `v2.3.0-alpha`；`pubspec.yaml` version
+`2.2.0-alpha+2020000` → `2.3.0-alpha+2030000`）。3.0 路线图
+（`docs/EMOPLAY-3.0-ROADMAP.md` §五 M5）音乐三任务（循环/队列、
+replaygain/gapless、歌词与迷你条）+ 用户改向纳入的在线元数据兜底框架
+（M4-T7）。本轮要点（全部实测取证，分项明细见下）：
 
 > 第 11 轮施工：M5 音乐三任务（循环/队列、replaygain/gapless、歌词与
 > 迷你条）+ 用户改向纳入的在线元数据兜底框架（M4-T7）。全量测试
@@ -60,9 +66,10 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   analyze` 0 告警；`flutter test` 60 文件 **539 通过 + 1 平台条件跳过**
   全绿（1 skip = Windows-only 探针，按设计跳过；新增用例 50 逐文件计数
   与全量差值 539-489 闭环；真 libmpv live 用例真跑）。
-- CI：R11 四施工提交未推送（ahead 4），推送后预期签名 **539 passed /
-  1 skipped**（未测：远端尚未载入 R11）；v2.2.0-alpha（R10 收口）已
-  公开：main run 43101040926 ✓、release run 43101070581 ✓（11 资产）。
+- CI：R11 五提交已推送（origin/main = `e5a5e0d`，2026-11-12 fetch 实测
+  ahead 0）；main run 43117670715 ✓（CI 签名 **539 tests passed /
+  1 skipped**，与本地门一致）。发布门随 `v2.3.0-alpha` tag 触发
+  release.yaml 矩阵，全绿后 draft 收口（同 v2.2.0-alpha 流程）。
 
 ## [2.2.0-alpha] - 2026-11-12（已发布）
 

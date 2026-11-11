@@ -1,7 +1,7 @@
 name: emoplay
 description: "EmoPlay - a local media player built on mpv (media_kit)."
 publish_to: "none"
-version: 2.2.0-alpha+2020000
+version: 2.3.0-alpha+2030000
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
