@@ -9,6 +9,7 @@ import 'package:emoplay/pages/settings/displaymode_settings.dart';
 import 'package:emoplay/pages/settings/general_settings.dart';
 import 'package:emoplay/pages/settings/keyboard_settings.dart';
 import 'package:emoplay/pages/settings/mpv_settings.dart';
+import 'package:emoplay/pages/settings/online_settings.dart';
 import 'package:emoplay/pages/settings/player_settings.dart';
 import 'package:emoplay/pages/settings/quality_settings.dart';
 import 'package:emoplay/pages/settings/renderer_settings.dart';
@@ -83,6 +84,10 @@ final settingsModule = createModule(
           ..route(
             '/diagnostics',
             child: (context, state) => const DiagnosticsSettingsPage(),
+          )
+          ..route(
+            '/online',
+            child: (context, state) => const OnlineSettingsPage(),
           )
           ..module(aboutModule);
       },

@@ -105,6 +105,14 @@ const List<_SettingsGroup> _settingsGroups = [
         icon: Icons.storage_rounded,
         path: '/settings/storage',
       ),
+      // M4-T7（2026-11-12 用户改向纳入）：在线元数据联网兜底的总开关与
+      // TMDB API key。SPEC §6 的 11 分类之外的增补项。
+      _SettingsCategory(
+        label: '在线元数据',
+        description: 'TMDB 联网补全与 API key',
+        icon: Icons.cloud_sync_outlined,
+        path: '/settings/online',
+      ),
       _SettingsCategory(
         label: '诊断',
         description: '版本、渲染后端与目录',

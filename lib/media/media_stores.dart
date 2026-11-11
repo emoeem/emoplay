@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -9,6 +10,8 @@ import 'package:emoplay/media/history_store.dart';
 import 'package:emoplay/media/library_model.dart';
 import 'package:emoplay/media/library_store.dart';
 import 'package:emoplay/media/nfo_meta_cache.dart';
+import 'package:emoplay/media/online/online_meta_service.dart';
+import 'package:emoplay/media/online/tmdb_provider.dart';
 import 'package:emoplay/media/thumbnail_service.dart';
 import 'package:emoplay/mpv/compat/compat_controller.dart';
 import 'package:emoplay/mpv/compat/mpv_profile_scanner.dart';
@@ -43,6 +46,7 @@ class MediaStores {
     required this.favorites,
     required this.thumbnails,
     required this.nfoMeta,
+    required this.onlineMeta,
     required this.compat,
     required this.quality,
     required this.plugins,
@@ -83,6 +87,12 @@ class MediaStores {
   // (lib/media/nfo_meta_cache.dart). Drives the episode/movie grouping
   // views, local poster art and the NFO details sheet.
   final NfoMetaCache nfoMeta;
+
+  // The M4-T7 online metadata FALLBACK (user redirection 2026-11-12):
+  // media_online.json under AppData — the same new-file precedent
+  // (lib/media/online/online_meta_service.dart). Gated OFF by default;
+  // only videos WITHOUT a local NFO can ever reach the network.
+  final OnlineMetaService onlineMeta;
 
   // The mpv compat layer (M5): decision persistence + config-dir scan +
   // startup option assembly (1.x CompatController, main.cpp L170-223).
@@ -210,6 +220,23 @@ class MediaStores {
     // artwork files that sit next to the videos).
     final nfoMeta = NfoMetaCache('${dir.path}/media_nfo.json');
 
+    // M4-T7 在线元数据兜底：media_online.json，同一新文件先例。门禁
+    // lambda 直读 settings（enabled 默认 false：不开就零请求）；provider
+    // 工厂在每次 lookup 时组装——key 由用户在设置中心随时填写，工厂空
+    // key 时返回 null 走 unavailable 降级（noKey 门禁在前，这里是保险）。
+    // http.Client 是 package:http 的注入缝：测试直接构造
+    // OnlineMetaService + MockClient，不走这条装配线。
+    final httpClient = http.Client();
+    final onlineMeta = OnlineMetaService(
+      '${dir.path}/media_online.json',
+      enabled: () => settings.onlineEnabled,
+      apiKey: () => settings.onlineApiKey,
+      nfoMeta: nfoMeta,
+      providerFactory: () => settings.onlineApiKey.trim().isEmpty
+          ? null
+          : TmdbProvider(client: httpClient, apiKey: settings.onlineApiKey),
+    );
+
     // M6 画质层：三个画质控制器 + 1.x main.cpp L255-268 的着色器目录规则
     // （导入决策 full/selective 时用用户 mpv 目录的 shaders/，否则用应用
     // 数据目录自己的 shaders/）+ 应用数据 vs/ 目录（插帧 .vpy 预设，不随
@@ -246,6 +273,7 @@ class MediaStores {
       favorites: favorites,
       thumbnails: thumbnails,
       nfoMeta: nfoMeta,
+      onlineMeta: onlineMeta,
       compat: compat,
       quality: quality,
       plugins: plugins,

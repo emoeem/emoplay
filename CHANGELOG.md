@@ -6,6 +6,27 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
+## [Unreleased] - R11 施工件 D
+
+### Added
+
+- **在线元数据兜底框架（M4-T7，2026-11-12 用户改向纳入）**：本地
+  NFO/海报（M4-T6）之后的联网补全框架轮。`lib/media/online/` 三件：
+  provider 接缝、TMDB 适配器骨架（注入 http.Client，测试用 mock 不真连）、
+  `OnlineMetaService`（五道门禁：总开关关 → 无 API key → 本地 NFO 覆盖
+  → media_online.json 缓存命中 → 才发起联网；断网/超时/损坏响应/HTTP 错
+  误全部降级不崩溃，传输失败不落缓存）。设置中心新增「在线元数据」分类：
+  总开关**默认关闭**（本地优先）+ TMDB API key 输入项（settings.json 增
+  `online` 段，默认值与往返用例按 §四红线补齐）。媒体库 NFO 详情弹层挂
+  「联网补全」动作，无 key / 关闭 / 本地覆盖 / 断网各有优雅提示，命中与
+  明确未命中缓存到新文件 `media_online.json`（三份 §7 schema 一个字段不
+  改）。可达性实测（2026-11-12）：api.themoviedb.org 可达，curl 0.83s /
+  Dart HttpClient 1.04s，无效 key 恰返 HTTP 401 标准错误体（2026-11-11
+  GitHub API 的 TLS ECONNRESET 未复现于 TMDB）；**真实联网数据流待用户
+  填入有效 TMDB API key 后人工验收（pending）**。新增
+  `test/online_meta_service_test.dart`、`test/tmdb_provider_test.dart`、
+  `test/library_online_ui_test.dart`，`flutter test` 全量 539 绿。
+
 ## [2.2.0-alpha] - 2026-11-12（已发布）
 
 R10 施工收口（tag `v2.2.0-alpha`；`pubspec.yaml` version

@@ -116,7 +116,10 @@ void main() {
     expect(find.byType(Image), findsWidgets);
 
     // The NFO info badge opens the details sheet (克制的 NFO 数据展示).
-    await tester.tap(find.byIcon(Icons.info_outline_rounded).first);
+    // M4-T7 widened the badge to every video cell (NFO-less cells carry the
+    // 联网补全 tooltip), so the NFO-backed sheet is addressed by tooltip —
+    // same intent, deterministic under the widened badge set.
+    await tester.tap(find.byTooltip('NFO 信息').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('简介'), findsWidgets);
     expect(find.textContaining('仅记录不下载'), findsOneWidget,

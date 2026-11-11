@@ -531,6 +531,98 @@ void main() {
       expect(settings.qualityTier, 'off');
     }
   });
+
+  test('onlineDefaultsWhenMissing', () {
+    // M4-T7 键追加契约（roadmap §四红线）：M4-T7 之前的 settings.json
+    //（无 online 段）按默认加载——enabled false（本地优先：不开就永远
+    // 没有网络请求）、apiKey ''（无 key 降级路径），且既有字段不受影响。
+    final path = file('pre-m4t7.json');
+    {
+      final settings = EmoPlaySettings(path);
+      settings.resumeOnReopen = false;
+      settings.audioReplaygain = 'track';
+      expect(settings.save(), isTrue);
+    }
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.onlineEnabled, isFalse);
+    expect(settings.onlineApiKey, '');
+    expect(settings.resumeOnReopen, isFalse);
+    expect(settings.audioReplaygain, 'track');
+  });
+
+  test('onlineRoundTrips', () {
+    // 新段追加的往返用例：开关 + API key 跨实例往返，并与既有段在同一
+    // 文档中共存。setter 的 trim 契约（key 首尾空白不落盘）一并锁定。
+    final path = file('online.json');
+    {
+      final settings = EmoPlaySettings(path);
+      expect(settings.onlineEnabled, isFalse); // 默认值
+      settings.onlineEnabled = true;
+      settings.onlineApiKey = '  tmdb-test-key-123  ';
+      expect(settings.onlineApiKey, 'tmdb-test-key-123');
+      expect(settings.save(), isTrue);
+    }
+    {
+      final settings = EmoPlaySettings(path);
+      expect(settings.load(), isTrue);
+      expect(settings.onlineEnabled, isTrue);
+      expect(settings.onlineApiKey, 'tmdb-test-key-123');
+      // 再改回：开关关闭后 apiKey 保留（重新打开即恢复，不必重填）。
+      settings.onlineEnabled = false;
+      expect(settings.save(), isTrue);
+    }
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.onlineEnabled, isFalse);
+    expect(settings.onlineApiKey, 'tmdb-test-key-123');
+  });
+
+  test('onlineSurvivesWrongTypes', () async {
+    // 手改文件：online 段错误类型一律回落默认（enabled false / apiKey
+    // ''），不崩溃、绝不把垃圾 key 喂给 provider。
+    final path = file('online-wrong-types.json');
+    await File(path).writeAsString('''
+{
+    "online": {
+        "enabled": "yes",
+        "apiKey": 42
+    }
+}
+''');
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.onlineEnabled, isFalse);
+    expect(settings.onlineApiKey, '');
+
+    await File(path).writeAsString('''
+{
+    "online": "bogus"
+}
+''');
+    final settings2 = EmoPlaySettings(path);
+    expect(settings2.load(), isTrue);
+    expect(settings2.onlineEnabled, isFalse);
+    expect(settings2.onlineApiKey, '');
+  });
+
+  test('restoreDefaultsResetsOnlineSection', () {
+    // restoreDefaults 的 M4-T7 扩展：online 段回默认（关 + 无 key），
+    // 媒体库/历史/导入决策照旧不动（1.x restoreDefaults 契约）。
+    final path = file('online-restore.json');
+    {
+      final settings = EmoPlaySettings(path);
+      settings.onlineEnabled = true;
+      settings.onlineApiKey = 'some-key';
+      expect(settings.save(), isTrue);
+    }
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    settings.restoreDefaults();
+    expect(settings.onlineEnabled, isFalse);
+    expect(settings.onlineApiKey, '');
+    expect(settings.importDecision, '');
+  });
 }
 
 /// QStandardPaths::setTestModeEnabled equivalent: redirects the

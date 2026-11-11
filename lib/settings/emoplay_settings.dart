@@ -63,6 +63,14 @@ import 'package:emoplay/mpv/config/mpv_player_properties.dart';
 //     Unlike the music section this applies to ALL audio playback, which is
 //     why it gets its own section mirroring the settings-center 音频
 //     category (SPEC §6 category 4) instead of joining "music".
+//  - the M4-T7 online-metadata preferences in a nested "online" section
+//   (NEW section, same §四红线 sanctioned append — 1.x readers ignore
+//   unknown keys; defaults + round-trip asserted in
+//   test/emoplay_settings_test.dart):
+//   - enabled: the 联网补全 master switch, default FALSE — local-first:
+//     nothing ever leaves the machine until the user turns this on
+//   - apiKey:  the user's own TMDB v3 API key, default "" (never shipped,
+//     never guessed; empty key = the no-key degrade path)
 //
 // Storage is a single JSON document written atomically (temp file + rename,
 // the QSaveFile pattern), mirroring HistoryStore/LibraryStore. The file path
@@ -118,6 +126,12 @@ class EmoPlaySettings extends ChangeNotifier {
   // replaygain 属性从未被写过）。
   static const String _kAudio = 'audio';
   static const String _kAudioReplaygain = 'replaygain';
+  // M4-T7 在线元数据段（同上红线）。enabled 默认 false = 本地优先（不
+  // 开关就永远没有网络请求）；apiKey 默认 ''（用户在设置中心自行填写，
+  // 空即无 key 降级路径，绝不内置任何 key）。
+  static const String _kOnline = 'online';
+  static const String _kOnlineEnabled = 'enabled';
+  static const String _kOnlineApiKey = 'apiKey';
 
   // Path of the backing JSON document (shown in the settings UI so the
   // user can find / back it up).
@@ -365,6 +379,30 @@ class EmoPlaySettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  // M4-T7 在线元数据段（online）。读取方：OnlineMetaService 的门禁
+  // lambda（MediaStores 装配）与在线元数据设置页（切换/填 key 时保存）。
+  // 改值只动内存并通知，落盘仍由调用方 save()（与全类同一契约）。
+  bool get onlineEnabled => _onlineEnabled;
+  bool _onlineEnabled = false;
+  set onlineEnabled(bool enabled) {
+    if (_onlineEnabled == enabled) {
+      return;
+    }
+    _onlineEnabled = enabled;
+    notifyListeners();
+  }
+
+  String get onlineApiKey => _onlineApiKey;
+  String _onlineApiKey = '';
+  set onlineApiKey(String key) {
+    final trimmed = key.trim();
+    if (_onlineApiKey == trimmed) {
+      return;
+    }
+    _onlineApiKey = trimmed;
+    notifyListeners();
+  }
+
   // Reads the file. Missing or corrupt files reset to defaults and return
   // false; a valid file returns true. Never throws.
   bool load() {
@@ -391,6 +429,8 @@ class EmoPlaySettings extends ChangeNotifier {
     _musicEqualizerPreset = 'flat';
     _musicEqualizerGains.clear();
     _audioReplaygain = MpvPlayerProperties.replaygainOff;
+    _onlineEnabled = false;
+    _onlineApiKey = '';
 
     String text;
     try {
@@ -491,6 +531,12 @@ class EmoPlaySettings extends ChangeNotifier {
             .contains(storedReplaygain)
         ? storedReplaygain
         : MpvPlayerProperties.replaygainOff;
+
+    // M4-T7：online 段按 Qt 宽容语义回落——enabled 错误类型回落 false
+    //（关），apiKey 错误类型回落 ''（无 key 降级路径）。
+    final online = _mapOr(obj, _kOnline);
+    _onlineEnabled = _boolOr(online, _kOnlineEnabled, _onlineEnabled);
+    _onlineApiKey = _stringOr(online, _kOnlineApiKey, _onlineApiKey);
     return true;
   }
 
@@ -523,6 +569,11 @@ class EmoPlaySettings extends ChangeNotifier {
       _kAudioReplaygain: _audioReplaygain,
     };
 
+    final online = <String, Object?>{
+      _kOnlineEnabled: _onlineEnabled,
+      _kOnlineApiKey: _onlineApiKey,
+    };
+
     final behavior = <String, Object?>{
       _kResumeOnReopen: _resumeOnReopen,
       _kLibraryMaxDepth: _libraryMaxDepth,
@@ -540,6 +591,7 @@ class EmoPlaySettings extends ChangeNotifier {
       _kQuality: quality,
       _kMusic: music,
       _kAudio: audio,
+      _kOnline: online,
     };
 
     // Atomic write via temp file + rename: a crash mid-write leaves the
@@ -563,7 +615,7 @@ class EmoPlaySettings extends ChangeNotifier {
   }
 
   // Restores the persisted preference sections ("quality", "behavior",
-  // "music", "audio") to their constructor defaults and notifies
+  // "music", "audio", "online") to their constructor defaults and notifies
   // listeners once.
   //
   // 1.x contract (src/settings/SettingsService.cpp restoreDefaults +
@@ -606,6 +658,9 @@ class EmoPlaySettings extends ChangeNotifier {
     _musicEqualizerGains.clear();
     // audio section (M5-T2)：off = 1.x 现状。
     _audioReplaygain = MpvPlayerProperties.replaygainOff;
+    // online section (M4-T7)：关 + 无 key = 本地优先默认。
+    _onlineEnabled = false;
+    _onlineApiKey = '';
     notifyListeners();
   }
 

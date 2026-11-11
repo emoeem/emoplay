@@ -57,6 +57,11 @@ import 'package:emoplay/utils/format.dart';
 ///    opening the details sheet (nfo_details_sheet.dart). All facts come
 ///    from NfoMetaCache (media_nfo.json); `<thumb>` URLs are recorded only,
 ///    nothing is downloaded.
+///
+/// M4-T7 additions (user redirection 2026-11-12, 在线元数据兜底框架): the
+/// details-sheet badge extends to every video cell — NFO-less cells show it
+/// as the 联网补全 entry — and the sheet carries the OnlineMetaService
+/// action (local-first gate chain inside; nfo_details_sheet.dart).
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
 
@@ -854,7 +859,9 @@ class _LibraryPageState extends State<LibraryPage> {
 
   /// The one grid cell builder every view shares: local poster art when the
   /// M4-T6 discovery found some, else the ffmpeg thumbnail; the info badge
-  /// (details sheet) only where NFO data actually exists.
+  /// (details sheet) on every video cell — NFO-backed cells keep the M4-T6
+  /// 'NFO 信息' badge, NFO-less videos gain the M4-T7 '联网补全' entry (the
+  /// sheet carries the online fallback action). Audio cells stay badge-less.
   _GridCell _buildCell(BuildContext context, LibraryEntry entry,
       {bool useNfoTitle = false}) {
     final theme = Theme.of(context);
@@ -870,9 +877,10 @@ class _LibraryPageState extends State<LibraryPage> {
       isFavorite: _stores.favorites.contains(entry.path),
       onToggleFavorite: () => _stores.favorites.toggle(entry.path),
       onPlay: () => _play(entry),
-      onShowDetails: info?.hasNfo == true
-          ? () => NfoDetailsSheet.show(context, entry, info!)
+      onShowDetails: entry.type == 'video'
+          ? () => NfoDetailsSheet.show(context, entry, info)
           : null,
+      detailsTooltip: info?.hasNfo == true ? 'NFO 信息' : '联网补全',
       placeholder: Icon(
         entry.type == 'audio'
             ? Icons.audiotrack_rounded
@@ -971,8 +979,9 @@ class _GroupHeaderDelegate extends SliverPersistentHeaderDelegate {
 /// One grid cell (1.x grid delegate): thumbnail (or the M4-T6 local poster
 /// — the caller decides the image path), title, the M4-T3 favorite badge
 /// (corner star; filled when favorited, tap toggles — the badge's own
-/// gesture wins over the cell's play tap) and the M4-T6 info badge, present
-/// only when the cell has NFO facts; it opens the details sheet.
+/// gesture wins over the cell's play tap) and the info badge, present on
+/// video cells (M4-T6 'NFO 信息' where NFO facts exist, M4-T7 '联网补全'
+/// otherwise); it opens the details sheet.
 class _GridCell extends StatefulWidget {
   const _GridCell({
     required this.title,
@@ -983,6 +992,7 @@ class _GridCell extends StatefulWidget {
     required this.onPlay,
     required this.onToggleFavorite,
     this.onShowDetails,
+    this.detailsTooltip = 'NFO 信息',
   });
 
   final String title;
@@ -993,8 +1003,11 @@ class _GridCell extends StatefulWidget {
   final VoidCallback onPlay;
   final VoidCallback onToggleFavorite;
 
-  /// Opens the NFO details sheet; null hides the badge (no NFO data).
+  /// Opens the NFO details sheet; null hides the badge (audio cells).
   final VoidCallback? onShowDetails;
+
+  /// The badge tooltip ('NFO 信息' / '联网补全').
+  final String detailsTooltip;
 
   @override
   State<_GridCell> createState() => _GridCellState();
@@ -1067,7 +1080,7 @@ class _GridCellState extends State<_GridCell> {
               top: 2,
               left: 2,
               child: IconButton(
-                tooltip: 'NFO 信息',
+                tooltip: widget.detailsTooltip,
                 visualDensity: VisualDensity.compact,
                 constraints:
                     const BoxConstraints(minWidth: 30, minHeight: 30),
