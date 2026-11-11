@@ -12,6 +12,10 @@ import 'package:emoplay/media/library_model.dart';
 import 'package:emoplay/media/library_store.dart';
 import 'package:emoplay/media/media_stores.dart';
 import 'package:emoplay/models/playback_args.dart';
+import 'package:emoplay/pages/library/favorites_sheet.dart';
+import 'package:emoplay/pages/library/library_directory_sidebar.dart';
+import 'package:emoplay/pages/library/library_folder_tree.dart';
+import 'package:emoplay/pages/library/library_grid_groups.dart';
 import 'package:emoplay/services/platform/mobile_media_scanner.dart';
 import 'package:emoplay/services/storage/storage.dart';
 import 'package:emoplay/utils/format.dart';
@@ -20,10 +24,23 @@ import 'package:emoplay/utils/format.dart';
 ///
 /// The media folders, their indexed files, search / filter / sort /
 /// grid-list switching, scan progress and cancellation. Every piece of state
-/// comes from [MediaStores] (LibraryStore + LibraryModel + ThumbnailService)
-/// — the page itself keeps no media index. Interaction ported from 1.x
-/// qml/LibraryPage.qml: the scan-state label, the directory panel, the
-/// cancel/rescan toggle and the grid/list switch.
+/// comes from [MediaStores] (LibraryStore + LibraryModel + ThumbnailService
+/// + FavoritesStore) — the page itself keeps no media index. Interaction
+/// ported from 1.x qml/LibraryPage.qml: the scan-state label, the directory
+/// panel, the cancel/rescan toggle and the grid/list switch.
+///
+/// 3.0 additions (docs/EMOPLAY-3.0-ROADMAP.md M4-T2/T3/T5):
+///  - the grid renders as a CustomScrollView of SliverMainAxisGroup(Sliver-
+///    PinnedHeader, SliverGrid) per group — Kazumi popular_page's pinned
+///    paradigm — grouped by directory or last-played year-month
+///    (library_grid_groups.dart); search/typeFilter/sortMode keep their
+///    model-side semantics and order the rows inside each group;
+///  - a folder sidebar (breadcrumb + tree) scoped to the indexed
+///    directories, derived from LibraryStore with no extra scan
+///    (library_folder_tree.dart);
+///  - favorites: a star badge on every card, an ordered collection
+///    (favorites.json) and the ReorderableListView sorting sheet
+///    (favorites_sheet.dart).
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
 
@@ -35,7 +52,15 @@ class _LibraryPageState extends State<LibraryPage> {
   late final MediaStores _stores;
   late final LibraryModel _model;
   bool _showDirectories = false;
+  bool _showFolderTree = false;
   bool _gridView = true;
+
+  /// What the grid groups by (M4-T2). Only the grid segment groups; the
+  /// list view keeps the flat rows.
+  LibraryGroupMode _groupMode = LibraryGroupMode.directory;
+
+  /// Directory scope chosen in the folder sidebar (M4-T5); '' = no scope.
+  String _scopeDirectory = '';
 
   /// True while the phone storage discovery walks the volumes.
   bool _mobileScanning = false;
@@ -122,7 +147,10 @@ class _LibraryPageState extends State<LibraryPage> {
     if (!_stores.library.addDirectory(directory)) {
       return;
     }
-    setState(() => _showDirectories = true);
+    setState(() {
+      _showDirectories = true;
+      _showFolderTree = true;
+    });
   }
 
   String _scanStateLabel() {
@@ -142,6 +170,47 @@ class _LibraryPageState extends State<LibraryPage> {
     return '空闲 · 已索引 ${_model.count} 个媒体文件';
   }
 
+  // ---- derived state (grouping / folder scope) ---------------------------
+
+  /// The model's filtered+sorted visible list, narrowed to the sidebar's
+  /// directory scope. The scope only ever REMOVES rows — search, typeFilter
+  /// and sortMode keep their model semantics untouched.
+  List<LibraryEntry> _scopedEntries() {
+    final scope = _effectiveScope();
+    if (scope.isEmpty) {
+      return _model.visible;
+    }
+    return [
+      for (final entry in _model.visible)
+        if (entryMatchesDirectoryScope(entry, scope)) entry,
+    ];
+  }
+
+  /// The scope as it will actually apply: a selection whose node the current
+  /// tree no longer contains (its directory was removed or a rescan dropped
+  /// every entry under it) falls back to the unscoped view.
+  String _effectiveScope() {
+    if (_scopeDirectory.isEmpty) {
+      return '';
+    }
+    return libraryFolderTreeContains(_folderForest(), _scopeDirectory)
+        ? _scopeDirectory
+        : '';
+  }
+
+  /// The directory forest over the store's current state (roots =
+  /// LibraryStore.directories, children derived from the indexed entries —
+  /// no new scan).
+  List<LibraryFolderNode> _folderForest() {
+    final store = _stores.library;
+    return buildLibraryFolderTree(
+      directories: store.directories,
+      entries: store.entryList,
+      maxDepth: store.scanOptions.maxDepth,
+      skipHidden: store.scanOptions.skipHidden,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -151,6 +220,26 @@ class _LibraryPageState extends State<LibraryPage> {
         title: const Text('媒体库'),
         centerTitle: false,
         actions: [
+          if (_gridView)
+            PopupMenuButton<LibraryGroupMode>(
+              tooltip: '网格分组方式',
+              icon: const Icon(Icons.workspaces_rounded),
+              onSelected: (mode) => setState(() => _groupMode = mode),
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: LibraryGroupMode.directory,
+                  child: Text(_groupMode == LibraryGroupMode.directory
+                      ? '✓ 按目录分组'
+                      : '按目录分组'),
+                ),
+                PopupMenuItem(
+                  value: LibraryGroupMode.yearMonth,
+                  child: Text(_groupMode == LibraryGroupMode.yearMonth
+                      ? '✓ 按年月分组'
+                      : '按年月分组'),
+                ),
+              ],
+            ),
           IconButton(
             tooltip: _gridView ? '切换为列表' : '切换为网格',
             icon: Icon(_gridView
@@ -161,7 +250,9 @@ class _LibraryPageState extends State<LibraryPage> {
         ],
       ),
       body: AnimatedBuilder(
-        animation: _model,
+        // The model drives the rows; the favorites store drives the badges
+        // (and the sheet's count) — one rebuild serves both.
+        animation: Listenable.merge([_model, _stores.favorites]),
         builder: (context, _) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,12 +277,36 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
               Expanded(
                 child: _model.count == 0
-                    ? _emptyState(context)
-                    : Padding(
+                    ? Padding(
                         padding: const EdgeInsets.all(16),
-                        child: _gridView
-                            ? _grid(context)
-                            : _list(context),
+                        child: _emptyState(context),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.only(
+                            left: 16, top: 16, right: 16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_showFolderTree) ...[
+                              SizedBox(
+                                width: 240,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: LibraryDirectorySidebar(
+                                    forest: _folderForest(),
+                                    selected: _scopeDirectory,
+                                    onSelect: (path) => setState(
+                                        () => _scopeDirectory = path),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                            Expanded(
+                              child: _results(context),
+                            ),
+                          ],
+                        ),
                       ),
               ),
               if (_model.count > 0)
@@ -199,7 +314,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Center(
                     child: Text(
-                      '${_model.count} 项',
+                      _resultCountLabel(),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -211,6 +326,22 @@ class _LibraryPageState extends State<LibraryPage> {
         },
       ),
     );
+  }
+
+  /// Footer count: scoped count when the sidebar narrows the view, the model
+  /// total otherwise (the 1.x "N 项" line).
+  String _resultCountLabel() {
+    final scope = _effectiveScope();
+    if (scope.isEmpty) {
+      return '${_model.count} 项';
+    }
+    return '${_scopedEntries().length} / ${_model.count} 项 · ${_scopeLabel(scope)}';
+  }
+
+  String _scopeLabel(String directory) {
+    final slash = directory.lastIndexOf('/');
+    final name = slash < 0 ? directory : directory.substring(slash + 1);
+    return name.isEmpty ? directory : name;
   }
 
   // ---- search / type filter / sort ------------------------------------
@@ -291,6 +422,17 @@ class _LibraryPageState extends State<LibraryPage> {
           ),
         ),
         const SizedBox(width: 4),
+        // M4-T3: the ordered favorites collection (ReorderableListView sheet).
+        OutlinedButton.icon(
+          onPressed: () => FavoritesSheet.show(context, _stores),
+          icon: const Icon(Icons.star_rounded, size: 18),
+          label: Text('收藏 (${_stores.favorites.count})'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => setState(() => _showFolderTree = !_showFolderTree),
+          icon: const Icon(Icons.account_tree_rounded, size: 18),
+          label: Text('目录树'),
+        ),
         OutlinedButton(
           onPressed: () => setState(() => _showDirectories = !_showDirectories),
           child: Text('媒体目录 (${store.directories.length})'),
@@ -378,6 +520,44 @@ class _LibraryPageState extends State<LibraryPage> {
 
   // ---- results ----------------------------------------------------------
 
+  /// The scoped results: empty page state when the whole model is empty, a
+  /// "nothing matches here" state when the scope/filter combination yields
+  /// nothing, and the grid/list otherwise.
+  Widget _results(BuildContext context) {
+    if (_model.count == 0) {
+      return _emptyState(context);
+    }
+    final entries = _scopedEntries();
+    if (entries.isEmpty) {
+      final theme = Theme.of(context);
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.filter_alt_off_rounded,
+              size: 36,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 8),
+            Text('当前范围没有匹配的媒体', style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => setState(() {
+                _scopeDirectory = '';
+                _model
+                  ..filter = ''
+                  ..typeFilter = 'all';
+              }),
+              child: const Text('显示全部'),
+            ),
+          ],
+        ),
+      );
+    }
+    return _gridView ? _groupedGrid(context, entries) : _list(context, entries);
+  }
+
   Widget _emptyState(BuildContext context) {
     final store = _stores.library;
     final filtered =
@@ -417,54 +597,117 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
-  Widget _grid(BuildContext context) {
+  /// The grouped grid (M4-T2, Kazumi popular_page 范式): one
+  /// SliverMainAxisGroup per group — a pinned header (SliverPersistentHeader
+  /// with pinned: true; this Flutter version has no SliverPinnedHeader
+  /// shorthand) that pins while the group's SliverGrid scrolls beneath it,
+  /// exactly the popular_page pinned behavior. Group order comes from the
+  /// grouping module; rows inside a group keep the model's sort order.
+  Widget _groupedGrid(BuildContext context, List<LibraryEntry> entries) {
     final theme = Theme.of(context);
-    final count = _model.count;
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 210,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 198 / 174,
-      ),
-      itemCount: count,
-      itemBuilder: (context, row) {
-        final thumbnail = _model.thumbnailAt(row);
-        final isAudio = _model.typeAt(row) == 'audio';
-        return _GridCell(
-          title: _model.titleAt(row),
-          thumbnail: thumbnail,
-          isAudio: isAudio,
-          onPlay: () => _play(_entryAt(row)),
-          placeholder: Icon(
-            isAudio ? Icons.audiotrack_rounded : Icons.movie_rounded,
-            size: 34,
-            color: theme.colorScheme.onSurfaceVariant,
+    final groups = groupLibraryEntries(entries, mode: _groupMode);
+    return CustomScrollView(
+      slivers: [
+        for (final group in groups)
+          SliverMainAxisGroup(
+            slivers: [
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _GroupHeaderDelegate(
+                  child: Container(
+                    height: 34,
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    alignment: Alignment.centerLeft,
+                    color: theme.colorScheme.surface,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _groupMode == LibraryGroupMode.directory
+                              ? Icons.folder_rounded
+                              : Icons.calendar_month_rounded,
+                          size: 15,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            group.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${group.entries.length}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              SliverGrid(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 210,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 198 / 174,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final entry = group.entries[index];
+                    return _GridCell(
+                      title: entry.title,
+                      thumbnail:
+                          _stores.thumbnails.cachedThumbnailPath(entry.path),
+                      isAudio: entry.type == 'audio',
+                      isFavorite: _stores.favorites.contains(entry.path),
+                      onToggleFavorite: () =>
+                          _stores.favorites.toggle(entry.path),
+                      onPlay: () => _play(entry),
+                      placeholder: Icon(
+                        entry.type == 'audio'
+                            ? Icons.audiotrack_rounded
+                            : Icons.movie_rounded,
+                        size: 34,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    );
+                  },
+                  childCount: group.entries.length,
+                ),
+              ),
+            ],
           ),
-        );
-      },
+      ],
     );
   }
 
-  Widget _list(BuildContext context) {
+  Widget _list(BuildContext context, List<LibraryEntry> entries) {
     final theme = Theme.of(context);
-    final count = _model.count;
     return ListView.builder(
-      itemCount: count,
+      itemCount: entries.length,
       itemExtent: 44,
       itemBuilder: (context, row) {
-        final isAudio = _model.typeAt(row) == 'audio';
-        final lastPlayed = _model.lastPlayedAt(row);
+        final entry = entries[row];
+        final lastPlayed = entry.lastPlayed;
         return ListTile(
           dense: true,
           visualDensity: VisualDensity.compact,
           leading: Icon(
-            isAudio ? Icons.audiotrack_rounded : Icons.movie_rounded,
+            entry.type == 'audio'
+                ? Icons.audiotrack_rounded
+                : Icons.movie_rounded,
             size: 18,
             color: theme.colorScheme.onSurfaceVariant,
           ),
           title: Text(
-            _model.titleAt(row),
+            entry.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyMedium,
@@ -473,7 +716,7 @@ class _LibraryPageState extends State<LibraryPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                formatBytes(_model.sizeAt(row)),
+                formatBytes(entry.size),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -493,35 +736,64 @@ class _LibraryPageState extends State<LibraryPage> {
               ),
             ],
           ),
-          onTap: () => _play(_entryAt(row)),
+          onTap: () => _play(entry),
         );
       },
     );
   }
-
-  LibraryEntry _entryAt(int row) => LibraryEntry(
-        path: _model.pathAt(row),
-        title: _model.titleAt(row),
-        type: _model.typeAt(row),
-        size: _model.sizeAt(row),
-        lastPlayed: _model.lastPlayedAt(row),
-      );
 }
 
+/// The pinned group header delegate (M4-T2): a fixed 34px row the sliver
+/// keeps pinned while its SliverMainAxisGroup scrolls. The child is rebuilt
+/// by the page on every state change, so the delegate only needs identity
+/// comparison for shouldRebuild.
+class _GroupHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _GroupHeaderDelegate({required this.child});
+
+  final Widget child;
+
+  static const double _height = 34;
+
+  @override
+  double get maxExtent => _height;
+
+  @override
+  double get minExtent => _height;
+
+  @override
+  Widget build(
+          BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      child;
+
+  @override
+  bool shouldRebuild(_GroupHeaderDelegate oldDelegate) =>
+      !identical(oldDelegate.child, child);
+
+  @override
+  String toString() => '_GroupHeaderDelegate';
+}
+
+/// One grid cell (1.x grid delegate): thumbnail, title and the M4-T3
+/// favorite badge (corner star; filled when favorited, tap toggles — the
+/// badge's own gesture wins over the cell's play tap).
 class _GridCell extends StatefulWidget {
   const _GridCell({
     required this.title,
     required this.thumbnail,
     required this.isAudio,
+    required this.isFavorite,
     required this.placeholder,
     required this.onPlay,
+    required this.onToggleFavorite,
   });
 
   final String title;
   final String thumbnail;
   final bool isAudio;
+  final bool isFavorite;
   final Widget placeholder;
   final VoidCallback onPlay;
+  final VoidCallback onToggleFavorite;
 
   @override
   State<_GridCell> createState() => _GridCellState();
@@ -538,54 +810,79 @@ class _GridCellState extends State<_GridCell> {
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
-      child: InkWell(
-        onTap: widget.onPlay,
-        borderRadius: BorderRadius.circular(12),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: _hovering
-                ? theme.colorScheme.surfaceContainerHigh
-                : theme.colorScheme.surfaceContainerLow,
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: widget.onPlay,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _hovering
-                  ? theme.colorScheme.primary.withValues(alpha: 0.4)
-                  : Colors.transparent,
-            ),
-          ),
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: widget.thumbnail.isEmpty
-                        ? widget.placeholder
-                        : Image.file(
-                            File(widget.thumbnail),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (_, _, _) => widget.placeholder,
-                          ),
-                  ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              decoration: BoxDecoration(
+                color: _hovering
+                    ? theme.colorScheme.surfaceContainerHigh
+                    : theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _hovering
+                      ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                      : Colors.transparent,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                widget.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        alignment: Alignment.center,
+                        child: widget.thumbnail.isEmpty
+                            ? widget.placeholder
+                            : Image.file(
+                                File(widget.thumbnail),
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                errorBuilder: (_, _, _) => widget.placeholder,
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: IconButton(
+              tooltip: widget.isFavorite ? '取消收藏' : '收藏',
+              visualDensity: VisualDensity.compact,
+              constraints:
+                  const BoxConstraints(minWidth: 30, minHeight: 30),
+              padding: const EdgeInsets.all(4),
+              icon: Icon(
+                widget.isFavorite
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                size: 19,
+                color: widget.isFavorite
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+              onPressed: widget.onToggleFavorite,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -206,6 +206,11 @@ class LibraryStore extends ChangeNotifier {
   ScanOptions _scanOptions = const ScanOptions();
   void setScanOptions(ScanOptions options) => _scanOptions = options;
 
+  // The options the last (or next) scan runs with. The folder sidebar
+  // (M4-T5) derives its depth pruning from these so the tree ends exactly
+  // where the scanner stopped — see library_folder_tree.dart.
+  ScanOptions get scanOptions => _scanOptions;
+
   // True while a scan runs in the worker isolate.
   bool get isScanning => _scanning;
   bool _scanning = false;

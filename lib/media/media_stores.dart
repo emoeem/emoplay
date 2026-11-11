@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:emoplay/media/favorites_store.dart';
 import 'package:emoplay/media/history_store.dart';
 import 'package:emoplay/media/library_model.dart';
 import 'package:emoplay/media/library_store.dart';
@@ -21,7 +22,8 @@ import 'package:emoplay/settings/emoplay_settings.dart';
 
 // The JSON data layer of the app, assembled once at startup (1.x main.cpp
 // lines ~230-244): settings.json, library.json + library scan worker,
-// history.json, and the ffmpeg thumbnail cache under AppData/thumbnails.
+// history.json, the M4-T3 favorites collection (favorites.json) and the
+// ffmpeg thumbnail cache under AppData/thumbnails.
 //
 // Lifetime follows the GStorage convention (services/storage/storage.dart):
 // a root-owned static service initialized in main() before runApp — the
@@ -37,6 +39,7 @@ class MediaStores {
     required this.settings,
     required this.library,
     required this.history,
+    required this.favorites,
     required this.thumbnails,
     required this.compat,
     required this.quality,
@@ -67,6 +70,10 @@ class MediaStores {
   final EmoPlaySettings settings;
   final LibraryStore library;
   final HistoryStore history;
+
+  // The favorites collection (M4-T3): favorites.json under AppData, a NEW
+  // file next to the §7 trio — see lib/media/favorites_store.dart.
+  final FavoritesStore favorites;
   final ThumbnailService thumbnails;
 
   // The mpv compat layer (M5): decision persistence + config-dir scan +
@@ -185,6 +192,11 @@ class MediaStores {
 
     final history = HistoryStore(null, '${dir.path}/history.json');
 
+    // M4-T3 favorites: favorites.json next to the §7 trio (a NEW file —
+    // adding files ≠ modifying schemas). A missing/corrupt file degrades to
+    // an empty collection inside the store constructor.
+    final favorites = FavoritesStore('${dir.path}/favorites.json');
+
     // M6 画质层：三个画质控制器 + 1.x main.cpp L255-268 的着色器目录规则
     // （导入决策 full/selective 时用用户 mpv 目录的 shaders/，否则用应用
     // 数据目录自己的 shaders/）+ 应用数据 vs/ 目录（插帧 .vpy 预设，不随
@@ -218,6 +230,7 @@ class MediaStores {
       settings: settings,
       library: library,
       history: history,
+      favorites: favorites,
       thumbnails: thumbnails,
       compat: compat,
       quality: quality,

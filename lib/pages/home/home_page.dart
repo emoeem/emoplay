@@ -140,6 +140,9 @@ class _HomePageState extends State<HomePage> {
           _stores.history,
           _stores.library,
           _stores.thumbnails,
+          // M4-T3: the favorite badges on the history rows read the
+          // favorites collection.
+          _stores.favorites,
         ]),
         builder: (context, _) {
           final history = _stores.history.entries;
@@ -232,6 +235,10 @@ class _HomePageState extends State<HomePage> {
                                   onPlay: () => _play(entry),
                                   onRemove: () =>
                                       _stores.history.removeEntry(entry.path),
+                                  isFavorite: _stores.favorites
+                                      .contains(entry.path),
+                                  onToggleFavorite: () =>
+                                      _stores.favorites.toggle(entry.path),
                                 ),
                             ],
                           ),
@@ -266,6 +273,10 @@ class _HomePageState extends State<HomePage> {
                                   onPlay: () => _play(entry),
                                   onRemove: () =>
                                       _stores.history.removeEntry(entry.path),
+                                  isFavorite: _stores.favorites
+                                      .contains(entry.path),
+                                  onToggleFavorite: () =>
+                                      _stores.favorites.toggle(entry.path),
                                 ),
                               if (history.length > _recentLimit)
                                 Align(
@@ -402,7 +413,8 @@ class _HomePageState extends State<HomePage> {
 
 /// One "recently played" row (1.x qml/HistoryRow.qml): thumbnail, title,
 /// path, progress and last-played time. All actions are emitted upwards; the
-/// row itself only reads the stores.
+/// row itself only reads the stores. The M4-T3 favorite star toggles the
+/// row's path in the favorites collection.
 class _HistoryRow extends StatelessWidget {
   const _HistoryRow({
     required this.entry,
@@ -410,6 +422,8 @@ class _HistoryRow extends StatelessWidget {
     required this.timeText,
     required this.onPlay,
     required this.onRemove,
+    required this.isFavorite,
+    required this.onToggleFavorite,
     this.highlightProgress = false,
   });
 
@@ -422,6 +436,10 @@ class _HistoryRow extends StatelessWidget {
   final String timeText;
   final VoidCallback onPlay;
   final VoidCallback onRemove;
+
+  /// M4-T3 favorite state + toggle for this row's path.
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
 
   /// Continue-watching rows emphasize the progress bar.
   final bool highlightProgress;
@@ -531,6 +549,21 @@ class _HistoryRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
+                // M4-T3 favorite badge: filled star = favorited; tap toggles.
+                IconButton(
+                  tooltip: isFavorite ? '取消收藏' : '收藏',
+                  icon: Icon(
+                    isFavorite
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    size: 18,
+                    color: isFavorite
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onToggleFavorite,
+                ),
                 IconButton(
                   tooltip: '从历史中移除',
                   icon: const Icon(Icons.close_rounded, size: 16),
