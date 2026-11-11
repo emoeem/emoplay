@@ -4,12 +4,12 @@ import 'dart:typed_data';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:flutter_modular/flutter_modular.dart';
-import 'package:emoplay/media/media_classifier.dart';
 import 'package:emoplay/services/player/external_playback_launcher.dart';
 import 'package:emoplay/pages/player/controller/player_chapters_controller.dart';
 import 'package:emoplay/pages/player/controller/player_debug_controller.dart';
 import 'package:emoplay/pages/player/controller/player_models.dart';
 import 'package:emoplay/pages/player/controller/player_seek_controller.dart';
+import 'package:emoplay/pages/player/controller/player_subtitles_controller.dart';
 import 'package:emoplay/pages/player/controller/player_aspect_ratio.dart';
 import 'package:emoplay/pages/player/controller/player_panel_controller.dart';
 import 'package:emoplay/pages/player/controller/player_playback_controller.dart';
@@ -56,6 +56,10 @@ class PlayerController implements Disposable {
     seek: seek,
     position: () => playback.currentPosition,
   );
+
+  /// M3 字幕管理：track-list/sid 观察、外挂字幕 sub-add 命令面与 sub-delay
+  /// 步进状态。
+  late final PlayerSubtitlesController subtitles = PlayerSubtitlesController();
   late final ExternalPlaybackLauncher externalPlayback =
       ExternalPlaybackLauncher(
     videoUrl: () => videoUrl,
@@ -203,6 +207,12 @@ class PlayerController implements Disposable {
     if (!_ownsInitialization(initialization, player)) {
       return false;
     }
+    // M3 字幕管理：挂 track-list 订阅与 sid/sub-delay 读取（同样 open 之后，
+    // attach 内的 state 快照覆盖此前已派发的事件）。
+    await subtitles.attach(player);
+    if (!_ownsInitialization(initialization, player)) {
+      return false;
+    }
 
     if (isDesktop()) {
       final freshStart = playback.volume == -1;
@@ -269,19 +279,15 @@ class PlayerController implements Disposable {
   /// Loads an external subtitle (srt/ass/ssa/vtt/sub) into the current media.
   ///
   /// Ported from mpv-emo `PlaybackController::addSubtitle`
-  /// (src/mpv/PlaybackController.cpp:233): `sub-add <path> select`, with the
-  /// same 1.x guards — no-op without a live player or an empty path. The
-  /// command fails audibly when the media does not support it, so errors
-  /// propagate to the caller for user feedback.
+  /// (src/mpv/PlaybackController.cpp:233). M3 字幕管理把命令面挪到了
+  /// [PlayerSubtitlesController.loadExternal]（select/auto 标志、显式 title）；
+  /// 本方法保持 1.x 语义（select，加载即启用）作为既有调用点
+  /// （播放页选择器 / 拖放 planDrop）的稳定入口。
   Future<void> addSubtitle(String path) async {
     if (path.isEmpty) {
       return;
     }
-    final platform = playback.mediaPlayer?.platform;
-    if (platform is NativePlayer) {
-      await platform.command(
-          ['sub-add', MediaClassifier.normalise(path), 'select']);
-    }
+    await subtitles.loadExternal(path);
   }
 
   Future<void> setShader(SuperResolutionMode mode, {Player? player}) async {
@@ -378,6 +384,8 @@ class PlayerController implements Disposable {
     FlutterVolumeController.removeListener();
     // M3-T2：摘掉章节观察并清空章节状态（下一个文件 init 时重新挂）。
     await chapters.detach();
+    // M3 字幕管理：同样摘掉 track-list/sid 订阅与 sub-delay 状态。
+    await subtitles.detach();
     await Future.wait([
       audioController.deactivate(),
       playback.stop(),

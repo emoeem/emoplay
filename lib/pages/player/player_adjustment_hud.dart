@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:emoplay/pages/player/controller/player_subtitles_model.dart';
 import 'package:emoplay/utils/format.dart';
 
 enum PlayerAdjustmentHudType {
@@ -910,6 +911,132 @@ class _PlayerSpeedHudState extends State<PlayerSpeedHud> {
                     Expanded(
                       child: Text(
                         _speedText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subtitle-delay feedback pill (M3 字幕管理): the Kazumi PlayerSpeedHud
+/// shape re-used for the ±0.5s `sub-delay` stepper — a small top-center
+/// surface pill with the current offset, shown briefly after each step.
+class PlayerSubDelayHud extends StatefulWidget {
+  const PlayerSubDelayHud({
+    super.key,
+    required this.visible,
+    required this.delay,
+    this.disableAnimations = false,
+  });
+
+  final bool visible;
+  final double delay;
+  final bool disableAnimations;
+
+  @override
+  State<PlayerSubDelayHud> createState() => _PlayerSubDelayHudState();
+}
+
+class _PlayerSubDelayHudState extends State<PlayerSubDelayHud> {
+  late double _displayDelay;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayDelay = widget.delay;
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayerSubDelayHud oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.visible) {
+      _displayDelay = widget.delay;
+    }
+  }
+
+  String get _delayText => formatSubDelay(_displayDelay);
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final container = colorScheme.inverseSurface;
+    final onContainer = colorScheme.onInverseSurface;
+    final surface = colorScheme.surfaceContainerHighest;
+    final border = colorScheme.outlineVariant.withValues(alpha: 0.22);
+    final duration = widget.disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 160);
+
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: widget.visible ? 1 : 0,
+        duration: duration,
+        curve: Curves.easeOutCubic,
+        child: AnimatedSlide(
+          offset: widget.visible ? Offset.zero : const Offset(0, -0.12),
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          child: AnimatedScale(
+            scale: widget.visible ? 1 : 0.96,
+            duration: duration,
+            curve: Curves.easeOutCubic,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              // Avoid BackdropFilter/ImageFilter.blur: it can trigger Impeller
+              // native aborts when HUD saveLayers are drawn over video output.
+              // See flutter/flutter#185506.
+              child: AnimatedContainer(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                width: 150,
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: duration,
+                      curve: Curves.easeOutCubic,
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: container,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.subtitles_rounded,
+                        color: onContainer,
+                        size: 15,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '字幕延迟 $_delayText',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style:

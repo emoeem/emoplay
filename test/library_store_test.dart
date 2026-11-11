@@ -361,6 +361,14 @@ void main() {
       expect(store.addDirectory(fixturePath('Music')), isTrue);
 
       await pumpUntil(() => store.entryList.length == 8); // 6 Movies + 2 Music
+      // The 8 entries can land while a chained (or restarted) re-scan is
+      // still draining: _startScan snapshots the folders at send time, so a
+      // slow worker handshake makes the first scan already cover both folders
+      // and _applyScanResults chains the pending request afterwards
+      // (library_store.dart "scanning stays true until the chained scan
+      // completes"). Wait for the pipeline to drain before asserting the
+      // quiescent state — same closing idiom as the scan tests below.
+      await pumpUntil(() => !store.isScanning);
       expect(store.isScanning, isFalse);
       expect(findEntry(store.entryList, 'track').type, 'audio');
       expect(findEntry(store.entryList, 'song').type, 'audio');

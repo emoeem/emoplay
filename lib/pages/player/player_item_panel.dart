@@ -16,6 +16,7 @@ import 'package:emoplay/pages/player/player_panel_hold.dart';
 import 'package:emoplay/pages/player/player_progress_bar.dart';
 import 'package:emoplay/pages/player/player_screenshot_controls.dart';
 import 'package:emoplay/pages/player/player_transport_bar.dart';
+import 'package:emoplay/pages/player/subtitles_sheet.dart';
 import 'package:emoplay/pages/player/controller/player_aspect_ratio.dart';
 import 'package:emoplay/pages/player/controller/player_page_controller.dart';
 import 'package:emoplay/pages/player/controller/player_super_resolution.dart';
@@ -479,6 +480,11 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
           onPressed: widget.onLoadSubtitle,
           label: '加载字幕',
         ),
+      // M3 字幕管理：字幕轨道切换面板（含关闭字幕与加载外挂字幕行）。
+      EmoMenuItem(
+        onPressed: () => _openMenu(_showSubtitlesSheet),
+        label: '字幕轨道',
+      ),
       EmoMenuItem(
         onPressed: () => _openMenu(_showPlaylistSheet),
         label: '播放列表',
@@ -578,6 +584,14 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
     return showChaptersSheet(
       context,
       chapters: widget.playerController.chapters,
+    );
+  }
+
+  Future<void> _showSubtitlesSheet() {
+    return showSubtitlesSheet(
+      context,
+      subtitles: widget.playerController.subtitles,
+      onLoadSubtitle: widget.onLoadSubtitle,
     );
   }
 

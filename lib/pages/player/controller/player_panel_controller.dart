@@ -33,6 +33,10 @@ abstract class _PlayerPanelController with Store {
   @observable
   bool showPlaySpeed = false;
 
+  /// M3 字幕管理：sub-delay 步进后的 HUD 反馈（PlayerSubDelayHud）。
+  @observable
+  bool showSubDelay = false;
+
   /// Double-tap seek overlays (PiliPlus view.dart mountSeekBackwardButton /
   /// mountSeekForwardButton, rewritten as MobX observables).
   @observable
@@ -56,6 +60,7 @@ abstract class _PlayerPanelController with Store {
     showBrightness = false;
     showVolume = false;
     showPlaySpeed = false;
+    showSubDelay = false;
     showSeekBackwardOverlay = false;
     showSeekForwardOverlay = false;
     brightnessSeeking = false;

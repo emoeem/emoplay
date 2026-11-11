@@ -373,6 +373,9 @@ class _PlayerItemState extends State<PlayerItem>
       'speed3': () => setPlaybackSpeed(3.0),
       'speedup': () => handleSpeedChange('up'),
       'speeddown': () => handleSpeedChange('down'),
+      // M3 字幕管理：sub-delay ±0.5s 步进（无播放器/无媒体时是安全空操作）。
+      'subdelaydown': () => handleSubDelayChange(-1),
+      'subdelayup': () => handleSubDelayChange(1),
       // M3-T2 章节导航：无章节的文件上这两个动作是安全的空操作。
       'nextchapter': () => playerController.chapters.nextChapter(),
       'prevchapter': () => playerController.chapters.previousChapter(),
@@ -453,7 +456,9 @@ class _PlayerItemState extends State<PlayerItem>
         GStorage.getSetting(SettingsKeys.defaultShortcutForwardPlaySpeed);
     if (playerController.playback.playerSpeed <
         defaultShortcutForwardPlaySpeed) {
-      playerController.panel.showPlaySpeed = true;
+      playerController.panel
+        ..showSubDelay = false
+        ..showPlaySpeed = true;
       await setPlaybackSpeed(defaultShortcutForwardPlaySpeed);
     }
   }
@@ -577,13 +582,25 @@ class _PlayerItemState extends State<PlayerItem>
   void _showVolumeAdjustmentHud() {
     _cancelAdjustmentHudHideTimer();
     playerController.panel.showBrightness = false;
+    playerController.panel.showSubDelay = false;
     playerController.panel.showVolume = true;
   }
 
   void _showBrightnessAdjustmentHud() {
     _cancelAdjustmentHudHideTimer();
     playerController.panel.showVolume = false;
+    playerController.panel.showSubDelay = false;
     playerController.panel.showBrightness = true;
+  }
+
+  /// M3 字幕管理：sub-delay 步进后的 HUD（Kazumi PlayerSpeedHud 同款顶部队
+  /// 列；与其余调节浮层互斥）。
+  void _showSubDelayAdjustmentHud() {
+    _cancelAdjustmentHudHideTimer();
+    playerController.panel.showVolume = false;
+    playerController.panel.showBrightness = false;
+    playerController.panel.showPlaySpeed = false;
+    playerController.panel.showSubDelay = true;
   }
 
   void _scheduleAdjustmentHudHide({
@@ -594,6 +611,7 @@ class _PlayerItemState extends State<PlayerItem>
       if (mounted) {
         playerController.panel.showVolume = false;
         playerController.panel.showBrightness = false;
+        playerController.panel.showSubDelay = false;
       }
       _adjustmentHudHideTimer = null;
     });
@@ -1081,6 +1099,22 @@ class _PlayerItemState extends State<PlayerItem>
     }
   }
 
+  /// M3 字幕管理：sub-delay ±0.5s（[direction] +1/-1），步骤到达引擎才弹
+  /// HUD；无播放器/无媒体时 adjustSubDelay 是安全空操作。
+  Future<void> handleSubDelayChange(int direction) async {
+    try {
+      final applied =
+          await playerController.subtitles.adjustSubDelay(direction);
+      if (!applied) {
+        return;
+      }
+      _showSubDelayAdjustmentHud();
+      _scheduleAdjustmentHudHide(delay: const Duration(seconds: 1));
+    } catch (e) {
+      EmoLogger().e('PlayerController: sub-delay change failed', error: e);
+    }
+  }
+
   Future<void> setBrightness(double value) async {
     try {
       await ScreenBrightnessPlatform.instance
@@ -1345,7 +1379,9 @@ class _PlayerItemState extends State<PlayerItem>
                         }
                         setState(() {
                           _longPressSpeedEngaged = true;
-                          playerController.panel.showPlaySpeed = true;
+                          playerController.panel
+                            ..showSubDelay = false
+                            ..showPlaySpeed = true;
                         });
                         lastPlayerSpeed = playerController.playback.playerSpeed;
                         setPlaybackSpeed(longPressPlaySpeed);
@@ -1394,6 +1430,19 @@ class _PlayerItemState extends State<PlayerItem>
                         builder: (context) => PlayerSpeedHud(
                           visible: playerController.panel.showPlaySpeed,
                           speed: playerController.playback.playerSpeed,
+                          disableAnimations: widget.disableAnimations,
+                        ),
+                      ),
+                    ),
+                    // M3 字幕管理：sub-delay 步进反馈（同款顶部队列）。
+                    Positioned(
+                      top: 25,
+                      left: 0,
+                      right: 0,
+                      child: Observer(
+                        builder: (context) => PlayerSubDelayHud(
+                          visible: playerController.panel.showSubDelay,
+                          delay: playerController.subtitles.subDelay,
                           disableAnimations: widget.disableAnimations,
                         ),
                       ),

@@ -183,6 +183,12 @@ final Map<String, List<String>> defaultShortcuts = const {
   // M3-T2 章节导航：上一章/下一章（无章节的文件上静默无操作）。
   'nextchapter': ['Page Down'],
   'prevchapter': ['Page Up'],
+  // M3 字幕管理：sub-delay ±0.5s 步进。mpv 惯例的 z/Z 不可用：本表按
+  // keyLabel 分发、不区分 Shift（player_keyboard_shortcuts.dart
+  // _keyIdentity，字母键 label 恒为大写），且 Z 已被 Kazumi 的倍速减占用
+  // （SPEC §10 取 Kazumi 现状）——取 mpv z/x 邻位的 C/V 承接 -/+。
+  'subdelaydown': ['C'],
+  'subdelayup': ['V'],
 };
 
 // 键位别名
@@ -221,4 +227,6 @@ final Map<String, String> shortcutsChineseName = {
   'speeddown': '倍速减',
   'nextchapter': '下一章',
   'prevchapter': '上一章',
+  'subdelaydown': '字幕延迟减（-0.5s）',
+  'subdelayup': '字幕延迟加（+0.5s）',
 };

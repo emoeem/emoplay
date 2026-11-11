@@ -21,6 +21,8 @@ const List<_ShortcutGroup> _shortcutGroups = [
   _ShortcutGroup(
       '画面与声音', ['fullscreen', 'exitfullscreen', 'screenshot']),
   _ShortcutGroup('倍速', ['speed1', 'speed2', 'speed3', 'speedup', 'speeddown']),
+  // M3 字幕管理：sub-delay ±0.5s 步进（mpv z/Z 键位不可用，见 constants.dart）。
+  _ShortcutGroup('字幕', ['subdelaydown', 'subdelayup']),
 ];
 
 class KeyboardSettingsPage extends StatefulWidget {

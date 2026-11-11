@@ -171,6 +171,24 @@ mixin _$PlayerPanelController on _PlayerPanelController, Store {
     });
   }
 
+  late final _$showSubDelayAtom = Atom(
+    name: '_PlayerPanelController.showSubDelay',
+    context: context,
+  );
+
+  @override
+  bool get showSubDelay {
+    _$showSubDelayAtom.reportRead();
+    return super.showSubDelay;
+  }
+
+  @override
+  set showSubDelay(bool value) {
+    _$showSubDelayAtom.reportWrite(value, super.showSubDelay, () {
+      super.showSubDelay = value;
+    });
+  }
+
   late final _$showSeekBackwardOverlayAtom = Atom(
     name: '_PlayerPanelController.showSeekBackwardOverlay',
     context: context,
@@ -298,6 +316,7 @@ seekCancelPending: ${seekCancelPending},
 showBrightness: ${showBrightness},
 showVolume: ${showVolume},
 showPlaySpeed: ${showPlaySpeed},
+showSubDelay: ${showSubDelay},
 showSeekBackwardOverlay: ${showSeekBackwardOverlay},
 showSeekForwardOverlay: ${showSeekForwardOverlay},
 brightnessSeeking: ${brightnessSeeking},
