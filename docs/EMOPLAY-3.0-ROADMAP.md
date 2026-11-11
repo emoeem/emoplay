@@ -83,7 +83,7 @@ Haruna、IINA、mpv.net 的成熟交互语义移植进来，这是 EmoPlay「mpv
 
 | 位置 | 问题 | 动作 | 依据 |
 | --- | --- | --- | --- |
-| `lib/pages/player/player_item.dart`（**1538 行**，审计时 1506） | 上帝类：PiP/键盘/HUD 定时/audio_service 绑定/全屏/菜单 8 职责簇 | M3-T0 按 AUDIT_FULL §一 P1 建议拆分（PiP→`player_pip.dart`、audio 绑定→`player_audio_binding.dart`、HUD→`player_adjustment_hud.dart` 已部分存在），355 用例护航 | audits/AUDIT_FULL_2026-11-10.md §一第 1 行 |
+| `lib/pages/player/player_item.dart`（**1538 行**，审计时 1506） | 上帝类：PiP/键盘/HUD 定时/audio_service 绑定/全屏/菜单 8 职责簇 | M3-T0 按 AUDIT_FULL §一 P1 建议拆分（PiP→`player_pip.dart`、audio 绑定→`player_audio_binding.dart`、HUD→`player_adjustment_hud.dart` 已部分存在），355 用例护航。**已拆分（`c9245f8`，2026-11-12 实测 git `5fedee0` 工作树）**：`player_item.dart` **484 行**（<500 达标）；拆出 `player_pip.dart` 264、`player_audio_binding.dart` 83、`player_keyboard_shortcuts.dart` 526、`player_menu_binding.dart` 32、`player_item_gestures.dart` 302、`player_panel_hold.dart` 288、`player_progress_pipeline.dart` 164、`player_screenshot_actions.dart` 165、`player_screenshot_filmstrip.dart` 211、`player_super_resolution_prompt.dart` 120 行；`player_screenshot_sheet.dart` 1052→855 行 | audits/AUDIT_FULL_2026-11-10.md §一第 1 行 |
 | `lib/pages/player/player_screenshot_sheet.dart`（1052 行） | 截图功能单文件过巨 | 随 player_item 拆分一并复审（同审计 §三） | 同上 |
 | `lib/pages/player/controller/player_playback_controller.dart:443`（`setPlaylistMode(PlaylistMode.none)` 硬编码） | 循环模式不可达 | M5-T1 把 PlaylistMode 提升为设置项+面板项 | 本文 §五 M5 |
 | `lib/mpv/diagnostics/diagnostics_info.dart:48-54` | 诊断字段全是静态路径（appVersion/dataDir/configDir/logDir），无运行时探针 | M7-T1 补 mpvVersion/renderBackend/ao 运行时读取 | SPEC §6 第 10 类要求「全部运行时读取」 |
@@ -203,7 +203,7 @@ build_runner → `flutter analyze` → `flutter test` → `flutter build linux -
 
 | 任务 | 内容（文件级） | 依赖 | 验收（机检） |
 | --- | --- | --- | --- |
-| M3-T0 ☐ | 拆 `player_item.dart`（1538 行）：PiP→`player_pip.dart`、audio_service 绑定→`player_audio_binding.dart`、键盘→既有 `player_keyboard_shortcuts.dart` 收拢、菜单→独立文件；`player_screenshot_sheet.dart`（1052 行）复审拆分。纯搬移不改行为 | 无 | `flutter test` 355+1 全绿；`flutter analyze` 0 error；`wc -l lib/pages/player/player_item.dart` < 500；新增文件均 < 600 行 |
+| M3-T0 ✅（`c9245f8`） | 拆 `player_item.dart`（1538 行）：PiP→`player_pip.dart`、audio_service 绑定→`player_audio_binding.dart`、键盘→既有 `player_keyboard_shortcuts.dart` 收拢、菜单→独立文件；`player_screenshot_sheet.dart`（1052 行）复审拆分。纯搬移不改行为 | 无 | `flutter test` 355+1 全绿；`flutter analyze` 0 error；`wc -l lib/pages/player/player_item.dart` < 500；新增文件均 < 600 行 |
 | M3-T1 ☐ | 帧预览：新建 `lib/pages/player/controller/seek_preview_controller.dart`（第二 Player，Haruna 属性集：pause/mute/aid=no/sid=no/sub-auto=no/osd-level=0/audio-display=no/hr-seek 跟随等价设置）；`player_progress_bar.dart` hover 气泡加载帧图（`Video` widget 纹理）；拖动中双 seek（主+预览）；开关+预览宽度设置落 `player_settings.dart` + `settings_keys.dart` 新键 | T0 | 新增 `test/seek_preview_controller_test.dart`（≥6 用例：激活条件 isLocalFile&&isVideo&&非停止、消抖、隐藏即 pause、设置关闭不建实例、dispose 链）；性能守卫入 `performance_guards_test.dart`：关闭开关时 Player 实例数不增（测试缝计数） |
 | M3-T2 ☐ | 章节：`mpv_player_properties.dart` 补 chapter/chapter-list 读取说明（沿用文件头考证格式）；新建 `lib/pages/player/controller/chapters_model.dart`（titleAtPosition 上界二分）；`player_progress_bar.dart` 章节刻度（rowCount*20<宽 规则）+ hover 章节标题；新建 `lib/pages/player/chapters_sheet.dart`（跳转+Skip 过滤设置键）；中键跳下一章 | T0 | 新增 `test/chapters_model_test.dart`（≥8 用例：空表/单章/边界/二分正确性）；chapters_sheet 挂接；全绿底数 ≥ 355+14 |
 | M3-T3 ☐ | 播放列表悬浮面板：`player_item_panel.dart:569` 底板升级悬浮面板（`SidePanelTransition` 容器）；左右 edge 设置键、宽度记忆键、边缘悬停展开（复用 `player_gesture_detector.dart:39-43`）；行右键菜单（播放下一/移除/复制路径）+ 行拖拽排序（PiliPlus ReorderableListView 范式） | T0 | 面板宽度/edge 持久化用例入 `test/emoplay_settings_test.dart`；新增 `test/playlist_panel_test.dart`（≥4 用例：开关/宽度钳制 260..window-50 语义/拖拽重排/菜单动作） |
@@ -225,11 +225,12 @@ M3 阶段验收追加：`flutter test` 用例数 ≥ **355 + 45**；`flutter bui
 
 | 任务 | 内容 | 依赖 | 验收 |
 | --- | --- | --- | --- |
-| M4-T0 ☐ | §四步骤 1+2：`lib/models/media_item.dart`、`lib/models/playback_session.dart`、`lib/models/media_item_mappers.dart`；播放队列收编 | M3 | 新增 `test/media_item_mappers_test.dart`（≥8：1.x 样例 JSON 进出无损）；`data_compat_spec7_test.dart` 必绿 |
-| M4-T2 ☐ | 网格观感：`library_page.dart` 改 SliverGrid + pinned 分组头（目录/年月分组，Kazumi popular_page 范式）；保持 search/typeFilter/sortMode 既有语义 | M4-T0 | 新增 `test/library_grid_grouping_test.dart`（≥3：分组键、筛选后分组、pinned 结构冒烟）；响应性守卫维持绿 |
-| M4-T3 ☐ | 收藏集：新建 `lib/media/favorites_store.dart`（`favorites.json` 新文件，条目=MediaItem path+addedAt；原子写同 settings 模式）；library/home 卡片收藏角标；排序复用 ReorderableListView 范式 | M4-T0 | 新增 `test/favorites_store_test.dart`（≥6：增删/去重/损坏 JSON 降级/原子写/lastPlayed 不受影响） |
-| M4-T4 ☐ | 元数据缓存：§四步骤 3（`media_meta_cache.dart` + `media_meta.json`） | M4-T0 | 新增 `test/media_meta_cache_test.dart`（≥6：sha1 键、损坏降级、超时强杀、无 ffprobe 优雅退化）；性能守卫：缓存命中不触发进程 |
-| M4-T5 ☐ | 目录树导航：`library_page.dart` 加目录侧栏（面包屑+树），数据源 LibraryStore.directories 派生，不加新扫描 | M4-T2 | 新增 `test/library_folder_tree_test.dart`（≥4：树构造、深度剪枝与扫描器语义一致、选中联动） |
+| M4-T0 ✅（`0da4a95`） | §四步骤 1+2：`lib/models/media_item.dart`、`lib/models/playback_session.dart`、`lib/models/media_item_mappers.dart`；播放队列收编 | M3 | 新增 `test/media_item_mappers_test.dart`（≥8：1.x 样例 JSON 进出无损）；`data_compat_spec7_test.dart` 必绿 |
+| M4-T2 ✅（`25dd830`） | 网格观感：`library_page.dart` 改 SliverGrid + pinned 分组头（目录/年月分组，Kazumi popular_page 范式）；保持 search/typeFilter/sortMode 既有语义 | M4-T0 | 新增 `test/library_grid_grouping_test.dart`（≥3：分组键、筛选后分组、pinned 结构冒烟）；响应性守卫维持绿 |
+| M4-T3 ✅（`25dd830`） | 收藏集：新建 `lib/media/favorites_store.dart`（`favorites.json` 新文件，条目=MediaItem path+addedAt；原子写同 settings 模式）；library/home 卡片收藏角标；排序复用 ReorderableListView 范式 | M4-T0 | 新增 `test/favorites_store_test.dart`（≥6：增删/去重/损坏 JSON 降级/原子写/lastPlayed 不受影响） |
+| M4-T4 ✅（`0da4a95`） | 元数据缓存：§四步骤 3（`media_meta_cache.dart` + `media_meta.json`） | M4-T0 | 新增 `test/media_meta_cache_test.dart`（≥6：sha1 键、损坏降级、超时强杀、无 ffprobe 优雅退化）；性能守卫：缓存命中不触发进程 |
+| M4-T5 ✅（`25dd830`） | 目录树导航：`library_page.dart` 加目录侧栏（面包屑+树），数据源 LibraryStore.directories 派生，不加新扫描 | M4-T2 | 新增 `test/library_folder_tree_test.dart`（≥4：树构造、深度剪枝与扫描器语义一致、选中联动） |
+| M4-T6 ✅（`5fedee0`，2026-11-12 用户增补） | 本地 NFO/海报/剧集分组：新建 `lib/media/nfo_parser.dart`、`lib/media/nfo_meta_cache.dart`（NFO 元数据缓存）、`lib/media/poster_finder.dart`（本地海报定位）、`lib/media/episode_grouper.dart`（剧集分组）+ `lib/pages/library/nfo_details_sheet.dart` 详情弹层；`library_grid_groups.dart`/`library_page.dart` 接入剧集分组与海报展示 | M4-T0 | 随 `5fedee0` 新增 `test/nfo_parser_test.dart`、`test/nfo_meta_cache_test.dart`、`test/episode_grouper_test.dart`、`test/poster_finder_test.dart`、`test/library_nfo_ui_test.dart` 共 5 个测试文件（git show --stat 核实入库） |
 
 ### M5 音乐
 
@@ -304,5 +305,7 @@ M3 阶段验收追加：`flutter test` 用例数 ≥ **355 + 45**；`flutter bui
 - **性能基线口径**：R7 性能实测为容器 Isolate 计时，非宿主基线
   （reports/WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md）；M7-T3 的守卫仍沿用
   该口径，宿主基线归 SPEC §9 人工验收轮。
-- **未排期**：iOS 正式进矩阵（签名方案未定）、Flatpak 打包、在线字幕/元数据
-  联网源（与本地优先纪律冲突，明确不做，除非用户改方向）。
+- **未排期**：iOS 正式进矩阵（签名方案未定）、Flatpak 打包（维持不做）、在线
+  字幕联网源（与本地优先纪律冲突，明确不做）。
+- **改向纳入（2026-11-12 用户决策）**：在线元数据联网源由「明确不做」改方向
+  纳入排期，排在第 11 轮，位于本地 NFO/海报（M4-T6，`5fedee0`）之后作联网兜底。

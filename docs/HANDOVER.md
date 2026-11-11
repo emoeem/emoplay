@@ -2,31 +2,67 @@
 
 | 项     | 值                                                                          |
 | ------ | --------------------------------------------------------------------------- |
-| 状态   | 生效中（2026-11-12 R9 M3 播放器交互轮之后）                                 |
+| 状态   | 生效中（2026-11-12 R10 M4 媒体库升级轮之后）                                 |
 | 日期   | 2026-11-12（最后实质性更新）                                                 |
-| 适用版本 | git `2e5d73d`（R9 三提交 `f2b7754` / `a8cb844` / `2e5d73d` 未推送；本地 origin/main 跟踪引用在 `3dcfb6a` = R8，远端状态因 gh EOF 不可复核） |
-| 相关   | [SPEC.md](SPEC.md)、[EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md) |
+| 适用版本 | git `5fedee0`（R10 四提交 `c9245f8` / `0da4a95` / `25dd830` / `5fedee0` 未推送；本地 origin/main 跟踪引用在 `e9bf692` = R9 尾提交，2026-11-12 gh 恢复可达窗口实测该点 main CI 绿 run 43069268623） |
+| 相关   | [SPEC.md](SPEC.md)、[EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md)、[R10 工作报告](reports/WORK_REPORT_2026-11-10_M4_MEDIA_LIBRARY.md) |
 
 ## 现状一句话
 
-M1-M8 迁移主流程、R1-R4 四轮收尾、R5 两小轮（移动端播放修复 / 面板观感）、
-R6 卫生与交付形态轮（仓库卫生清账 / AppImage 打包 / Kazumi 空态与徽章
-对齐 / README 对账）、R7 性能实测与设置收尾轮（性能定量实测 / 恢复默认
-设置 / draft 发布制）、R8 纯文档轮（3.0 路线图 / 跨平台验证矩阵 / fork
-治理三件套）与 R9 M3 播放器交互轮（3.0 阶段第一批施工：章节导航 / 字幕
-管理 / A-B 循环与逐帧步进）全部完成：Kazumi 骨架上重建的 Flutter/mpv 本地
-播放器功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv 兼容导入 / 画质引擎 /
-插件 / 11 类设置 / 更新检查），**CI 首绿已达成**（run 42718530280，
-`332 tests passed, 1 skipped`），**v2.0.0-alpha 已公开发布**（tag 指向
-`bd36f70`，GitHub Release 9 资产；R7 起后续 tag 发布改 draft 制，人工
-核对 publish 才公开）；2.0 路线图「性能实测」已 ✅（容器 Isolate 计时口径，
-宿主基线归 SPEC §9），1.x 对账已清零；本地 44 个测试文件 411 用例 +
-1 平台条件跳过全绿（R9 文档窗口两次实测，含 7 条真 libmpv live 用例；
-无 /tmp 夹具时 perf 基准段与音频探针按设计降级）、analyze 0 告警；
-origin/main 跟踪引用在 `3dcfb6a`（R8），R9 三提交待推送（推送后预期 CI
-签名 **411 passed / 1 skipped**，远端当前状态因 gh EOF 不可复核），版本
-仍是 2.0.0-alpha，3.0 施工按 EMOPLAY-3.0-ROADMAP 推进中（M3 进行到 T2
-主体，T0 拆分未做）。
+M1-M8 迁移主流程、R1-R4 四轮收尾、R5-R9 六轮（移动端播放 / 面板观感 /
+卫生与 AppImage / 性能实测与设置收尾 / 3.0 文档三件套 / M3 播放器交互）
+与 R10 M4 媒体库升级轮（3.0 阶段第二批施工：统一 `MediaItem` 模型 +
+ffprobe 元数据缓存、网格四分组、收藏集、目录树、本地 NFO/海报/剧集分组
+用户增补，并清偿 M3-T0 拆分挂账）全部完成：Kazumi 骨架上重建的
+Flutter/mpv 本地播放器功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv
+兼容导入 / 画质引擎 / 插件 / 11 类设置 / 更新检查），**v2.1.0-alpha 已
+公开发布**（draft 制人工 publish，11 资产，run 43069322152 矩阵全绿）；
+gh 2026-11-12 窗口恢复可达（R9 尾提交 `e9bf692` 的 main run 43069268623
+绿）；本地 54 个测试文件 489 用例 + 1 平台条件跳过全绿（R10 文档窗口
+实测，含真 libmpv live 用例；无 /tmp 夹具时 perf 基准段与音频探针按
+设计降级）、analyze 0 告警；R10 四提交待推送（ahead 4，推送后预期 CI
+签名 **489 passed / 1 skipped**），版本仍 `2.1.0-alpha+2010000`（未
+bump 未发版），3.0 施工按 EMOPLAY-3.0-ROADMAP 推进中（M3-T0 ✅、M4
+六任务全 ✅ 含 T6 用户增补，M3 剩 T1/T2 收口/T3，下一阶段 M5 音乐，
+第 11 轮联网元数据兜底已由用户决策排期）。
+
+## 最近实质性变更（R10·M4 媒体库升级，2026-11-12 03:14-04:50 CST 施工 + 文档收网）
+
+四个施工提交（`c9245f8` M3-T0 拆分、`0da4a95` 统一模型 + 元数据缓存、
+`25dd830` 网格分组 + 收藏 + 目录树、`5fedee0` 本地 NFO/海报/剧集分组
+用户增补）+ 本轮文档收网。细节与证据见
+[发布说明](releases/RELEASE_2026-11-10_M4_MEDIA_LIBRARY.md) 与
+[轮级工作报告](reports/WORK_REPORT_2026-11-10_M4_MEDIA_LIBRARY.md)。
+
+- 统一媒体模型（M4-T0，`0da4a95`）：`MediaItem`（基础字段对齐 §7 store
+  语义，3.0 扩展槽可空且永不写回三份 JSON）+ `PlaybackSession`（播放页
+  事实源，对外 playlist 接口不变，resume 语义仍归 PendingResumeSeek）+
+  无损映射器（11 用例）；元数据缓存 M4-T4：两段 ffprobe 链 +
+  `media_meta.json`，缓存键 sha1(path+mtimeMs) 与缩略图链同输入、命中
+  零进程、无 ffprobe 优雅降级。
+- 网格 / 收藏 / 目录树（M4-T2/T3/T5，`25dd830`）：SliverGrid + pinned
+  分组头（初始目录/年月两种）、收藏集 `favorites.json`（条目=path+
+  addedAt，渲染期 join 不复制 §7 数据，ReorderableListView 拖拽排序）、
+  目录侧栏（`scanOptions` 派生，不加新扫描）。
+- 本地 NFO/海报/剧集分组（M4-T6 用户增补，`5fedee0`）：手写容错 NFO
+  解析（类型看根元素、坏字段跳过不崩）、海报四名约定（sidecar →
+  poster → folder → fanart）、文件名 SxxEyy/1x02 词边界剧集三级分组、
+  `media_nfo.json` 缓存（video+目录双 mtime 失效）、NFO 详情弹层；
+  `<thumb>` URL 只记录不下载（本地优先，第 11 轮联网兜底已排期）。
+- M3-T0 拆分清偿（`c9245f8`）：`player_item.dart` 1614 → **484 行**
+  （验收线 <500），拆出 10 个职责文件全部 <600 行，纯搬移不改行为。
+- 本轮文档收网：R10 发布说明 + 轮级工作报告 + 本文件刷新 +
+  docs/README.md 索引 + CHANGELOG 顶部新增 `[Unreleased]` R10 节。
+  **路线图 M3-T0/M4 六任务的 ✅+哈希回填已在工作树**（未提交，随本轮
+  文档提交入库，勾选与四提交逐一相符），另含 §六改向注记：联网元数据
+  排期第 11 轮（用户决策）。
+- 门禁实测（2026-11-12 文档窗口）：analyze 0 告警（4.8s）；54 文件
+  **489 通过 / 1 平台条件跳过**全绿（1 skip = `mpv_profile_scanner_test.dart`
+  Windows-only 探针；10 个新测试文件逐个点数合计 78 = 489−411 账目闭环；
+  /tmp 夹具缺失时 perf 基准段与音频探针按设计降级，live 用例真跑）；
+  gh 恢复可达：R9 尾提交 `e9bf692` main run 43069268623 ✓，v2.1.0-alpha
+  release run 43069322152 ✓（首跑 43068258121 缺 ffmpeg 失败后修复），
+  release 已公开 11 资产；R10 四提交未推送（ahead 4）。
 
 ## 最近实质性变更（R9·M3 播放器交互，2026-11-11 08:20 - 11-12 00:52 CST 施工 + 文档收网）
 
@@ -276,29 +312,43 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
     字母键恒大写，mpv z/Z 型双键惯例映射不进本表（字幕延迟取 C/V 的
     根因，`constants.dart` 注释随行），新键位用
     `test/player_shortcut_keys_test.dart` 的模式锁 keyLabel 身份与冲突。
+13. **新增落盘文件 ≠ 改 §7 schema，但缓存失效键要想清楚**：M4 一轮加了
+    favorites.json / media_meta.json / media_nfo.json 三个 AppData 文件
+    （各带损坏降级 + 原子写，data_compat 契约测试照跑，先例成立）；
+    但失效键各有讲究：media_meta.json 键 `sha1(path+mtimeMs)` 与缩略图
+    链同输入（改一个文件两缓存同失效），media_nfo.json 条目带 video +
+    目录双 mtime（改海报/NFO 动的是目录 mtime）；app 外改刮削文件后
+    要等重扫才刷新，没有文件监听。
+14. **本地刮削的约定面很窄，排障先对约定**：海报只探四名
+    （`<名>-poster.jpg` / poster.jpg / folder.jpg / fanart.jpg，png 变体
+    不探测）；剧集只认文件名词边界的 SxxEyy / 1x02（`M4S01E02` 是文件名
+    不是剧集，词边界守卫故意如此）；NFO 类型看根元素不看文件名，坏
+    字段跳过不崩；`<thumb>` URL 只记录不抓取（第 11 轮联网兜底未做）。
+    约定不匹配不是 bug，是增补范围的有意收窄。
 
 ## 接手第一步清单
 
 1. `source /opt/emoplay-env.sh && cd /home/emo/code/emoplay && flutter analyze && flutter test`
-    - 预期 0 告警 + 411 通过 / 1 skipped（44 文件，R9 实测底数；1 skip =
-      Windows-only 探针，按设计跳过。7 条真 libmpv live 用例真跑；
+    - 预期 0 告警 + 489 通过 / 1 skipped（54 文件，R10 实测底数；1 skip =
+      Windows-only 探针，按设计跳过。真 libmpv live 用例真跑；
       /tmp/emoplay-perf-lib 夹具在场时 4 段基准真跑，缺失时 skip 打印
       降级同样全绿，夹具可用 `tools/gen_perf_fixture.sh` 重建），
       达不到先查环境再查代码。
 2. `git fetch origin && git log origin/main..HEAD --oneline` 与
-   `gh run list -R emoeem/emoplay --limit 5`（gh 需要外网，收网窗口内
-   api.github.com 不可达） - 确认 R9 三提交（`f2b7754` / `a8cb844` /
-   `2e5d73d`）与本轮文档是否已推送、推送后 CI 是否
-   **411 passed / 1 skipped**；红灯按坑 2 的归因链处理。
+   `gh run list -R emoeem/emoplay --limit 5`（gh 2026-11-12 窗口恢复
+   可达，但属窗口性） - 确认 R10 四提交（`c9245f8` / `0da4a95` /
+   `25dd830` / `5fedee0`）与本轮文档（含路线图工作树回填）是否已推送、
+   推送后 CI 是否 **489 passed / 1 skipped**；红灯按坑 2 的归因链处理。
 3. 通读 [SPEC.md](SPEC.md) §4 不变量与 [PORT-MAP.md](PORT-MAP.md) 头部铁律；
    3.0 施工任务从 [EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md) §五取
-   （M3 进行中：T2 主体已落地、进度条刻度半边挂账，T0 拆分是其余任务的
-   前置且 player_item.dart 已 1614 行）。
+   （M4 六任务全 ✅；M3 剩 T1 帧预览 / T2 刻度收口 / T3 面板；下一阶段
+   M5 音乐（T1 依赖 M4-T0 已清）；第 11 轮联网元数据兜底按 §六改向
+   注记排期）。
 4. 2.0 尾巴从 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) §四
    未做项清单取（发布产物实体机验证 → prerelease 语义 → i18n 其余设置页
    → 签名/公证；性能实测已 R7 ✅、AppImage 打包已 R6 `e1a2df0` 落地，
    路线图 §四 与 R3-R7 轮次表的勾选态以路线图下次收网为准），以及
-   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_M3_PLAYER_INTERACTION.md)
+   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_M4_MEDIA_LIBRARY.md)
    的优先级建议。
 5. 改完代码跑 SPEC §9 gate（build_runner → analyze → test → build linux）。
 

@@ -6,6 +6,69 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
+## [Unreleased]
+
+### R10 · M4 媒体库升级轮（2026-11-12）
+
+> 3.0 路线图（`docs/EMOPLAY-3.0-ROADMAP.md` §五 M4）整体施工 + R9 挂账的
+> M3-T0 清偿 + 用户增补的本地 NFO / 海报 / 剧集分组（M4-T6）。施工在
+> v2.1.0-alpha 发版之后、未发版，按 Keep a Changelog 归 Unreleased。
+
+#### Added
+
+- **统一媒体模型与播放队列收编**（M4-T0，`0da4a95`）：`MediaItem` /
+  `PlaybackSession` / 无损映射器；基础字段逐字段对齐 §7 store 语义，
+  3.0 扩展槽全部可空且永不写回 history.json / library.json /
+  settings.json（`test/data_compat_spec7_test.dart` 契约测试保持绿）；
+  播放页以 `PlaybackSession` 为事实源，对外 playlist 接口不变，resume
+  语义仍归 `PendingResumeSeek`（不变量 4）。
+- **元数据缓存**（M4-T4，`0da4a95`）：`media_meta.json` 新 AppData 文件，
+  两段 ffprobe 链（容器 → 编码 + 宽高），缓存键 `sha1(path+mtimeMs)` 与
+  缩略图链同输入，30s 超时强杀，部分失败缓存可用部分，无 ffprobe 时
+  优雅降级且已缓存条目继续服务，命中零进程。
+- **网格分组**（M4-T2，`25dd830`）：媒体库网格 SliverGrid + pinned 分组
+  头，search / typeFilter / sortMode 语义不变；分组键 / 输入序保持契约
+  随行注释。初始目录 / 年月两种，剧集 / 电影两种随 M4-T6 到场。
+- **收藏集**（M4-T3，`25dd830`）：`favorites.json` 新 AppData 文件
+  （条目 = path + addedAt，渲染期对库索引 join、不复制 §7 数据），卡片
+  收藏角标、ReorderableListView 拖拽排序弹层（失效收藏降级文件名不丢
+  条目）、损坏 JSON 降级 + 原子写用例锁定。
+- **目录树侧栏**（M4-T5，`25dd830`）：面包屑 + 树，深度剪枝从
+  `LibraryStore.scanOptions` 派生（树在扫描停的地方结束），不加新扫描。
+- **本地 NFO / 海报 / 剧集分组**（M4-T6 用户增补，`5fedee0`）：手写容错
+  NFO 解析（Kodi 语义：类型看根元素、跳过根前垃圾、多根取首块、坏字段
+  跳过不崩）、海报四名约定（sidecar → poster → folder → fanart，最具体
+  优先）、文件名 SxxEyy / 1x02 词边界解析与剧-季-集三级分组（无标记落
+  未分组桶，一行不丢）、网格剧集 / 电影两种分组（嵌套 SliverMainAxis
+  Groups + pinned 头）、本地海报上格子、NFO 详情弹层；`media_nfo.json`
+  缓存（video + 目录双 mtime 失效）；`<thumb>` URL 只记录不下载（本地
+  优先，联网兜底排期第 11 轮）。
+
+#### Changed
+
+- **`player_item.dart` 拆分**（M3-T0，`c9245f8`，R9 挂账清偿）：1614 →
+  484 行（验收线 <500），拆出 PiP / 音频绑定 / 键盘 / 菜单 / 手势 /
+  面板持有 / 进度管线 / 截图动作 / 截图胶片 / 超分提示十个职责文件
+  （全部 <600 行），`player_screenshot_sheet.dart` 1052 → 855 行；纯
+  搬移不改行为，用户可感知变化为零。
+
+#### 验证
+
+- `flutter analyze` 0 告警（`No issues found! (ran in 4.8s)`）；
+  `flutter test` 54 文件 **489 通过 + 1 平台条件跳过**全绿（2026-11-12
+  文档窗口实测；上轮 44 文件 / 411 + 1，+10 文件 / +78 用例：mappers 11、
+  meta cache 9、favorites 7、folder tree 5、grid grouping 6、episode
+  grouper 13、NFO UI 1、NFO meta cache 10、NFO parser 10、poster
+  finder 6，逐文件实测计数与全量差值交叉核对一致）。1 skip = Windows-only
+  探针（`mpv_profile_scanner_test.dart`，按设计跳过）。/tmp 夹具缺失时
+  perf 基准段与音频探针按 skip-打印降级（计数不变），live libmpv 用例
+  真跑。gh 本窗口恢复可达：R9 尾提交 `e9bf692` main run 43069268623 ✓、
+  v2.1.0-alpha release run 43069322152 ✓（release 已公开 11 资产）；
+  本轮四提交未推送（ahead 4），推送后预期签名 **489 passed / 1 skipped**
+  （未测）。分轮明细见
+  `docs/releases/RELEASE_2026-11-10_M4_MEDIA_LIBRARY.md` 与
+  `docs/reports/WORK_REPORT_2026-11-10_M4_MEDIA_LIBRARY.md`。
+
 ## [2.1.0-alpha] - 2026-11-12（已发布）
 
 R5–R9 施工收口（tag `v2.1.0-alpha`；`pubspec.yaml` version
