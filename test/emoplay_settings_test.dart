@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
+import 'package:emoplay/music/music_queue.dart';
 import 'package:emoplay/settings/emoplay_settings.dart';
 
 /// Headless tests for the persisted import decision + quality/behavior/music
@@ -320,6 +321,89 @@ void main() {
     expect(reloaded.qualityTier, 'high');
     expect(reloaded.musicEqualizerPreset, 'custom');
     expect(reloaded.musicEqualizerEnabled, isTrue);
+  });
+
+  test('playlistModeDefaultsWhenMissing', () {
+    // M5-T1 键追加契约（roadmap §四红线）：behavior 段写于 M5-T1 之前的
+    // 文件（无 playlistMode 键）按默认 none 加载，且既有 behavior 字段
+    // 不受影响。默认 none = 1.x/Kazumi 现状（原 PlaylistMode.none 硬编码）。
+    final path = file('pre-m5t1.json');
+    {
+      final settings = EmoPlaySettings(path);
+      settings.resumeOnReopen = false;
+      settings.libraryMaxDepth = 3;
+      expect(settings.save(), isTrue);
+    }
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.playlistMode, QueueLoopMode.none);
+    expect(settings.resumeOnReopen, isFalse);
+    expect(settings.libraryMaxDepth, 3);
+  });
+
+  test('playlistModeRoundTrips', () {
+    // 新键追加的往返用例：none → single → playlist 跨实例往返，并与
+    // behavior 段既有字段在同一文档中共存。
+    final path = file('playlist-mode.json');
+    {
+      final settings = EmoPlaySettings(path);
+      expect(settings.playlistMode, QueueLoopMode.none); // 默认值
+      settings.playlistMode = QueueLoopMode.single;
+      expect(settings.save(), isTrue);
+    }
+    {
+      final settings = EmoPlaySettings(path);
+      expect(settings.load(), isTrue);
+      expect(settings.playlistMode, QueueLoopMode.single);
+      settings.playlistMode = QueueLoopMode.playlist;
+      settings.librarySkipHidden = false;
+      expect(settings.save(), isTrue);
+    }
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.playlistMode, QueueLoopMode.playlist);
+    expect(settings.librarySkipHidden, isFalse);
+    // 再改回 none，确认三态都可写入并可读回。
+    settings.playlistMode = QueueLoopMode.none;
+    expect(settings.save(), isTrue);
+    final reloaded = EmoPlaySettings(path);
+    expect(reloaded.load(), isTrue);
+    expect(reloaded.playlistMode, QueueLoopMode.none);
+  });
+
+  test('playlistModeSurvivesWrongTypes', () async {
+    // 手改文件：未知值与错误类型一律回落默认 none（QueueLoopMode
+    // .fromStorageValue 契约），不崩溃、不喂垃圾给播放器。
+    final path = file('playlist-mode-wrong-types.json');
+    await File(path).writeAsString('''
+{
+    "behavior": {
+        "resumeOnReopen": true,
+        "playlistMode": 42
+    }
+}
+''');
+    final settings = EmoPlaySettings(path);
+    expect(settings.load(), isTrue);
+    expect(settings.playlistMode, QueueLoopMode.none);
+
+    await File(path).writeAsString('''
+{
+    "behavior": {"playlistMode": "bogus-mode"}
+}
+''');
+    final settings2 = EmoPlaySettings(path);
+    expect(settings2.load(), isTrue);
+    expect(settings2.playlistMode, QueueLoopMode.none);
+  });
+
+  test('restoreDefaultsResetsPlaylistMode', () {
+    // 恢复默认（behavior 段范围，施工件 B 扩展同款）也覆盖新键。
+    final path = file('restore-playlist-mode.json');
+    final settings = EmoPlaySettings(path);
+    settings.playlistMode = QueueLoopMode.single;
+    settings.restoreDefaults();
+    expect(settings.playlistMode, QueueLoopMode.none);
   });
 
   test('behaviorSectionRoundTrips', () {

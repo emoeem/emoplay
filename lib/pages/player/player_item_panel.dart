@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -10,7 +11,10 @@ import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/emo_menu.dart';
 import 'package:emoplay/bean/widget/embedded_native_control_area.dart';
 import 'package:emoplay/bean/widget/play_pause_icon.dart';
+import 'package:emoplay/media/media_stores.dart';
+import 'package:emoplay/music/music_queue.dart';
 import 'package:emoplay/pages/player/chapters_sheet.dart';
+import 'package:emoplay/pages/player/music_queue_panel.dart';
 import 'package:emoplay/pages/player/controller/ab_loop_model.dart';
 import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/pages/player/player_panel_hold.dart';
@@ -530,7 +534,16 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
       ),
       EmoMenuItem(
         onPressed: () => _openMenu(_showPlaylistSheet),
-        label: '播放列表',
+        // M5-T1：music 形态（audioMode）入口语义为队列（打开的是带循环
+        // 模式切换的音乐队列面板）；视频形态维持「播放列表」。
+        label: MediaStores.instance.music.audioMode ? '播放队列' : '播放列表',
+      ),
+      // M5-T1 循环模式：三态循环入口（标签随当前值变化，打开菜单时才构建
+      // ——A-B 循环同款约定）。none→single→playlist→none。
+      EmoMenuItem(
+        onPressed: _cycleLoopMode,
+        label:
+            '循环模式：${MediaStores.instance.settings.playlistMode.label}',
       ),
       // M3-T2 章节导航：无章节的文件不显示入口（读取该 observable 的面板
       // Observer 会在章节加载/清空时自动重建菜单）。
@@ -644,7 +657,32 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
     );
   }
 
+  /// M5-T1 循环模式三态循环：切换即落盘（settings.json behavior 段）并对
+  /// 存活的当前 Player 即时下发 media_kit setPlaylistMode；下一个 Player
+  /// 创建时（createVideoController）也会重新读取。写失败照常上报，内存态
+  /// 保持权威（general_settings _persistBehavior 同契约）。
+  void _cycleLoopMode() {
+    final settings = MediaStores.instance.settings;
+    settings.playlistMode = queueLoopModeCycle(settings.playlistMode);
+    if (!settings.save()) {
+      EmoDialog.showToast(message: '设置保存失败：${settings.filePath}');
+    }
+    unawaited(widget.playerController.playback.applyPlaylistMode());
+  }
+
   Future<void> _showPlaylistSheet() {
+    // M5-T1：music 形态走队列面板（底板同源：showAdaptiveBottomSheet +
+    // Observer 列表，加三态循环模式头部）；视频形态维持既有播放列表面板。
+    if (MediaStores.instance.music.audioMode) {
+      return showMusicQueueSheet(
+        context: context,
+        playerPageController: widget.playerPageController,
+        onSelectItem: widget.onSelectItem,
+        onLoopModeChanged: (_) => unawaited(
+          widget.playerController.playback.applyPlaylistMode(),
+        ),
+      );
+    }
     return showAdaptiveBottomSheet<void>(
       context: context,
       builder: (context) {

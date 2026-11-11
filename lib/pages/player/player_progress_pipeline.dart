@@ -7,6 +7,7 @@ import 'package:emoplay/pages/player/player_panel_hold.dart';
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
 import 'package:emoplay/services/logging/logger.dart';
 import 'package:emoplay/services/storage/storage.dart';
+import 'package:emoplay/music/music_queue.dart';
 import 'package:emoplay/utils/device.dart';
 import 'package:flutter/material.dart';
 
@@ -146,8 +147,19 @@ class PlayerProgressPipeline {
           // Replay stale near-end resumes instead of advancing to the next item.
           unawaited(playerController.playback.restartFromBeginning());
         } else {
-          final nextIndex = playerPageController.currentIndex + 1;
-          if (nextIndex < playerPageController.playlist.length && autoPlayNext) {
+          // M5-T1 循环/队列：推进决策收口到 resolveQueueNextIndex（纯函数，
+          // test/music_queue_test.dart 护航）。none：顺序推进、队尾停止
+          // （即原 inline 语义）；playlist：队尾回卷到 0；single：永不推进
+          // （引擎原生 loop-file 重复，completed 到不了这里，双保险）；
+          // autoPlayNext 仍是总闸。模式实时读 settings.json behavior 段
+          // （面板/设置页切换即时生效）；MediaStores 未就绪回落 none。
+          final nextIndex = resolveQueueNextIndex(
+            currentIndex: playerPageController.currentIndex,
+            count: playerPageController.playlist.length,
+            mode: playerController.playback.currentLoopMode(),
+            autoPlayNext: autoPlayNext,
+          );
+          if (nextIndex != null) {
             final next = playerPageController.itemAt(nextIndex);
             if (next != null) {
               EmoDialog.showToast(message: '正在加载${next.title}');

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:emoplay/music/music_queue.dart';
+
 // Persisted application settings (settings.json in the application support
 // directory).
 //
@@ -41,6 +43,9 @@ import 'package:path_provider/path_provider.dart';
 //   - libraryMaxDepth (folder levels below a media root that the library
 //     scan descends into, 0 = unlimited, default 2)
 //   - librarySkipHidden (skip hidden files and directories, default true)
+//   - playlistMode (M5-T1 loop mode, "none"/"single"/"playlist", default
+//     "none" — the 1.x behavior; §四红线 sanctioned key append, round-trip
+//     asserted in test/emoplay_settings_test.dart)
 //  - the P7 music preferences in a nested "music" section:
 //   - equalizerEnabled (10-band EQ wired to mpv's af chain, default false)
 //   - equalizerPreset ("flat"/"bass"/"vocal"/"live"/"custom", default "flat")
@@ -84,6 +89,11 @@ class EmoPlaySettings extends ChangeNotifier {
   static const String _kResumeOnReopen = 'resumeOnReopen';
   static const String _kLibraryMaxDepth = 'libraryMaxDepth';
   static const String _kLibrarySkipHidden = 'librarySkipHidden';
+  // M5-T1（roadmap §四红线：settings.json 新增键允许追加，1.x 读取方忽略
+  // 未知键；每追加一键必须在 test/emoplay_settings_test.dart 补默认值与
+  // 往返用例）。取值域见 QueueLoopMode（'none' | 'single' | 'playlist'），
+  // 默认 'none' 保持 1.x/Kazumi 现状（原硬编码 PlaylistMode.none）。
+  static const String _kPlaylistMode = 'playlistMode';
   static const String _kMusic = 'music';
   static const String _kMusicEqualizerEnabled = 'equalizerEnabled';
   static const String _kMusicEqualizerPreset = 'equalizerPreset';
@@ -267,6 +277,20 @@ class EmoPlaySettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  // M5-T1 循环模式（behavior 段）。读取方：player_playback_controller
+  // （每个 Player 创建时经 media_kit setPlaylistMode 下发）与
+  // PlayerProgressPipeline（completed 后的队列推进，M5-T1 列表循环回卷）。
+  // 改值只动内存并通知，落盘仍由调用方 save()（与全类同一契约）。
+  QueueLoopMode get playlistMode => _playlistMode;
+  QueueLoopMode _playlistMode = QueueLoopMode.none;
+  set playlistMode(QueueLoopMode mode) {
+    if (_playlistMode == mode) {
+      return;
+    }
+    _playlistMode = mode;
+    notifyListeners();
+  }
+
   // P7 music section. Same contract as the quality section: setters notify
   // and persist only when the caller calls save().
   bool get musicEqualizerEnabled => _musicEqualizerEnabled;
@@ -323,6 +347,7 @@ class EmoPlaySettings extends ChangeNotifier {
     _resumeOnReopen = true;
     _libraryMaxDepth = 2;
     _librarySkipHidden = true;
+    _playlistMode = QueueLoopMode.none;
     _musicEqualizerEnabled = false;
     _musicEqualizerPreset = 'flat';
     _musicEqualizerGains.clear();
@@ -397,6 +422,8 @@ class EmoPlaySettings extends ChangeNotifier {
     _libraryMaxDepth = _intOr(behavior, _kLibraryMaxDepth, _libraryMaxDepth);
     _librarySkipHidden =
         _boolOr(behavior, _kLibrarySkipHidden, _librarySkipHidden);
+    // 未知值/错误类型回落 none（QueueLoopMode.fromStorageValue 契约）。
+    _playlistMode = QueueLoopMode.fromStorageValue(behavior[_kPlaylistMode]);
 
     final music = _mapOr(obj, _kMusic);
     _musicEqualizerEnabled =
@@ -445,6 +472,7 @@ class EmoPlaySettings extends ChangeNotifier {
       _kResumeOnReopen: _resumeOnReopen,
       _kLibraryMaxDepth: _libraryMaxDepth,
       _kLibrarySkipHidden: _librarySkipHidden,
+      _kPlaylistMode: _playlistMode.storageValue,
     };
 
     final obj = <String, Object?>{
@@ -514,6 +542,7 @@ class EmoPlaySettings extends ChangeNotifier {
     _resumeOnReopen = true;
     _libraryMaxDepth = 2;
     _librarySkipHidden = true;
+    _playlistMode = QueueLoopMode.none;
     // music section (gains default to empty, exactly like load()'s reset —
     // a fresh / shortened list loads as the flat preset with zero gains).
     _musicEqualizerEnabled = false;

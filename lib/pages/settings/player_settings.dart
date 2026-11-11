@@ -11,6 +11,8 @@ import 'package:emoplay/utils/constants.dart';
 import 'package:emoplay/services/storage/storage.dart';
 import 'package:emoplay/services/player/pip_utils.dart';
 import 'package:emoplay/bean/settings/settings_list.dart';
+import 'package:emoplay/media/media_stores.dart';
+import 'package:emoplay/music/music_queue.dart';
 import 'package:emoplay/utils/device.dart';
 
 class PlayerSettingsPage extends StatefulWidget {
@@ -340,6 +342,27 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
                 title: Text('自动连播'),
                 description: Text('当前视频播放完毕后自动播放下一集'),
                 initialValue: autoPlayNext,
+              ),
+              // M5-T1 循环模式（settings.json behavior.playlistMode，默认
+              // 不循环 = 1.x 行为）。单曲循环经 media_kit 原生 loop-file；
+              // 列表循环在应用层队列内回卷（music_queue.dart）。切换对当前
+              // 播放器在下次起播时生效；播放面板菜单/队列面板可即时下发。
+              SettingsDropdownTile<QueueLoopMode>(
+                leading: Icons.repeat_rounded,
+                title: const Text('循环模式'),
+                description: const Text('单曲/列表循环与顺序播完'),
+                value: MediaStores.instance.settings.playlistMode,
+                options: {
+                  for (final mode in QueueLoopMode.values) mode: mode.label,
+                },
+                onChanged: (mode) {
+                  final settings = MediaStores.instance.settings;
+                  settings.playlistMode = mode;
+                  if (!settings.save()) {
+                    EmoDialog.showToast(context: context, message: '设置保存失败');
+                  }
+                  setState(() {});
+                },
               ),
               if (Platform.isAndroid)
                 SettingsTile.switchTile(

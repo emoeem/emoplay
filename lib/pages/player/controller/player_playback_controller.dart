@@ -23,6 +23,7 @@ import 'package:mobx/mobx.dart';
 import 'package:emoplay/media/media_stores.dart';
 import 'package:emoplay/mpv/config/mpv_player_properties.dart';
 import 'package:emoplay/music/music_controller.dart' show kPlaybackAfBaseline;
+import 'package:emoplay/music/music_queue.dart';
 import 'package:emoplay/utils/device.dart';
 import 'package:emoplay/utils/media.dart';
 import 'package:emoplay/services/platform/platform_environment_service.dart';
@@ -440,7 +441,11 @@ abstract class _PlayerPlaybackController with Store {
           androidAttachSurfaceAfterVideoParameters: false,
         ),
       );
-      player.setPlaylistMode(PlaylistMode.none);
+      // M5-T1 循环模式：settings.json behavior.playlistMode（默认 none，即
+      // 1.x 硬编码行为）驱动 media_kit PlaylistMode 原生通道。映射与「列表
+      // 循环为何在应用层回卷」的考证见 [_playlistModeFor] 与
+      // lib/music/music_queue.dart 文件头。
+      await applyPlaylistMode(player: player);
       if (!isCurrentPlayer(player)) {
         return await _discardIfNotCurrent(candidate);
       }
@@ -585,6 +590,57 @@ abstract class _PlayerPlaybackController with Store {
         error: e,
       );
     }
+  }
+
+  /// M5-T1 循环模式：把持久化的 [QueueLoopMode] 经 media_kit 原生
+  /// setPlaylistMode 通道下发到目标播放器。
+  ///
+  /// 两个调用点：[createVideoController]（每个 Player 创建时，原
+  /// `PlaylistMode.none` 硬编码位）与播放面板/设置页的切换动线（对存活
+  /// 的当前 Player 即时生效）。MediaStores 未就绪（测试/极早启动窗口）时
+  /// 读到默认 none，行为与 1.x 硬编码一致。
+  Future<void> applyPlaylistMode({Player? player}) async {
+    final target = player ?? mediaPlayer;
+    if (target == null) {
+      return;
+    }
+    try {
+      await target.setPlaylistMode(_playlistModeFor(currentLoopMode()));
+    } catch (e) {
+      EmoLogger().w('PlayerController: failed to set playlist mode', error: e);
+    }
+  }
+
+  /// 当前持久化的循环模式（每次调用实时读设置，面板切换即时生效）。
+  QueueLoopMode currentLoopMode() {
+    if (MediaStores.isReady) {
+      return MediaStores.instance.settings.playlistMode;
+    }
+    return QueueLoopMode.none;
+  }
+
+  /// QueueLoopMode → media_kit PlaylistMode 映射。
+  ///
+  ///  * none → [PlaylistMode.none]：loop-file/loop-playlist 均关，EOF 到达
+  ///    应用层，队列按 autoPlayNext 推进、到队尾停止（1.x 行为）。
+  ///  * single → [PlaylistMode.single]：引擎原生 loop-file=yes，文件由 mpv
+  ///    自行重复，completed 永不触发、队列不前进（media_kit real.dart
+  ///    setPlaylistMode 的属性映射，原样利用）。
+  ///  * playlist → [PlaylistMode.none]（刻意不开 [PlaylistMode.loop]）：
+  ///    media_kit `open(Media)` 只向 mpv 装载一个 entry 的内部 playlist
+  ///    （real.dart open(): `playlist.add(playable)` → loadlist 临时文件），
+  ///    `loop-playlist=yes` 会让 mpv 在文件结尾回卷到这唯一 entry、文件
+  ///    自身无限循环，completed/eof 永远到不了应用层，队列无法续播。列表
+  ///    循环的回卷由应用层实现：队列的 source of truth 是 PlaybackSession
+  ///    （roadmap §四统一模型），每文件一个 Player 实例
+  ///    （player_page.dart _loadCurrent），推进走
+  ///    PlayerProgressPipeline → resolveQueueNextIndex（music_queue.dart）。
+  PlaylistMode _playlistModeFor(QueueLoopMode mode) {
+    return switch (mode) {
+      QueueLoopMode.none => PlaylistMode.none,
+      QueueLoopMode.single => PlaylistMode.single,
+      QueueLoopMode.playlist => PlaylistMode.none,
+    };
   }
 
   Future<void> setShader(SuperResolutionMode mode, {Player? player}) async {
