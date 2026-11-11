@@ -404,6 +404,26 @@ class MusicController extends ChangeNotifier {
     _setLyricIndex(lyricIndexAt(_lines, seconds));
   }
 
+  /// Test seam for the page tests (music_lyrics_page_test.dart): seeds the
+  /// exact shape [attachPlayer] + [_loadLyrics] + [_onPositionChanged]
+  /// produce, without an engine — flutter_test has no libmpv, so the real
+  /// path is unreachable there. Production code must not call this.
+  @visibleForTesting
+  void debugSeedLyrics({
+    required List<LrcLine> lines,
+    int index = -1,
+    Map<String, String> metadata = const <String, String>{},
+  }) {
+    _lines = lines;
+    _lyrics = <Map<String, Object?>>[
+      for (final line in lines)
+        <String, Object?>{'time': line.time, 'text': line.text},
+    ];
+    _lrcMetadata = metadata;
+    _lrcPath = 'test://seeded';
+    _setLyricIndex(index);
+  }
+
   void _onMetadataChanged(Map<String, String> metadata) {
     if (_mapEquals(_mediaMetadata, metadata)) {
       return;

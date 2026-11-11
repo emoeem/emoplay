@@ -6,6 +6,7 @@ import 'package:emoplay/pages/index_page.dart';
 import 'package:emoplay/pages/init_page.dart';
 import 'package:emoplay/pages/library/library_module.dart';
 import 'package:emoplay/pages/player/player_module.dart';
+import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/pages/player/controller/player_page_controller.dart';
 import 'package:emoplay/pages/plugins/plugins_module.dart';
 import 'package:emoplay/pages/settings/settings_module.dart';
@@ -26,6 +27,15 @@ final tabModule = createModule(
     c
       // Tab state survives tab switches, but is released with the whole shell.
       ..addSingleton<PlayerPageController>(PlayerPageController.new)
+      // M5-T3 迷你条（docs/EMOPLAY-3.0-ROADMAP.md §五）: the player
+      // controller joins the tab singletons. It used to be a player-route
+      // `provide:` bind, which flutter_modular disposes when the outlet
+      // leaves /tab/player/ — switching tabs stopped playback, leaving
+      // nothing for the non-player-page mini bar to show. As a tab singleton
+      // playback keeps running across tab switches (background audio; the
+      // mini bar controls it, _handleBack still stops explicitly). Same
+      // release contract as PlayerPageController: gone with the whole shell.
+      ..addSingleton<PlayerController>(PlayerController.new)
       ..route(
         '/',
         child: (context, state) => IndexPage(location: state.uri.path),

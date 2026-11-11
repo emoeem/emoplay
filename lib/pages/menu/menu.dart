@@ -8,6 +8,7 @@ import 'package:emoplay/l10n/generated/app_localizations.dart';
 import 'package:emoplay/navigation.dart';
 import 'package:emoplay/pages/menu/route_visibility.dart';
 import 'package:emoplay/pages/player/controller/player_page_controller.dart';
+import 'package:emoplay/pages/player/music_mini_bar.dart';
 import 'package:emoplay/pages/router.dart';
 
 /// Localized labels for the five EmoPlay tabs (docs/SPEC.md §5), in
@@ -221,36 +222,45 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     final labels = menuTabLabels(AppLocalizations.of(context));
     return Scaffold(
       body: _outlet(context),
-      bottomNavigationBar: NavigationBar(
-        destinations: <Widget>[
-          NavigationDestination(
-            selectedIcon: const Icon(Icons.home),
-            icon: const Icon(Icons.home_outlined),
-            label: labels[0],
-          ),
-          NavigationDestination(
-            selectedIcon: const Icon(Icons.video_library),
-            icon: const Icon(Icons.video_library_outlined),
-            label: labels[1],
-          ),
-          NavigationDestination(
-            selectedIcon: const Icon(Icons.play_circle),
-            icon: const Icon(Icons.play_circle_outline),
-            label: labels[2],
-          ),
-          NavigationDestination(
-            selectedIcon: const Icon(Icons.extension),
-            icon: const Icon(Icons.extension_outlined),
-            label: labels[3],
-          ),
-          NavigationDestination(
-            selectedIcon: const Icon(Icons.settings),
-            icon: const Icon(Icons.settings_outlined),
-            label: labels[4],
+      // M5-T3: the mini bar sits above the NavigationBar on non-player pages;
+      // it shrinks to nothing when idle or on the player page (its own
+      // visibility condition), so the chrome layout is untouched otherwise.
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MusicMiniBar(onOpenPlayer: _openPlayerTab),
+          NavigationBar(
+            destinations: <Widget>[
+              NavigationDestination(
+                selectedIcon: const Icon(Icons.home),
+                icon: const Icon(Icons.home_outlined),
+                label: labels[0],
+              ),
+              NavigationDestination(
+                selectedIcon: const Icon(Icons.video_library),
+                icon: const Icon(Icons.video_library_outlined),
+                label: labels[1],
+              ),
+              NavigationDestination(
+                selectedIcon: const Icon(Icons.play_circle),
+                icon: const Icon(Icons.play_circle_outline),
+                label: labels[2],
+              ),
+              NavigationDestination(
+                selectedIcon: const Icon(Icons.extension),
+                icon: const Icon(Icons.extension_outlined),
+                label: labels[3],
+              ),
+              NavigationDestination(
+                selectedIcon: const Icon(Icons.settings),
+                icon: const Icon(Icons.settings_outlined),
+                label: labels[4],
+              ),
+            ],
+            selectedIndex: selectedIndex,
+            onDestinationSelected: _selectDestination,
           ),
         ],
-        selectedIndex: selectedIndex,
-        onDestinationSelected: _selectDestination,
       ),
     );
   }
@@ -301,9 +311,26 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
               onDestinationSelected: _selectDestination,
             ),
           ),
-          Expanded(child: _outlet(context, borderRadius: borderRadius)),
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  child: _outlet(context, borderRadius: borderRadius),
+                ),
+                // M5-T3: same mini bar contract as the portrait shell, at the
+                // bottom of the content area.
+                MusicMiniBar(onOpenPlayer: _openPlayerTab),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  /// Mini bar "return to the player page": the exact tab-switch path the
+  /// NavigationBar/Rail taps take (outlet navigate + selected-index update).
+  void _openPlayerTab() {
+    _selectDestination(_playerTabIndex);
   }
 }
