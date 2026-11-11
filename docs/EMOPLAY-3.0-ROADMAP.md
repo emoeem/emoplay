@@ -231,7 +231,7 @@ M3 阶段验收追加：`flutter test` 用例数 ≥ **355 + 45**；`flutter bui
 | M4-T4 ✅（`0da4a95`） | 元数据缓存：§四步骤 3（`media_meta_cache.dart` + `media_meta.json`） | M4-T0 | 新增 `test/media_meta_cache_test.dart`（≥6：sha1 键、损坏降级、超时强杀、无 ffprobe 优雅退化）；性能守卫：缓存命中不触发进程 |
 | M4-T5 ✅（`25dd830`） | 目录树导航：`library_page.dart` 加目录侧栏（面包屑+树），数据源 LibraryStore.directories 派生，不加新扫描 | M4-T2 | 新增 `test/library_folder_tree_test.dart`（≥4：树构造、深度剪枝与扫描器语义一致、选中联动） |
 | M4-T6 ✅（`5fedee0`，2026-11-12 用户增补） | 本地 NFO/海报/剧集分组：新建 `lib/media/nfo_parser.dart`、`lib/media/nfo_meta_cache.dart`（NFO 元数据缓存）、`lib/media/poster_finder.dart`（本地海报定位）、`lib/media/episode_grouper.dart`（剧集分组）+ `lib/pages/library/nfo_details_sheet.dart` 详情弹层；`library_grid_groups.dart`/`library_page.dart` 接入剧集分组与海报展示 | M4-T0 | 随 `5fedee0` 新增 `test/nfo_parser_test.dart`、`test/nfo_meta_cache_test.dart`、`test/episode_grouper_test.dart`、`test/poster_finder_test.dart`、`test/library_nfo_ui_test.dart` 共 5 个测试文件（git show --stat 核实入库） |
-| M4-T7 ✅（2026-11-12 用户改向纳入，框架轮） | 在线元数据兜底框架（本地 NFO 之后的联网补全；真实数据流待用户 TMDB key）：新建 `lib/media/online/metadata_provider.dart`（provider 接缝）、`lib/media/online/tmdb_provider.dart`（注入 http.Client 的 /search/multi 适配器，全部失败形态收束为一个类型化异常）、`lib/media/online/online_meta_service.dart`（五道门禁：关→无 key→本地 NFO 覆盖→缓存→才联网；`media_online.json` 新缓存文件，正命中与明确未命中落盘、传输失败不缓存）；`emoplay_settings.dart` 增 `online` 段（enabled 默认 **关** + apiKey 默认 ''）；设置中心增「在线元数据」分类（`online_settings.dart` + 路由）；NFO 详情弹层挂「联网补全」动作（badge 拓宽到全部视频格子，无 NFO 格子 tooltip 为联网补全），七种结果各有优雅提示；可达性实测：api.themoviedb.org 可达（curl 0.83s / Dart HttpClient 1.04s，无效 key 恰返 HTTP 401 标准错误体），此前 GitHub API TLS ECONNRESET 未复现于 TMDB | M4-T6 | 新增 `test/online_meta_service_test.dart`（10 用例：开关关不联网、无 key 降级、本地 NFO 不联网、缓存命中零请求、损坏响应/HTTP 错误/超时降级不落缓存、正命中持久化、负命中缓存、forget）、`test/tmdb_provider_test.dart`（10 用例：请求拼装、电影/剧集解析、person 行跳过、空结果、401/损坏体/缺 results 异常）、`test/library_online_ui_test.dart`（零请求 UI 冒烟）；`emoplay_settings_test.dart` 增 4 用例（online 默认值/往返/错误类型/恢复默认）；全量 `flutter test` 539 绿 |
+| M4-T7 ✅（`eb3b2bf`，2026-11-12 用户改向纳入，框架轮） | 在线元数据兜底框架（本地 NFO 之后的联网补全；真实数据流待用户 TMDB key）：新建 `lib/media/online/metadata_provider.dart`（provider 接缝）、`lib/media/online/tmdb_provider.dart`（注入 http.Client 的 /search/multi 适配器，全部失败形态收束为一个类型化异常）、`lib/media/online/online_meta_service.dart`（五道门禁：关→无 key→本地 NFO 覆盖→缓存→才联网；`media_online.json` 新缓存文件，正命中与明确未命中落盘、传输失败不缓存）；`emoplay_settings.dart` 增 `online` 段（enabled 默认 **关** + apiKey 默认 ''）；设置中心增「在线元数据」分类（`online_settings.dart` + 路由）；NFO 详情弹层挂「联网补全」动作（badge 拓宽到全部视频格子，无 NFO 格子 tooltip 为联网补全），七种结果各有优雅提示；可达性实测：api.themoviedb.org 可达（curl 0.83s / Dart HttpClient 1.04s，无效 key 恰返 HTTP 401 标准错误体），此前 GitHub API TLS ECONNRESET 未复现于 TMDB | M4-T6 | 新增 `test/online_meta_service_test.dart`（10 用例：开关关不联网、无 key 降级、本地 NFO 不联网、缓存命中零请求、损坏响应/HTTP 错误/超时降级不落缓存、正命中持久化、负命中缓存、forget）、`test/tmdb_provider_test.dart`（10 用例：请求拼装、电影/剧集解析、person 行跳过、空结果、401/损坏体/缺 results 异常）、`test/library_online_ui_test.dart`（零请求 UI 冒烟）；`emoplay_settings_test.dart` 增 4 用例（online 默认值/往返/错误类型/恢复默认）；全量 `flutter test` 539 绿 |
 
 ### M5 音乐
 
@@ -239,9 +239,9 @@ M3 阶段验收追加：`flutter test` 用例数 ≥ **355 + 45**；`flutter bui
 
 | 任务 | 内容 | 依赖 | 验收 |
 | --- | --- | --- | --- |
-| M5-T1 ☐ | 循环/队列：`player_playback_controller.dart:443` 的 `PlaylistMode.none` 硬编码提升为设置+面板切换（single/playlist/none，media_kit PlaylistMode 原生）；music 形态队列面板（复用 M3-T3 面板组件） | M4-T0 | 新增 `test/music_queue_test.dart`（≥5：模式切换持久化、audio 队列续播、切 video 形态语义） |
-| M5-T2 ☐ | 音频属性：replaygain（mpv replaygain 属性开关，设置落音频类）、gapless（`gapless-audio=weak` 默认考察注释随行）；沿用 `mpv_player_properties.dart` 通道 | M5-T1 | `mpv_player_properties_test.dart` 增 ≥2 用例；设置往返用例 |
-| M5-T3 ☐ | 歌词与迷你条：`music_lyrics_page.dart` 升级（逐行高亮精度、翻译列）；新建 `lib/pages/player/music_mini_bar.dart`（非播放页常驻迷你条） | M5-T1 | `test/music_lyrics_page_test.dart` 增 ≥3；新增 mini bar 测试 ≥2（`lrc_parser_test.dart` 不动） |
+| M5-T1 ✅（`2115183`） | 循环/队列：`player_playback_controller.dart:443` 的 `PlaylistMode.none` 硬编码提升为设置+面板切换（single/playlist/none，media_kit PlaylistMode 原生）；music 形态队列面板（复用 M3-T3 面板组件） | M4-T0 | 新增 `test/music_queue_test.dart`（≥5：模式切换持久化、audio 队列续播、切 video 形态语义） |
+| M5-T2 ✅（`ec456b3`） | 音频属性：replaygain（mpv replaygain 属性开关，设置落音频类）、gapless（`gapless-audio=weak` 默认考察注释随行）；沿用 `mpv_player_properties.dart` 通道 | M5-T1 | `mpv_player_properties_test.dart` 增 ≥2 用例；设置往返用例 |
+| M5-T3 ✅（`a539866`） | 歌词与迷你条：`music_lyrics_page.dart` 升级（逐行高亮精度、翻译列）；新建 `lib/pages/player/music_mini_bar.dart`（非播放页常驻迷你条） | M5-T1 | `test/music_lyrics_page_test.dart` 增 ≥3；新增 mini bar 测试 ≥2（`lrc_parser_test.dart` 不动） |
 
 ### M6 插件安全
 
@@ -309,4 +309,6 @@ M3 阶段验收追加：`flutter test` 用例数 ≥ **355 + 45**；`flutter bui
 - **未排期**：iOS 正式进矩阵（签名方案未定）、Flatpak 打包（维持不做）、在线
   字幕联网源（与本地优先纪律冲突，明确不做）。
 - **改向纳入（2026-11-12 用户决策）**：在线元数据联网源由「明确不做」改方向
-  纳入排期，排在第 11 轮，位于本地 NFO/海报（M4-T6，`5fedee0`）之后作联网兜底。
+  纳入排期，排在第 11 轮，位于本地 NFO/海报（M4-T6，`5fedee0`）之后作联网兜底；
+  框架已落地（M4-T7，`eb3b2bf`）：默认关闭、设置中心可开、API key 用户自填，
+  真实联网数据流待用户提供 TMDB key 后实测。

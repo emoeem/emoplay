@@ -6,10 +6,37 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
-## [Unreleased] - R11 施工件 D
+## [Unreleased] - R11（M5 音乐与在线元数据兜底）
+
+> 第 11 轮施工：M5 音乐三任务（循环/队列、replaygain/gapless、歌词与
+> 迷你条）+ 用户改向纳入的在线元数据兜底框架（M4-T7）。全量测试
+> 60 文件 539 用例 + 1 平台条件跳过（2026-11-12 文档窗口实测，明细见
+> docs/releases/RELEASE_2026-11-10_M5_MUSIC_METADATA.md）。
 
 ### Added
 
+- **循环模式三态与音乐队列面板（M5-T1，`2115183`）**：
+  `player_playback_controller.dart:443` 的 `PlaylistMode.none` 硬编码提升
+  为 settings.json `behavior.playlistMode` 三态（none/single/playlist，
+  默认 none = 1.x 现状，追加键 + 默认值/往返用例随行），设置下拉、播放
+  面板菜单、music 形态「播放队列」面板三动线可切；单曲循环走引擎原生
+  loop-file，列表循环刻意不开引擎 `loop-playlist`（media_kit 单 entry
+  装载下会让文件无限自循环、completed 永不到应用层），回卷在应用层
+  （PlaybackSession 事实源 + `resolveQueueNextIndex` 纯决策函数）；新增
+  `test/music_queue_test.dart`（7 用例，验收线 ≥5）。
+- **replaygain 与 gapless（M5-T2，`ec456b3`）**：设置 → 音频「音频属性」
+  分组：响度均衡（ReplayGain）三档 off/track/album（默认 off = 1.x 现状
+  从未写过该属性；off 显式钉 mpv `'no'` 让审计表陈述意图；未知/损坏取值
+  回落不启用；导入 mpv.conf 显式项后写者胜）、`gapless-audio=weak` 钉为
+  全局预置（mpv 默认已是 weak，shipped libmpv 回读实测；防 fork 默认
+  漂移）；1.x 明文遗留项清偿；属性层 live 用例真跑，增益/无缝的听感生效
+  待 SPEC §9 人工验收。
+- **歌词升级与常驻迷你条（M5-T3，`a539866`）**：歌词页首帧定位修复
+  （根因：此前只跟随 lyricIndex 变化，歌词加载晚于首帧时第一行不定位）
+  + 滚动动画时长与滚动距离成比例（120-420 ms 夹紧）+ 翻译列（同时间戳
+  相邻行分组，第一行原文其余译文，行高常量滚动确定性）；常驻迷你条
+  `music_mini_bar.dart`（非播放页底部显示当前曲目/播放暂停/进度，点击回
+  播放页与点 tab 同源；视频条目同样适用，文件名跟随路线图命名）。
 - **在线元数据兜底框架（M4-T7，2026-11-12 用户改向纳入）**：本地
   NFO/海报（M4-T6）之后的联网补全框架轮。`lib/media/online/` 三件：
   provider 接缝、TMDB 适配器骨架（注入 http.Client，测试用 mock 不真连）、
@@ -26,6 +53,16 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   填入有效 TMDB API key 后人工验收（pending）**。新增
   `test/online_meta_service_test.dart`、`test/tmdb_provider_test.dart`、
   `test/library_online_ui_test.dart`，`flutter test` 全量 539 绿。
+
+### 验证
+
+- 本地门（R11 施工/文档窗口实测，2026-11-12 07:00 CST）：`flutter
+  analyze` 0 告警；`flutter test` 60 文件 **539 通过 + 1 平台条件跳过**
+  全绿（1 skip = Windows-only 探针，按设计跳过；新增用例 50 逐文件计数
+  与全量差值 539-489 闭环；真 libmpv live 用例真跑）。
+- CI：R11 四施工提交未推送（ahead 4），推送后预期签名 **539 passed /
+  1 skipped**（未测：远端尚未载入 R11）；v2.2.0-alpha（R10 收口）已
+  公开：main run 43101040926 ✓、release run 43101070581 ✓（11 资产）。
 
 ## [2.2.0-alpha] - 2026-11-12（已发布）
 

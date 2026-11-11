@@ -2,29 +2,79 @@
 
 | 项     | 值                                                                          |
 | ------ | --------------------------------------------------------------------------- |
-| 状态   | 生效中（2026-11-12 R10 M4 媒体库升级轮之后）                                 |
+| 状态   | 生效中（2026-11-12 R11 M5 音乐与在线元数据兜底轮之后）                       |
 | 日期   | 2026-11-12（最后实质性更新）                                                 |
-| 适用版本 | git `5fedee0`（R10 四提交 `c9245f8` / `0da4a95` / `25dd830` / `5fedee0` 未推送；本地 origin/main 跟踪引用在 `e9bf692` = R9 尾提交，2026-11-12 gh 恢复可达窗口实测该点 main CI 绿 run 43069268623） |
-| 相关   | [SPEC.md](SPEC.md)、[EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md)、[R10 工作报告](reports/WORK_REPORT_2026-11-10_M4_MEDIA_LIBRARY.md) |
+| 适用版本 | git `eb3b2bf`（R11 四提交 `2115183` / `ec456b3` / `a539866` / `eb3b2bf` 未推送；本地 origin/main 跟踪引用在 `b87e1c8` = v2.2.0-alpha 发版提交，2026-11-12 文档窗口实测该点 main run 43101040926 ✓ 与 release run 43101070581 ✓，v2.2.0-alpha 已公开 11 资产） |
+| 相关   | [SPEC.md](SPEC.md)、[EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md)、[R11 工作报告](reports/WORK_REPORT_2026-11-10_M5_MUSIC_METADATA.md) |
 
 ## 现状一句话
 
-M1-M8 迁移主流程、R1-R4 四轮收尾、R5-R9 六轮（移动端播放 / 面板观感 /
-卫生与 AppImage / 性能实测与设置收尾 / 3.0 文档三件套 / M3 播放器交互）
-与 R10 M4 媒体库升级轮（3.0 阶段第二批施工：统一 `MediaItem` 模型 +
-ffprobe 元数据缓存、网格四分组、收藏集、目录树、本地 NFO/海报/剧集分组
-用户增补，并清偿 M3-T0 拆分挂账）全部完成：Kazumi 骨架上重建的
+M1-M8 迁移主流程、R1-R10 十轮收尾与施工（移动端播放 / 面板观感 / 卫生与
+AppImage / 性能实测与设置收尾 / 3.0 文档三件套 / M3 播放器交互 / M4 媒体
+库升级：统一 `MediaItem` 模型、元数据缓存、网格四分组、收藏集、目录树、
+本地 NFO/海报/剧集分组）与 R11 M5 音乐与在线元数据兜底轮（M5-T1 循环/
+队列三态 + music 队列面板、M5-T2 replaygain/gapless、M5-T3 歌词升级 +
+常驻迷你条、M4-T7 联网兜底框架默认关）全部完成：Kazumi 骨架上重建的
 Flutter/mpv 本地播放器功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv
-兼容导入 / 画质引擎 / 插件 / 11 类设置 / 更新检查），**v2.1.0-alpha 已
-公开发布**（draft 制人工 publish，11 资产，run 43069322152 矩阵全绿）；
-gh 2026-11-12 窗口恢复可达（R9 尾提交 `e9bf692` 的 main run 43069268623
-绿）；本地 54 个测试文件 489 用例 + 1 平台条件跳过全绿（R10 文档窗口
-实测，含真 libmpv live 用例；无 /tmp 夹具时 perf 基准段与音频探针按
-设计降级）、analyze 0 告警；R10 四提交待推送（ahead 4，推送后预期 CI
-签名 **489 passed / 1 skipped**），版本仍 `2.1.0-alpha+2010000`（未
-bump 未发版），3.0 施工按 EMOPLAY-3.0-ROADMAP 推进中（M3-T0 ✅、M4
-六任务全 ✅ 含 T6 用户增补，M3 剩 T1/T2 收口/T3，下一阶段 M5 音乐，
-第 11 轮联网元数据兜底已由用户决策排期）。
+兼容导入 / 画质引擎 / 插件 / 11 类设置 + 在线元数据 / 更新检查），
+**v2.2.0-alpha 已公开发布**（draft 制人工 publish，11 资产，run
+43101070581 矩阵全绿）；本地 60 个测试文件 539 用例 + 1 平台条件跳过
+全绿（R11 文档窗口实测，含真 libmpv live 用例；无 /tmp 夹具时 perf 基准
+段与音频探针按设计降级）、analyze 0 告警；R11 四提交待推送（ahead 4，
+推送后预期 CI 签名 **539 passed / 1 skipped**），版本仍
+`2.2.0-alpha+2020000`（R11 在 CHANGELOG [Unreleased]，未 bump 未发版），
+3.0 施工按 EMOPLAY-3.0-ROADMAP 推进中（M3-T0 ✅、M4 七任务全 ✅ 含 T7
+框架、M5 三任务全 ✅，下一阶段 M6 插件安全；TMDB 真实联网数据流与
+replaygain/gapless 听感两项目人工验收待用户）。
+
+## 最近实质性变更（R11·M5 音乐与在线元数据兜底，2026-11-12 05:51-06:55 CST 施工 + 文档收网）
+
+四个施工提交（`2115183` 循环/队列、`ec456b3` replaygain+gapless、
+`a539866` 歌词升级+迷你条、`eb3b2bf` 联网兜底框架）+ 本轮文档收网。细节
+与证据见 [发布说明](releases/RELEASE_2026-11-10_M5_MUSIC_METADATA.md) 与
+[轮级工作报告](reports/WORK_REPORT_2026-11-10_M5_MUSIC_METADATA.md)。
+
+- 循环模式三态（M5-T1，`2115183`）：`behavior.playlistMode` 三态
+  （none/single/playlist，默认 none = 1.x 硬编码现状，settings.json 追加
+  键 + 默认/往返用例随行）；单曲循环走引擎原生 loop-file，列表循环
+  **刻意不开**引擎 `loop-playlist`（media_kit `open(Media)` 只装一个
+  entry，引擎回卷会让 completed/eof 永不到应用层、队列无法续播），回卷
+  在应用层：PlaybackSession 事实源 + `resolveQueueNextIndex`
+  （`lib/music/music_queue.dart`）+ PlayerProgressPipeline 推进；music
+  形态「播放队列」底板面板（复用 M3-T3 组件 + 循环模式头部），视频形态
+  维持播放列表面板。
+- 音频属性（M5-T2，`ec456b3`）：设置 → 音频「音频属性」分组：replaygain
+  三档 off/track/album（默认 off = 1.x 现状（从未写过该属性），off 显式
+  钉 mpv `'no'` 让审计表陈述意图）、`gapless-audio=weak` 钉为全局预置
+  （mpv 默认已是 weak，shipped libmpv 回读实测；钉住 = 行为逐位一致 +
+  防 fork 默认漂移）；1.x 明文遗留项清偿（mpv-emo docs/roadmap.md 遗留项）；
+  **听感生效待 SPEC §9 人工验收**（属性层 live 用例只证明接受 + 回读一致）。
+- 歌词与迷你条（M5-T3，`a539866`）：歌词页首帧定位修复（根因：此前只跟随
+  lyricIndex 变化，歌词加载晚于首帧时第一行不定位）+ 滚动动画时长与距离
+  成比例（120-420 ms 夹紧）+ 翻译列（同时间戳相邻行分组、行高常量滚动
+  确定性）；常驻迷你条 `lib/pages/player/music_mini_bar.dart`（非播放页
+  底部，竖屏 NavigationBar 之上 / 横屏 outlet 之下；视频条目同样适用，
+  点击回播放页与点 tab 同一条 `_selectDestination` 路径）。
+- 在线元数据兜底框架（M4-T7，`eb3b2bf`，2026-11-12 用户改向纳入）：
+  五道门禁（总开关关 → 无 key → 本地 NFO 覆盖 → `media_online.json`
+  缓存命中 → 才联网，每道都不发请求）；正命中与明确未命中落盘、传输失败
+  **永不缓存**（网络恢复后可重试）；设置中心「在线元数据」分类（总开关
+  **默认关** + TMDB key 掩码输入，settings.json 增 `online` 段）；NFO
+  详情弹层「联网补全」动作 + badge 拓宽全部视频格子，七种结果优雅提示；
+  可达性实测：api.themoviedb.org curl 0.83s / Dart HttpClient 1.04s，
+  无效 key 恰返 HTTP 401；**真实联网数据流待用户填有效 TMDB key 后人工
+  验收（pending）**。
+- 本轮文档收网：R11 发布说明 + 轮级工作报告 + 本文件刷新 +
+  docs/README.md 索引 + CHANGELOG R11 节（一轮一节，覆盖四个施工件）。
+  **路线图 M4-T7 补哈希 / M5 三任务 ☐→✅+哈希的回填已在工作树**（未提交，
+  随本轮文档提交入库，勾选与四提交逐一相符）。
+- 门禁实测（2026-11-12 07:00 CST 文档窗口）：analyze 0 告警（5.3s）；60
+  文件 **539 通过 / 1 平台条件跳过**全绿（1 skip =
+  `mpv_profile_scanner_test.dart:217` Windows-only 探针；新增用例 50
+  逐文件点数与全量差值 539-489 闭环；真 libmpv live 用例真跑；/tmp 夹具
+  缺失时 perf 基准段按设计降级）；gh 本窗口可达：v2.2.0-alpha main run
+  43101040926 ✓、release run 43101070581 ✓（release 已公开 11 资产）；
+  R11 四提交未推送（ahead 4）。
 
 ## 最近实质性变更（R10·M4 媒体库升级，2026-11-12 03:14-04:50 CST 施工 + 文档收网）
 
@@ -323,32 +373,49 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
     （`<名>-poster.jpg` / poster.jpg / folder.jpg / fanart.jpg，png 变体
     不探测）；剧集只认文件名词边界的 SxxEyy / 1x02（`M4S01E02` 是文件名
     不是剧集，词边界守卫故意如此）；NFO 类型看根元素不看文件名，坏
-    字段跳过不崩；`<thumb>` URL 只记录不抓取（第 11 轮联网兜底未做）。
+    字段跳过不崩；`<thumb>` URL 只记录不抓取（联网兜底框架 M4-T7 已于
+    R11 落地，默认关、真实数据流待 TMDB key 验收）。
     约定不匹配不是 bug，是增补范围的有意收窄。
+15. **列表循环的回卷在应用层，别把它「修」回引擎**：`playlist` 档刻意映射
+    `PlaylistMode.none`（引擎 loop 关）。media_kit `open(Media)` 只向 mpv
+    装一个 entry 的内部 playlist，`loop-playlist=yes` 会让 mpv 无限回卷
+    同一文件、completed/eof 永不到应用层，队列续播随之失效；队列推进走
+    `PlayerProgressPipeline` → `resolveQueueNextIndex`
+    （`lib/music/music_queue.dart` 文件头有完整考证），改队列/循环语义前
+    先读它。
+16. **replaygain / gapless：属性层绿 ≠ 听感生效**：runtime setProperty 被
+    接受且回读一致只到属性层（R11 live 用例），增益 / 无缝的听感属 mpv
+    选项自身契约，SPEC §9 人工验收挂账；off 档刻意显式钉 mpv `'no'`
+    （审计表陈述意图，不靠「没写 = 默认」），导入 mpv.conf 显式项后写者
+    胜（compatOptions 在 build() 最后 addAll，测试锁定）。
+17. **media_online.json 的负缓存语义**：正命中与**明确未命中**都落盘，
+    传输失败（断网 / 超时 / HTTP 错误 / 损坏响应）**永不缓存**（网络恢复
+    后重试）；本地 NFO 覆盖的条目永远不联网。排障先对五道门禁顺序与
+    key 掩码显示（`lib/media/online/online_meta_service.dart` 文件头）。
 
 ## 接手第一步清单
 
 1. `source /opt/emoplay-env.sh && cd /home/emo/code/emoplay && flutter analyze && flutter test`
-    - 预期 0 告警 + 489 通过 / 1 skipped（54 文件，R10 实测底数；1 skip =
+    - 预期 0 告警 + 539 通过 / 1 skipped（60 文件，R11 实测底数；1 skip =
       Windows-only 探针，按设计跳过。真 libmpv live 用例真跑；
       /tmp/emoplay-perf-lib 夹具在场时 4 段基准真跑，缺失时 skip 打印
       降级同样全绿，夹具可用 `tools/gen_perf_fixture.sh` 重建），
       达不到先查环境再查代码。
 2. `git fetch origin && git log origin/main..HEAD --oneline` 与
    `gh run list -R emoeem/emoplay --limit 5`（gh 2026-11-12 窗口恢复
-   可达，但属窗口性） - 确认 R10 四提交（`c9245f8` / `0da4a95` /
-   `25dd830` / `5fedee0`）与本轮文档（含路线图工作树回填）是否已推送、
-   推送后 CI 是否 **489 passed / 1 skipped**；红灯按坑 2 的归因链处理。
+   可达，但属窗口性） - 确认 R11 四提交（`2115183` / `ec456b3` /
+   `a539866` / `eb3b2bf`）与本轮文档（含路线图工作树回填）是否已推送、
+   推送后 CI 是否 **539 passed / 1 skipped**；红灯按坑 2 的归因链处理。
 3. 通读 [SPEC.md](SPEC.md) §4 不变量与 [PORT-MAP.md](PORT-MAP.md) 头部铁律；
    3.0 施工任务从 [EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md) §五取
-   （M4 六任务全 ✅；M3 剩 T1 帧预览 / T2 刻度收口 / T3 面板；下一阶段
-   M5 音乐（T1 依赖 M4-T0 已清）；第 11 轮联网元数据兜底按 §六改向
-   注记排期）。
+   （M4 七任务全 ✅ 含 T7 框架、M5 三任务全 ✅；M3 剩 T1 帧预览 / T2
+   刻度收口 / T3 面板；下一阶段 M6 插件安全；TMDB 真实联网数据流与
+   replaygain/gapless 听感两项目人工验收待用户，见 R11 报告 §5）。
 4. 2.0 尾巴从 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) §四
    未做项清单取（发布产物实体机验证 → prerelease 语义 → i18n 其余设置页
    → 签名/公证；性能实测已 R7 ✅、AppImage 打包已 R6 `e1a2df0` 落地，
    路线图 §四 与 R3-R7 轮次表的勾选态以路线图下次收网为准），以及
-   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_M4_MEDIA_LIBRARY.md)
+   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_M5_MUSIC_METADATA.md)
    的优先级建议。
 5. 改完代码跑 SPEC §9 gate（build_runner → analyze → test → build linux）。
 
