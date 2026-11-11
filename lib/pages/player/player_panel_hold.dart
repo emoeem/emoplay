@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:emoplay/bean/widget/emo_menu.dart';
+import 'package:emoplay/pages/player/player_controller.dart';
 
 /// A one-shot lease that keeps the player panel visible until released.
 class PlayerPanelHold {
@@ -173,5 +176,113 @@ class _PlayerPanelHoldMenuAnchorState extends State<PlayerPanelHoldMenuAnchor> {
       builder: widget.builder,
       menuChildren: widget.menuChildren,
     );
+  }
+}
+
+/// Panel visibility + hold registry extracted from player_item.dart (M3-T0
+/// god-class split; pure move, no behavior change).
+///
+/// Owns the show/hide animation, the hide countdown and the one-shot leases
+/// that keep the panel visible (progress-bar drag, menus, screenshot sheet).
+/// The hosting state creates the [AnimationController] (it owns the
+/// TickerProvider) and hands it in.
+class PlayerPanelHoldRegistry {
+  PlayerPanelHoldRegistry({
+    required this.host,
+    required this.playerController,
+    required this.panelVisibility,
+    required this.hideDelayMs,
+  });
+
+  /// Hosting player state; only [State.mounted] is used inside the hide timer.
+  final State host;
+  final PlayerController playerController;
+
+  /// The forwarded/reversed panel visibility animation; the panel widget
+  /// receives it as panelVisibilityController (player_item build).
+  final AnimationController panelVisibility;
+
+  /// Auto-hide delay in milliseconds
+  /// (SettingsKeys.playerControllerLayerDisappearTime, read at initState).
+  final int hideDelayMs;
+
+  final Set<PlayerPanelHold> _playerPanelHolds = <PlayerPanelHold>{};
+  Timer? _hideTimer;
+
+  bool get canHidePlayerPanel =>
+      playerController.panel.canHidePlayerPanel && _playerPanelHolds.isEmpty;
+
+  void showVideoController({bool restartHideTimer = true}) {
+    // Re-forwarding restarts the ticker and stalls a frame, so hover must not.
+    if (!panelVisibility.isForwardOrCompleted) {
+      panelVisibility.forward();
+    }
+    playerController.panel.showVideoController = true;
+    if (restartHideTimer && canHidePlayerPanel) {
+      _startHideTimer();
+    }
+  }
+
+  void hideVideoController() {
+    if (!canHidePlayerPanel) {
+      return;
+    }
+    panelVisibility.reverse();
+    _cancelHideTimer();
+    playerController.panel.showVideoController = false;
+  }
+
+  PlayerPanelHold acquirePlayerPanelHold() {
+    late final PlayerPanelHold hold;
+    hold = PlayerPanelHold(
+      onRelease: () {
+        _playerPanelHolds.remove(hold);
+        if (_playerPanelHolds.isNotEmpty) {
+          return;
+        }
+        playerController.panel.canHidePlayerPanel = true;
+        _startHideTimer();
+      },
+    );
+    _playerPanelHolds.add(hold);
+    playerController.panel.canHidePlayerPanel = false;
+    _cancelHideTimer();
+    showVideoController(restartHideTimer: false);
+    return hold;
+  }
+
+  // Fullscreen and system overlays can dispose controls before their holds are released.
+  // (The progress-bar drag hold lives in PlayerProgressPipeline; releasing it
+  // silently here makes its later release() a no-op, same as before.)
+  void releaseAllHolds() {
+    for (final hold in _playerPanelHolds.toList()) {
+      hold.releaseSilently();
+    }
+    _playerPanelHolds.clear();
+    playerController.panel.canHidePlayerPanel = true;
+    _startHideTimer();
+  }
+
+  void _startHideTimer() {
+    _cancelHideTimer();
+    if (!canHidePlayerPanel) {
+      return;
+    }
+    _hideTimer = Timer(Duration(milliseconds: hideDelayMs), () {
+      if (host.mounted) {
+        hideVideoController();
+      }
+      _hideTimer = null;
+    });
+  }
+
+  void _cancelHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = null;
+  }
+
+  /// Cancels the hide timer (player_item dispose).
+  void dispose() {
+    _hideTimer?.cancel();
   }
 }

@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:emoplay/pages/player/controller/player_subtitles_model.dart';
+import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/utils/format.dart';
 
 enum PlayerAdjustmentHudType {
@@ -1181,4 +1185,165 @@ class _PlayerAbLoopHudState extends State<PlayerAbLoopHud> {
       ),
     );
   }
+}
+
+/// Adjustment-HUD scheduling extracted from player_item.dart (M3-T0 god-class
+/// split; pure move, no behavior change).
+///
+/// Owns the mutual-exclusion flags for the volume/brightness/sub-delay HUDs
+/// plus the auto-hide timer and the mouse-wheel volume display timer. The
+/// hosting state disposes this in its own dispose.
+class PlayerAdjustmentHudScheduler {
+  PlayerAdjustmentHudScheduler({
+    required this.host,
+    required this.playerController,
+    required this.brightnessVolumeGesture,
+  });
+
+  /// Hosting player state; only [State.mounted] is used inside timer
+  /// callbacks (same guarded writes as the original inline closures).
+  final State host;
+  final PlayerController playerController;
+
+  /// Whether the vertical drag may adjust brightness/volume at all
+  /// (SettingsKeys.brightnessVolumeGesture, read once at initState).
+  final bool brightnessVolumeGesture;
+
+  Timer? _adjustmentHudHideTimer;
+  Timer? _mouseScrollerTimer;
+
+  /// Mouse-wheel volume: show the volume HUD for 2s after the last scroll
+  /// (player_item _handleMouseScroller).
+  void handleMouseScroller() {
+    playerController.panel.showVolume = true;
+    _mouseScrollerTimer?.cancel();
+    _mouseScrollerTimer = Timer(const Duration(seconds: 2), () {
+      if (host.mounted) {
+        playerController.panel.showVolume = false;
+      }
+      _mouseScrollerTimer = null;
+    });
+  }
+
+  void cancelAdjustmentHudHideTimer() {
+    _adjustmentHudHideTimer?.cancel();
+    _adjustmentHudHideTimer = null;
+  }
+
+  void showVolumeAdjustmentHud() {
+    cancelAdjustmentHudHideTimer();
+    playerController.panel.showBrightness = false;
+    playerController.panel.showSubDelay = false;
+    playerController.panel.showAbLoop = false;
+    playerController.panel.showVolume = true;
+  }
+
+  void showBrightnessAdjustmentHud() {
+    cancelAdjustmentHudHideTimer();
+    playerController.panel.showVolume = false;
+    playerController.panel.showSubDelay = false;
+    playerController.panel.showAbLoop = false;
+    playerController.panel.showBrightness = true;
+  }
+
+  /// M3 字幕管理：sub-delay 步进后的 HUD（Kazumi PlayerSpeedHud 同款顶部队
+  /// 列；与其余调节浮层互斥）。
+  void showSubDelayAdjustmentHud() {
+    cancelAdjustmentHudHideTimer();
+    playerController.panel.showVolume = false;
+    playerController.panel.showBrightness = false;
+    playerController.panel.showPlaySpeed = false;
+    playerController.panel.showAbLoop = false;
+    playerController.panel.showSubDelay = true;
+  }
+
+  void scheduleAdjustmentHudHide({
+    Duration delay = const Duration(milliseconds: 650),
+  }) {
+    cancelAdjustmentHudHideTimer();
+    _adjustmentHudHideTimer = Timer(delay, () {
+      if (host.mounted) {
+        playerController.panel.showVolume = false;
+        playerController.panel.showBrightness = false;
+        playerController.panel.showSubDelay = false;
+        playerController.panel.showAbLoop = false;
+      }
+      _adjustmentHudHideTimer = null;
+    });
+  }
+
+  /// End of the brightness/volume vertical drag (player_item
+  /// _finishAdjustmentGesture).
+  void finishAdjustmentGesture() {
+    if (!brightnessVolumeGesture) {
+      return;
+    }
+    if (playerController.panel.volumeSeeking) {
+      playerController.panel.volumeSeeking = false;
+      unawaited(playerController.finishVolumeGesture());
+    }
+    if (playerController.panel.brightnessSeeking) {
+      playerController.panel.brightnessSeeking = false;
+    }
+    scheduleAdjustmentHudHide();
+  }
+
+  /// Cancels the timers the player state used to cancel in its dispose.
+  void dispose() {
+    _mouseScrollerTimer?.cancel();
+    _adjustmentHudHideTimer?.cancel();
+  }
+}
+
+/// The three top-center adjustment HUD layers (speed / sub-delay / A-B loop)
+/// exactly as they sat inline in the player_item build Stack (M3-T0 pure
+/// move). Observable reads stay inside each [Observer], so subscriptions are
+/// unchanged; call inside a Stack's children.
+List<Widget> playerAdjustmentHudLayers({
+  required PlayerController playerController,
+  required bool disableAnimations,
+}) {
+  return [
+    // Long-press / shortcut speed feedback (Kazumi
+    // PlayerSpeedHud, mounted top-center like the panel).
+    Positioned(
+      top: 25,
+      left: 0,
+      right: 0,
+      child: Observer(
+        builder: (context) => PlayerSpeedHud(
+          visible: playerController.panel.showPlaySpeed,
+          speed: playerController.playback.playerSpeed,
+          disableAnimations: disableAnimations,
+        ),
+      ),
+    ),
+    // M3 字幕管理：sub-delay 步进反馈（同款顶部队列）。
+    Positioned(
+      top: 25,
+      left: 0,
+      right: 0,
+      child: Observer(
+        builder: (context) => PlayerSubDelayHud(
+          visible: playerController.panel.showSubDelay,
+          delay: playerController.subtitles.subDelay,
+          disableAnimations: disableAnimations,
+        ),
+      ),
+    ),
+    // M3 施工件 C：A-B 循环三态反馈（设 A → 设 B → 清除，
+    // 拒绝原因也走这里；同款顶部队列）。
+    Positioned(
+      top: 25,
+      left: 0,
+      right: 0,
+      child: Observer(
+        builder: (context) => PlayerAbLoopHud(
+          visible: playerController.panel.showAbLoop,
+          text: playerController.panel.abLoopHudText,
+          disableAnimations: disableAnimations,
+        ),
+      ),
+    ),
+  ];
 }
