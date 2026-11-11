@@ -33,6 +33,24 @@
 //     gpu-shader-cache-dir, icc-cache-dir, demuxer-cache-dir) are accepted
 //     and effective; the redirects below therefore DO take effect at this
 //     layer.
+//
+// M3-T2 章节属性读取考证（2026-11-11，同一 libmpv + fork 源码，read-only）：
+// chapter-list / chapter 不是本预置表的条目（二者是只读运行时属性，无需
+// setProperty），读取通道是 NativePlayer.observeProperty —— fork 以
+// MPV_FORMAT_NONE 注册观察，事件到达后用 readNativeString（即
+// MPV_FORMAT_STRING）回读并把字符串交给监听器（real.dart `_handler`；
+// 值不可用时 readNativeString 返回 null，监听器不触发）。字符串形态实测：
+//   * chapter-list 序列化为 JSON 节点：`[{"title":"…","time":0.000000},…]`，
+//     无章节文件为 `[]`；解析在 lib/pages/player/controller/chapters_model.dart
+//     （非该 JSON 形态——例如旧 mpv 的 %len% 转义打印——降级为空章节表）。
+//   * chapter 为整数字符串（"0"、"1"，不可用时读回空串；属性本身定义为
+//     "not always available" 时为 -1）。
+//   * 观察 attach 在 player.open 之后仍可靠：mpv 对每个观察属性都会先发
+//     一次初始事件，文件加载完成后的值不丢。
+//   * 测试通道注意：fork 预置 vid=no（real.dart `_create`，"prevent
+//     redundant video decoding"，VideoController attach 时才恢复 auto），
+//     headless 测试里只有视频轨的文件会 "No video or audio streams
+//     selected" 直接卸载——live 夹具须带音频轨（或显式 vid=auto）。
 
 import 'package:media_kit/media_kit.dart';
 

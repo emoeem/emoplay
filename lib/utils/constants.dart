@@ -180,6 +180,9 @@ final Map<String, List<String>> defaultShortcuts = const {
   'speed3': ['3'],
   'speedup': ['X'],
   'speeddown': ['Z'],
+  // M3-T2 章节导航：上一章/下一章（无章节的文件上静默无操作）。
+  'nextchapter': ['Page Down'],
+  'prevchapter': ['Page Up'],
 };
 
 // 键位别名
@@ -189,6 +192,8 @@ final Map<String, String> keyAliases = {
   'Arrow Down': '↓',
   'Arrow Left': '←',
   'Arrow Right': '→',
+  'Page Up': 'PgUp',
+  'Page Down': 'PgDn',
   'Enter': '回车',
   'Tab': 'Tab',
   'Escape': 'Esc',
@@ -214,4 +219,6 @@ final Map<String, String> shortcutsChineseName = {
   'speed3': '倍速：3x',
   'speedup': '倍速加',
   'speeddown': '倍速减',
+  'nextchapter': '下一章',
+  'prevchapter': '上一章',
 };

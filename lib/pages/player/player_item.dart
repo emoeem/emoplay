@@ -373,6 +373,9 @@ class _PlayerItemState extends State<PlayerItem>
       'speed3': () => setPlaybackSpeed(3.0),
       'speedup': () => handleSpeedChange('up'),
       'speeddown': () => handleSpeedChange('down'),
+      // M3-T2 章节导航：无章节的文件上这两个动作是安全的空操作。
+      'nextchapter': () => playerController.chapters.nextChapter(),
+      'prevchapter': () => playerController.chapters.previousChapter(),
     };
     keyboardLongPressActions = {
       'forward': PlayerLongPressShortcutActions(

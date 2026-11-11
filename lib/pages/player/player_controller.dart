@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:emoplay/media/media_classifier.dart';
 import 'package:emoplay/services/player/external_playback_launcher.dart';
+import 'package:emoplay/pages/player/controller/player_chapters_controller.dart';
 import 'package:emoplay/pages/player/controller/player_debug_controller.dart';
 import 'package:emoplay/pages/player/controller/player_models.dart';
 import 'package:emoplay/pages/player/controller/player_seek_controller.dart';
@@ -48,6 +49,12 @@ class PlayerController implements Disposable {
     pause: pause,
     play: play,
     onSeekCompleted: _onSeekCompleted,
+  );
+
+  /// M3-T2 章节导航：mpv chapter-list/chapter 属性观察与章节跳转状态。
+  late final PlayerChaptersController chapters = PlayerChaptersController(
+    seek: seek,
+    position: () => playback.currentPosition,
   );
   late final ExternalPlaybackLauncher externalPlayback =
       ExternalPlaybackLauncher(
@@ -187,6 +194,13 @@ class PlayerController implements Disposable {
       return false;
     }
     if (player == null || !_ownsInitialization(initialization, player)) {
+      return false;
+    }
+
+    // M3-T2 章节导航：挂上 chapter-list/chapter 观察（attach 自带幂等与
+    // 失败降级；open 之后挂仍会收到 mpv 的初始观察事件）。
+    await chapters.attach(player);
+    if (!_ownsInitialization(initialization, player)) {
       return false;
     }
 
@@ -362,6 +376,8 @@ class PlayerController implements Disposable {
     hideVolumeUITimer?.cancel();
     _volumeGestureSyncTimer?.cancel();
     FlutterVolumeController.removeListener();
+    // M3-T2：摘掉章节观察并清空章节状态（下一个文件 init 时重新挂）。
+    await chapters.detach();
     await Future.wait([
       audioController.deactivate(),
       playback.stop(),

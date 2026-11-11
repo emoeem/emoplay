@@ -10,6 +10,7 @@ import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/emo_menu.dart';
 import 'package:emoplay/bean/widget/embedded_native_control_area.dart';
 import 'package:emoplay/bean/widget/play_pause_icon.dart';
+import 'package:emoplay/pages/player/chapters_sheet.dart';
 import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/pages/player/player_panel_hold.dart';
 import 'package:emoplay/pages/player/player_progress_bar.dart';
@@ -482,6 +483,13 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
         onPressed: () => _openMenu(_showPlaylistSheet),
         label: '播放列表',
       ),
+      // M3-T2 章节导航：无章节的文件不显示入口（读取该 observable 的面板
+      // Observer 会在章节加载/清空时自动重建菜单）。
+      if (widget.playerController.chapters.hasChapters)
+        EmoMenuItem(
+          onPressed: () => _openMenu(_showChaptersSheet),
+          label: '章节',
+        ),
       EmoMenuItem(
         onPressed: widget.onPrevItem,
         label: '上一集',
@@ -564,6 +572,13 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
         widget.keyboardFocus.requestFocus();
       }
     }
+  }
+
+  Future<void> _showChaptersSheet() {
+    return showChaptersSheet(
+      context,
+      chapters: widget.playerController.chapters,
+    );
   }
 
   Future<void> _showPlaylistSheet() {
