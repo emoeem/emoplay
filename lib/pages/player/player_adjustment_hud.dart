@@ -1056,3 +1056,129 @@ class _PlayerSubDelayHudState extends State<PlayerSubDelayHud> {
     );
   }
 }
+
+/// A-B loop feedback pill (M3 施工件 C「A-B 循环」): the PlayerSubDelayHud
+/// shape re-used for the 设 A → 设 B → 清除 cycle — a small top-center
+/// surface pill with the outcome text (new state or rejection reason), shown
+/// briefly after each step. Keyboard (L) and the panel menu entry both land
+/// here via PlayerController.cycleAbLoop.
+class PlayerAbLoopHud extends StatefulWidget {
+  const PlayerAbLoopHud({
+    super.key,
+    required this.visible,
+    required this.text,
+    this.disableAnimations = false,
+  });
+
+  final bool visible;
+  final String text;
+  final bool disableAnimations;
+
+  @override
+  State<PlayerAbLoopHud> createState() => _PlayerAbLoopHudState();
+}
+
+class _PlayerAbLoopHudState extends State<PlayerAbLoopHud> {
+  late String _displayText;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayText = widget.text;
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayerAbLoopHud oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.visible) {
+      _displayText = widget.text;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final container = colorScheme.inverseSurface;
+    final onContainer = colorScheme.onInverseSurface;
+    final surface = colorScheme.surfaceContainerHighest;
+    final border = colorScheme.outlineVariant.withValues(alpha: 0.22);
+    final duration = widget.disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 160);
+
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: widget.visible ? 1 : 0,
+        duration: duration,
+        curve: Curves.easeOutCubic,
+        child: AnimatedSlide(
+          offset: widget.visible ? Offset.zero : const Offset(0, -0.12),
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          child: AnimatedScale(
+            scale: widget.visible ? 1 : 0.96,
+            duration: duration,
+            curve: Curves.easeOutCubic,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              // Avoid BackdropFilter/ImageFilter.blur: it can trigger Impeller
+              // native aborts when HUD saveLayers are drawn over video output.
+              // See flutter/flutter#185506.
+              child: AnimatedContainer(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                width: 190,
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: duration,
+                      curve: Curves.easeOutCubic,
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: container,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.repeat_rounded,
+                        color: onContainer,
+                        size: 15,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _displayText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

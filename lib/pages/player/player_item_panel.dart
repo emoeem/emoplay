@@ -11,6 +11,7 @@ import 'package:emoplay/bean/widget/emo_menu.dart';
 import 'package:emoplay/bean/widget/embedded_native_control_area.dart';
 import 'package:emoplay/bean/widget/play_pause_icon.dart';
 import 'package:emoplay/pages/player/chapters_sheet.dart';
+import 'package:emoplay/pages/player/controller/ab_loop_model.dart';
 import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/pages/player/player_panel_hold.dart';
 import 'package:emoplay/pages/player/player_progress_bar.dart';
@@ -170,6 +171,10 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
                 playing: widget.playerController.playback.playing,
               ),
             ),
+            // M3 施工件 C「逐帧」：暂停态才显示的上一帧/下一帧按钮（mpv
+            // OSC 惯例位：播放键两侧），播放/加载中整对隐藏。
+            frameStepBack: _frameStepButton(forward: false),
+            frameStepForward: _frameStepButton(forward: true),
             nextEpisode: IconButton(
               color: Colors.white,
               icon: const Icon(Icons.skip_next_rounded),
@@ -204,6 +209,31 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
           ),
         ),
       );
+
+  /// M3 施工件 C「逐帧」：单帧步进按钮。仅暂停且媒体已加载（duration > 0）
+  /// 时显示；播放中 mpv 的 frame-step 会先暂停，但按钮跟随暂停态显隐可以让
+  /// 入口语义保持"暂停后逐帧检查"。
+  Widget _frameStepButton({required bool forward}) {
+    return Observer(
+      builder: (context) {
+        final playback = widget.playerController.playback;
+        final visible = !playback.playing && playback.duration > Duration.zero;
+        if (!visible) {
+          return const SizedBox.shrink();
+        }
+        return IconButton(
+          color: Colors.white,
+          icon: Icon(
+            forward
+                ? Icons.navigate_next_rounded
+                : Icons.navigate_before_rounded,
+          ),
+          tooltip: forward ? '下一帧（.）' : '上一帧（,）',
+          onPressed: () => widget.playerController.frameStep(forward ? 1 : -1),
+        );
+      },
+    );
+  }
 
   Widget _buildFullscreenButton(bool compact) {
     if (widget.playerPageController.isPip) {
@@ -466,6 +496,19 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
 
   // ---- "more" menu (Kazumi menuChildren minus danmaku/syncplay, plus our
   // local entries: playlist / prev item / subtitle / mobile screenshots / lock)
+  /// M3 施工件 C「A-B 循环」：菜单标签随三态变化（打开菜单时才构建，读到
+  /// 的 phase 即当前值）。
+  String get _abLoopMenuLabel {
+    final abLoop = widget.playerController.abLoop;
+    return switch (abLoop.phase) {
+      PlayerAbLoopPhase.none => 'A-B 循环：设 A 点',
+      PlayerAbLoopPhase.aSet =>
+        'A-B 循环：设 B 点（A ${formatAbLoopPosition(abLoop.positionA ?? 0)}）',
+      PlayerAbLoopPhase.looping =>
+        'A-B 循环：清除（${formatAbLoopPosition(abLoop.positionA ?? 0)} → ${formatAbLoopPosition(abLoop.positionB ?? 0)}）',
+    };
+  }
+
   List<Widget> _moreMenuItems(bool compact) {
     final panel = widget.playerController.panel;
     return [
@@ -499,6 +542,12 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
       EmoMenuItem(
         onPressed: widget.onPrevItem,
         label: '上一集',
+      ),
+      // M3 施工件 C「A-B 循环」：三态入口（设 A → 设 B → 清除），标签随
+      // 当前阶段变化；拒绝（B 早于 A 等）由 HUD 反馈。
+      EmoMenuItem(
+        onPressed: () => widget.playerController.cycleAbLoop(),
+        label: _abLoopMenuLabel,
       ),
       EmoMenuItem(
         onPressed: widget.showVideoInfo,

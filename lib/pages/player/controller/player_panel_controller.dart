@@ -37,6 +37,14 @@ abstract class _PlayerPanelController with Store {
   @observable
   bool showSubDelay = false;
 
+  /// M3 施工件 C：A-B 循环状态变更后的 HUD 反馈（PlayerAbLoopHud）。
+  @observable
+  bool showAbLoop = false;
+
+  /// A-B 循环 HUD 的一行文案（新状态或拒绝原因）。
+  @observable
+  String abLoopHudText = '';
+
   /// Double-tap seek overlays (PiliPlus view.dart mountSeekBackwardButton /
   /// mountSeekForwardButton, rewritten as MobX observables).
   @observable
@@ -61,6 +69,8 @@ abstract class _PlayerPanelController with Store {
     showVolume = false;
     showPlaySpeed = false;
     showSubDelay = false;
+    showAbLoop = false;
+    abLoopHudText = '';
     showSeekBackwardOverlay = false;
     showSeekForwardOverlay = false;
     brightnessSeeking = false;

@@ -189,6 +189,17 @@ final Map<String, List<String>> defaultShortcuts = const {
   // （SPEC §10 取 Kazumi 现状）——取 mpv z/x 邻位的 C/V 承接 -/+。
   'subdelaydown': ['C'],
   'subdelayup': ['V'],
+  // M3 施工件 C「A-B 循环 + 逐帧」：三键全部沿用 mpv 内置 input.conf 惯例，
+  // 无一冲突——
+  //   * L → A-B 循环三态（设 A → 设 B → 清除）：2.0 defaultShortcuts 未用
+  //     L；1.x 的应用级 Shortcut 表（mpv-emo Main.qml L471-508）同样没有
+  //     L，当年该键经 Main.qml L109-125 的未消费按键转发落到 mpv 内置绑定
+  //     （L=ab-loop）生效——本条等于把 1.x 的实际行为在 Flutter 层显式化。
+  //   * '.' / ',' → frame-step / frame-back-step：两张键位表均未占用，
+  //     mpv 0.38.0 起的内置惯例原样沿用。
+  'abloop': ['L'],
+  'framestep': ['.'],
+  'framebackstep': [','],
 };
 
 // 键位别名
@@ -229,4 +240,7 @@ final Map<String, String> shortcutsChineseName = {
   'prevchapter': '上一章',
   'subdelaydown': '字幕延迟减（-0.5s）',
   'subdelayup': '字幕延迟加（+0.5s）',
+  'abloop': 'A-B 循环（设 A → 设 B → 清除）',
+  'framestep': '逐帧：下一帧',
+  'framebackstep': '逐帧：上一帧',
 };

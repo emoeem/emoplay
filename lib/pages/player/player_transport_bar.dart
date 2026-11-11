@@ -25,6 +25,8 @@ class PlayerTransportBar extends StatelessWidget {
     required this.timePlacement,
     required this.controls,
     required this.fullscreen,
+    this.frameStepBack,
+    this.frameStepForward,
   });
 
   final bool compact;
@@ -35,6 +37,12 @@ class PlayerTransportBar extends StatelessWidget {
   final PlayerTimeLabelPlacement timePlacement;
   final Widget controls;
   final Widget fullscreen;
+
+  /// M3 施工件 C「逐帧」：暂停态显示的上一帧/下一帧按钮（mpv OSC 的
+  /// frame-step 惯例位：上一帧在播放键左侧、下一帧在播放键右侧）；null 时
+  /// 完全不占位。播放态由调用方传 null 隐藏。
+  final Widget? frameStepBack;
+  final Widget? frameStepForward;
 
   @override
   Widget build(BuildContext context) => compact
@@ -63,7 +71,9 @@ class PlayerTransportBar extends StatelessWidget {
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(children: [
+                  ?frameStepBack,
                   playPause,
+                  ?frameStepForward,
                   nextEpisode,
                   if (timePlacement ==
                       PlayerTimeLabelPlacement.afterPlaybackButtons)

@@ -379,6 +379,10 @@ class _PlayerItemState extends State<PlayerItem>
       // M3-T2 章节导航：无章节的文件上这两个动作是安全的空操作。
       'nextchapter': () => playerController.chapters.nextChapter(),
       'prevchapter': () => playerController.chapters.previousChapter(),
+      // M3 施工件 C「A-B 循环 + 逐帧」：无播放器时均为安全空操作。
+      'abloop': () => playerController.cycleAbLoop(),
+      'framestep': () => playerController.frameStep(1),
+      'framebackstep': () => playerController.frameStep(-1),
     };
     keyboardLongPressActions = {
       'forward': PlayerLongPressShortcutActions(
@@ -458,6 +462,7 @@ class _PlayerItemState extends State<PlayerItem>
         defaultShortcutForwardPlaySpeed) {
       playerController.panel
         ..showSubDelay = false
+        ..showAbLoop = false
         ..showPlaySpeed = true;
       await setPlaybackSpeed(defaultShortcutForwardPlaySpeed);
     }
@@ -583,6 +588,7 @@ class _PlayerItemState extends State<PlayerItem>
     _cancelAdjustmentHudHideTimer();
     playerController.panel.showBrightness = false;
     playerController.panel.showSubDelay = false;
+    playerController.panel.showAbLoop = false;
     playerController.panel.showVolume = true;
   }
 
@@ -590,6 +596,7 @@ class _PlayerItemState extends State<PlayerItem>
     _cancelAdjustmentHudHideTimer();
     playerController.panel.showVolume = false;
     playerController.panel.showSubDelay = false;
+    playerController.panel.showAbLoop = false;
     playerController.panel.showBrightness = true;
   }
 
@@ -600,6 +607,7 @@ class _PlayerItemState extends State<PlayerItem>
     playerController.panel.showVolume = false;
     playerController.panel.showBrightness = false;
     playerController.panel.showPlaySpeed = false;
+    playerController.panel.showAbLoop = false;
     playerController.panel.showSubDelay = true;
   }
 
@@ -612,6 +620,7 @@ class _PlayerItemState extends State<PlayerItem>
         playerController.panel.showVolume = false;
         playerController.panel.showBrightness = false;
         playerController.panel.showSubDelay = false;
+        playerController.panel.showAbLoop = false;
       }
       _adjustmentHudHideTimer = null;
     });
@@ -1381,6 +1390,7 @@ class _PlayerItemState extends State<PlayerItem>
                           _longPressSpeedEngaged = true;
                           playerController.panel
                             ..showSubDelay = false
+                            ..showAbLoop = false
                             ..showPlaySpeed = true;
                         });
                         lastPlayerSpeed = playerController.playback.playerSpeed;
@@ -1443,6 +1453,20 @@ class _PlayerItemState extends State<PlayerItem>
                         builder: (context) => PlayerSubDelayHud(
                           visible: playerController.panel.showSubDelay,
                           delay: playerController.subtitles.subDelay,
+                          disableAnimations: widget.disableAnimations,
+                        ),
+                      ),
+                    ),
+                    // M3 施工件 C：A-B 循环三态反馈（设 A → 设 B → 清除，
+                    // 拒绝原因也走这里；同款顶部队列）。
+                    Positioned(
+                      top: 25,
+                      left: 0,
+                      right: 0,
+                      child: Observer(
+                        builder: (context) => PlayerAbLoopHud(
+                          visible: playerController.panel.showAbLoop,
+                          text: playerController.panel.abLoopHudText,
                           disableAnimations: widget.disableAnimations,
                         ),
                       ),

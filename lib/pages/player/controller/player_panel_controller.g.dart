@@ -189,6 +189,42 @@ mixin _$PlayerPanelController on _PlayerPanelController, Store {
     });
   }
 
+  late final _$showAbLoopAtom = Atom(
+    name: '_PlayerPanelController.showAbLoop',
+    context: context,
+  );
+
+  @override
+  bool get showAbLoop {
+    _$showAbLoopAtom.reportRead();
+    return super.showAbLoop;
+  }
+
+  @override
+  set showAbLoop(bool value) {
+    _$showAbLoopAtom.reportWrite(value, super.showAbLoop, () {
+      super.showAbLoop = value;
+    });
+  }
+
+  late final _$abLoopHudTextAtom = Atom(
+    name: '_PlayerPanelController.abLoopHudText',
+    context: context,
+  );
+
+  @override
+  String get abLoopHudText {
+    _$abLoopHudTextAtom.reportRead();
+    return super.abLoopHudText;
+  }
+
+  @override
+  set abLoopHudText(String value) {
+    _$abLoopHudTextAtom.reportWrite(value, super.abLoopHudText, () {
+      super.abLoopHudText = value;
+    });
+  }
+
   late final _$showSeekBackwardOverlayAtom = Atom(
     name: '_PlayerPanelController.showSeekBackwardOverlay',
     context: context,
@@ -317,6 +353,8 @@ showBrightness: ${showBrightness},
 showVolume: ${showVolume},
 showPlaySpeed: ${showPlaySpeed},
 showSubDelay: ${showSubDelay},
+showAbLoop: ${showAbLoop},
+abLoopHudText: ${abLoopHudText},
 showSeekBackwardOverlay: ${showSeekBackwardOverlay},
 showSeekForwardOverlay: ${showSeekForwardOverlay},
 brightnessSeeking: ${brightnessSeeking},

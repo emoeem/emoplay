@@ -5,8 +5,11 @@ import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:emoplay/services/player/external_playback_launcher.dart';
+import 'package:emoplay/pages/player/controller/ab_loop_model.dart';
+import 'package:emoplay/pages/player/controller/player_ab_loop_controller.dart';
 import 'package:emoplay/pages/player/controller/player_chapters_controller.dart';
 import 'package:emoplay/pages/player/controller/player_debug_controller.dart';
+import 'package:emoplay/pages/player/controller/player_frame_step_controller.dart';
 import 'package:emoplay/pages/player/controller/player_models.dart';
 import 'package:emoplay/pages/player/controller/player_seek_controller.dart';
 import 'package:emoplay/pages/player/controller/player_subtitles_controller.dart';
@@ -60,10 +63,33 @@ class PlayerController implements Disposable {
   /// M3 字幕管理：track-list/sid 观察、外挂字幕 sub-add 命令面与 sub-delay
   /// 步进状态。
   late final PlayerSubtitlesController subtitles = PlayerSubtitlesController();
+
+  /// M3 施工件 C「A-B 循环」：ab-loop-a/b 属性观察与设 A→设 B→清除三态命令面
+  /// （位置取 playerPosition 的实时读取，秒）。
+  late final PlayerAbLoopController abLoop = PlayerAbLoopController(
+    position: () => playback.playerPosition.inMilliseconds / 1000.0,
+  );
+
+  /// M3 施工件 C「逐帧」：frame-step / frame-back-step 命令面。
+  late final PlayerFrameStepController frameSteps = PlayerFrameStepController(
+    platform: _nativePlatform,
+  );
+
   late final ExternalPlaybackLauncher externalPlayback =
       ExternalPlaybackLauncher(
     videoUrl: () => videoUrl,
   );
+
+  Timer? _abLoopHudTimer;
+
+  NativePlayer? _nativePlatform() {
+    final player = playback.mediaPlayer;
+    if (player == null) {
+      return null;
+    }
+    final platform = player.platform;
+    return platform is NativePlayer ? platform : null;
+  }
 
   late String referer = '';
   String? coverUrl;
@@ -213,6 +239,12 @@ class PlayerController implements Disposable {
     if (!_ownsInitialization(initialization, player)) {
       return false;
     }
+    // M3 施工件 C：挂 ab-loop-a/b 属性观察（换文件后循环区间不延续，mpv 在
+    // 新文件的初始观察事件里报回 no，本地 marks 随之复位）。
+    await abLoop.attach(player);
+    if (!_ownsInitialization(initialization, player)) {
+      return false;
+    }
 
     if (isDesktop()) {
       final freshStart = playback.volume == -1;
@@ -315,6 +347,59 @@ class PlayerController implements Disposable {
     await playback.playOrPause(pause: pause, play: play);
   }
 
+  /// M3 施工件 C「A-B 循环」：跑一步三态循环（none→设 A→设 B→清除），并在
+  /// 播放器顶部弹 HUD（PlayerAbLoopHud，1 秒自动隐藏，与其余调节浮层互斥）。
+  ///
+  /// 快捷键 L 与「更多选项」菜单入口共用本方法；无播放器时是安全空操作。
+  Future<void> cycleAbLoop() async {
+    final outcome = await abLoop.cycleAbLoop();
+    if (outcome == null) {
+      return;
+    }
+    _showAbLoopHud(outcome);
+  }
+
+  /// M3 施工件 C「A-B 循环」：显式清除（任意状态），同样走 HUD 反馈。
+  Future<void> clearAbLoop() async {
+    final outcome = await abLoop.clearAbLoop();
+    if (outcome == null) {
+      return;
+    }
+    _showAbLoopHud(outcome);
+  }
+
+  void _showAbLoopHud(AbLoopCycleOutcome outcome) {
+    _abLoopHudTimer?.cancel();
+    panel
+      ..showVolume = false
+      ..showBrightness = false
+      ..showPlaySpeed = false
+      ..showSubDelay = false
+      ..abLoopHudText = outcome.message
+      ..showAbLoop = true;
+    _abLoopHudTimer = Timer(const Duration(seconds: 1), () {
+      panel.showAbLoop = false;
+      _abLoopHudTimer = null;
+    });
+  }
+
+  /// M3 施工件 C「逐帧」：步进一帧（[direction] +1 前进 / -1 后退）。
+  ///
+  /// 播放中先暂停（mpv 的 frame-step 本身也会先暂停，先停可以保证本地
+  /// playing 观察值与引擎一致，底部栏的逐帧按钮随之保持可见）；步进后立即
+  /// 同步一次状态，让进度条与画面同步。无播放器时安全空操作。
+  Future<void> frameStep(int direction) async {
+    if (playback.playerPlaying) {
+      await pause();
+    }
+    final issued = await frameSteps.stepBy(direction);
+    if (!issued) {
+      return;
+    }
+    playback.playing = false;
+    syncPlaybackState();
+  }
+
   Future<void> seek(Duration duration, {bool enableSync = true}) =>
       seeking.seekTo(duration, enableSync: enableSync);
 
@@ -381,11 +466,15 @@ class PlayerController implements Disposable {
   Future<void> _releasePlaybackResources() async {
     hideVolumeUITimer?.cancel();
     _volumeGestureSyncTimer?.cancel();
+    _abLoopHudTimer?.cancel();
+    _abLoopHudTimer = null;
     FlutterVolumeController.removeListener();
     // M3-T2：摘掉章节观察并清空章节状态（下一个文件 init 时重新挂）。
     await chapters.detach();
     // M3 字幕管理：同样摘掉 track-list/sid 订阅与 sub-delay 状态。
     await subtitles.detach();
+    // M3 施工件 C：摘掉 ab-loop 观察并复位 marks（循环区间不跨文件）。
+    await abLoop.detach();
     await Future.wait([
       audioController.deactivate(),
       playback.stop(),
