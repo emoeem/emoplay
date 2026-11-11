@@ -6,13 +6,57 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
-## [Unreleased]
+## [2.2.0-alpha] - 2026-11-12（已发布）
+
+R10 施工收口（tag `v2.2.0-alpha`；`pubspec.yaml` version
+`2.1.0-alpha+2010000` → `2.2.0-alpha+2020000`）。3.0 路线图
+（`docs/EMOPLAY-3.0-ROADMAP.md` §五 M4）媒体库升级整轮施工 + R9 挂账的
+M3-T0 清偿 + 用户增补的本地 NFO / 海报 / 剧集分组（M4-T6）。本轮要点
+（全部实测取证，分项明细见下方 R10 节）：
+
+### Added
+
+- **统一媒体模型与播放队列收编**（M4-T0，`0da4a95`）：`MediaItem` /
+  `PlaybackSession` / 无损映射器；基础字段逐字段对齐 §7 store 语义，
+  3.0 扩展槽可空且永不写回 1.x 数据文件，播放页以 `PlaybackSession` 为
+  事实源（不变量 4 的 resume 语义不动）。
+- **元数据缓存**（M4-T4，`0da4a95`）：`media_meta.json` 新 AppData 文件，
+  两段 ffprobe 链（容器 → 编码 + 宽高），缓存键 `sha1(path+mtimeMs)`，
+  30s 超时强杀、无 ffprobe 优雅降级、命中零进程。
+- **网格分组与目录树侧栏**（M4-T2/T5，`25dd830`）：媒体库 SliverGrid +
+  pinned 分组头（目录 / 年月 / 剧集 / 电影四种），search / typeFilter /
+  sortMode 语义不变；面包屑 + 目录树，深度剪枝从
+  `LibraryStore.scanOptions` 派生，不加新扫描。
+- **收藏集**（M4-T3，`25dd830`）：`favorites.json` 新 AppData 文件，卡片
+  收藏角标、拖拽排序弹层（失效收藏降级文件名不丢条目）、损坏 JSON 降级 +
+  原子写用例锁定。
+- **本地 NFO / 海报 / 剧集分组**（M4-T6 用户增补，`5fedee0`）：手写容错
+  NFO 解析（Kodi 语义）、海报四名约定（sidecar → poster → folder →
+  fanart）、SxxEyy / 1x02 词边界解析与剧-季-集三级分组、本地海报上格子、
+  NFO 详情弹层、`media_nfo.json` 双 mtime 缓存；`<thumb>` URL 只记录不
+  下载（联网兜底排期第 11 轮）。
+
+### Changed
+
+- **`player_item.dart` 拆分**（M3-T0，`c9245f8`，R9 挂账清偿）：1614 →
+  484 行（验收线 <500），拆出十个职责文件（全部 <600 行）；纯搬移不改
+  行为，用户可感知变化为零。
+
+### 验证
+
+- 本地门（R10 施工/文档窗口实测）：`flutter analyze` 0 告警；`flutter
+  test` 54 文件 **489 通过 + 1 平台条件跳过**全绿（1 skip = Windows-only
+  探针，按设计跳过）；分项计数与全量差值交叉核对见下方 R10 节。
+- 发布门：release.yaml 矩阵（flutter-test / flutter-analyze 前置，Android
+  split-per-abi ×3、Windows zip+msix、macOS zip、Linux amd64 / arm64
+  tar.gz+deb+AppImage）全绿后产物落 draft，人工核对产物集后
+  `gh release edit v2.2.0-alpha --draft=false` 公开（同 v2.1.0-alpha 流程）。
 
 ### R10 · M4 媒体库升级轮（2026-11-12）
 
 > 3.0 路线图（`docs/EMOPLAY-3.0-ROADMAP.md` §五 M4）整体施工 + R9 挂账的
-> M3-T0 清偿 + 用户增补的本地 NFO / 海报 / 剧集分组（M4-T6）。施工在
-> v2.1.0-alpha 发版之后、未发版，按 Keep a Changelog 归 Unreleased。
+> M3-T0 清偿 + 用户增补的本地 NFO / 海报 / 剧集分组（M4-T6）。施工于
+> v2.1.0-alpha 发版之后，随 v2.2.0-alpha tag 收口发布。
 
 #### Added
 
@@ -63,9 +107,11 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   探针（`mpv_profile_scanner_test.dart`，按设计跳过）。/tmp 夹具缺失时
   perf 基准段与音频探针按 skip-打印降级（计数不变），live libmpv 用例
   真跑。gh 本窗口恢复可达：R9 尾提交 `e9bf692` main run 43069268623 ✓、
-  v2.1.0-alpha release run 43069322152 ✓（release 已公开 11 资产）；
-  本轮四提交未推送（ahead 4），推送后预期签名 **489 passed / 1 skipped**
-  （未测）。分轮明细见
+  v2.1.0-alpha release run 43069322152 ✓（release 已公开 11 资产）。
+  发布窗口补记：本轮四提交与 docs 收网提交 `f87b4e2` 均已随 main 推送
+  （2026-11-12 fetch 实测 ahead 0）；随 v2.2.0-alpha tag 触发的发布矩阵
+  flutter-test job 为 CI 实测签名来源，预期 **489 passed / 1 skipped**。
+  分轮明细见
   `docs/releases/RELEASE_2026-11-10_M4_MEDIA_LIBRARY.md` 与
   `docs/reports/WORK_REPORT_2026-11-10_M4_MEDIA_LIBRARY.md`。
 
