@@ -16,8 +16,14 @@ import 'package:emoplay/media/library_store.dart';
 // What the grid groups by. [directory] = the file's parent folder (derived
 // from the entry path — no extra scan); [yearMonth] = the last-played
 // month, mirroring the "recent" sort's data source, with never-played
-// entries in a trailing "未播放" group.
-enum LibraryGroupMode { directory, yearMonth }
+// entries in a trailing "未播放" group; [movies] = the M4-T6 movie view —
+// videos WITHOUT an episode marker (the caller partitions first via
+// episode_grouper.dart), keyed by their movie title (the NFO title when the
+// caller resolves one, else the file name); [episodes] is NOT a
+// groupLibraryEntries mode — the show-season-episode hierarchy is three
+// levels deep and the page renders it with its own sliver builder
+// (partitionEpisodes), so asking this function for it yields nothing.
+enum LibraryGroupMode { directory, yearMonth, movies, episodes }
 
 // One group: the pinned header text plus the rows under it. |key| is the
 // stable identity (sort/ordering key), |label| the display text.
@@ -38,33 +44,53 @@ class LibraryGridGroup {
 // display groups. Stable: rows keep their input order inside a group; the
 // group order itself follows the mode's own key order (directories
 // case-insensitive ascending like the "path" sort; year-months newest
-// first with "未播放" last, like the "recent" sort).
+// first with "未播放" last, like the "recent" sort; movie titles
+// case-insensitive ascending).
+//
+// |movieTitleOf| resolves the movie display title for the [movies] mode —
+// the page injects the NFO-title override (nfo_meta_cache.dart); when null
+// the file's own title (completeBaseName) is used. It is ignored by the
+// other single-level modes.
 List<LibraryGridGroup> groupLibraryEntries(
   List<LibraryEntry> entries, {
   required LibraryGroupMode mode,
+  String Function(LibraryEntry entry)? movieTitleOf,
 }) {
-  if (entries.isEmpty) {
+  if (entries.isEmpty || mode == LibraryGroupMode.episodes) {
+    // Empty input, or the three-level [episodes] mode that never routes
+    // through here (see the enum's contract).
     return const <LibraryGridGroup>[];
   }
 
-  // Key + bucket per row, preserving input order.
-  final keys = <String>[];
+  // Key + bucket per row, preserving input order. The movies mode keeps a
+  // display label per key (first non-empty resolved title in input order —
+  // the caller's sort decides which member represents the movie).
   final buckets = <String, List<LibraryEntry>>{};
+  final labels = <String, String>{};
   for (final entry in entries) {
     final key = switch (mode) {
       LibraryGroupMode.directory => p.dirname(entry.path),
       LibraryGroupMode.yearMonth => _yearMonthKey(entry.lastPlayed),
+      LibraryGroupMode.movies =>
+        _movieKey(entry, movieTitleOf).toLowerCase(),
+      LibraryGroupMode.episodes => '',
     };
     if (key.isEmpty && mode == LibraryGroupMode.directory) {
       // A path without a parent directory cannot happen for indexed files
       // (the scanner only stores absolute paths); guard the degenerate case
       // by falling back to the path itself so nothing is dropped.
-      keys.add(entry.path);
-      (buckets[entry.path] ??= <LibraryEntry>[]).add(entry);
+      buckets
+          .putIfAbsent(entry.path, () => <LibraryEntry>[])
+          .add(entry);
       continue;
     }
-    keys.add(key);
-    (buckets[key] ??= <LibraryEntry>[]).add(entry);
+    buckets.putIfAbsent(key, () => <LibraryEntry>[]).add(entry);
+    if (mode == LibraryGroupMode.movies && !labels.containsKey(key)) {
+      final label = _movieKey(entry, movieTitleOf);
+      if (label.isNotEmpty) {
+        labels[key] = label;
+      }
+    }
   }
 
   final groupKeys = buckets.keys.toList();
@@ -83,6 +109,12 @@ List<LibraryGridGroup> groupLibraryEntries(
         return b.compareTo(a);
       });
       break;
+    case LibraryGroupMode.movies:
+      groupKeys.sort(
+          (a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      break;
+    case LibraryGroupMode.episodes:
+      break; // unreachable: early-returned above
   }
 
   return [
@@ -91,10 +123,24 @@ List<LibraryGridGroup> groupLibraryEntries(
         key: key,
         label: mode == LibraryGroupMode.directory
             ? _directoryLabel(key)
-            : _yearMonthLabel(key),
+            : mode == LibraryGroupMode.movies
+                ? (labels[key] ?? key)
+                : _yearMonthLabel(key),
         entries: List.unmodifiable(buckets[key]!),
       ),
   ];
+}
+
+// The movie display title for one entry: the injected NFO-title resolver,
+// falling back to the entry's own title (the scanner's completeBaseName)
+// and finally the path so a degenerate row is never dropped.
+String _movieKey(
+    LibraryEntry entry, String Function(LibraryEntry)? movieTitleOf) {
+  final resolved = movieTitleOf?.call(entry) ?? entry.title;
+  if (resolved.isNotEmpty) {
+    return resolved;
+  }
+  return entry.title.isNotEmpty ? entry.title : entry.path;
 }
 
 // "2026-11-15T20:03:00.000" → "2026-11"; anything unparseable (empty,

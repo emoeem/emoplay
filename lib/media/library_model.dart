@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:emoplay/media/library_store.dart';
+import 'package:emoplay/media/nfo_meta_cache.dart';
 import 'package:emoplay/media/thumbnail_service.dart';
 
 // View state over the LibraryStore's entries, mapped from 1.x LibraryModel
@@ -19,14 +20,21 @@ import 'package:emoplay/media/thumbnail_service.dart';
 // delegates reload without a full reset (1.x dataChanged(ThumbnailRole);
 // Flutter rebuilds the delegate from the notification instead).
 //
+// The same on-demand pattern drives the M4-T6 NFO/poster facts: visible
+// VIDEO entries are handed to the NfoMetaCache (audio files have no NFO
+// conventions to look for), whose notifications rebuild the grid the same
+// way — the page re-reads its grouping, poster paths and NFO titles.
+//
 // The model re-reads the whole filtered list whenever the store reports an
 // update or a filter changes — library sizes make incremental diffing
 // pointless in v1.
 class LibraryModel extends ChangeNotifier {
-  // |thumbnails| is optional: null keeps the thumbnail role permanently
-  // empty (and is what minimal setups pass).
-  LibraryModel(this._store, [ThumbnailService? thumbnails])
-      : _thumbnails = thumbnails {
+  // |thumbnails| and |nfoMeta| are optional: null keeps the thumbnail role
+  // permanently empty / no NFO facts flowing (and is what minimal setups
+  // pass).
+  LibraryModel(this._store, [ThumbnailService? thumbnails, NfoMetaCache? nfoMeta])
+      : _thumbnails = thumbnails,
+        _nfoMeta = nfoMeta {
     _store.addListener(_rebuild);
     if (_thumbnails != null) {
       final thumbnails = _thumbnails;
@@ -38,11 +46,15 @@ class LibraryModel extends ChangeNotifier {
       _availabilitySubscription =
           thumbnails.onThumbnailReady.listen((_) => notifyListeners());
     }
+    if (_nfoMeta != null) {
+      _nfoMeta.addListener(_onServiceUpdate);
+    }
     _rebuild();
   }
 
   final LibraryStore _store;
   final ThumbnailService? _thumbnails;
+  final NfoMetaCache? _nfoMeta;
   StreamSubscription<ThumbnailReady>? _availabilitySubscription;
 
   // Rows matching the current filter.
@@ -190,6 +202,17 @@ class LibraryModel extends ChangeNotifier {
     // service dedupes, serves cache hits synchronously (thumbnailReady
     // arrives within this loop) and queues the rest.
     _requestVisibleThumbnails();
+    // M4-T6: the same wave for the NFO/poster facts, video entries only —
+    // audio has no NFO conventions to discover. Hits settle synchronously;
+    // misses queue into the cache's serial scan chain.
+    final nfoMeta = _nfoMeta;
+    if (nfoMeta != null) {
+      for (final entry in _visible) {
+        if (entry.type == 'video') {
+          unawaited(nfoMeta.requestInfo(entry.path));
+        }
+      }
+    }
     notifyListeners();
   }
 
@@ -215,6 +238,7 @@ class LibraryModel extends ChangeNotifier {
     _availabilitySubscription?.cancel();
     _store.removeListener(_rebuild);
     _thumbnails?.removeListener(_onServiceUpdate);
+    _nfoMeta?.removeListener(_onServiceUpdate);
     super.dispose();
   }
 }

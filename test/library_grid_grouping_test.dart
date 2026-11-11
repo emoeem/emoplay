@@ -202,6 +202,48 @@ void main() {
     expect(find.text('ep1'), findsOneWidget);
     expect(find.text('song'), findsOneWidget);
   });
+
+  // ---- M4-T6 additions: the movies mode ---------------------------------
+
+  test('movieGroupsKeyOnTheInjectedNfoTitleCaseInsensitively', () {
+    final entries = [
+      _entry('/media/Movies/blade.runner.2049.mkv', title: 'blade.runner.2049'),
+      _entry('/media/Movies/BR2049-extended.mkv', title: 'BR2049-extended'),
+      _entry('/media/Movies/other.movie.mkv', title: 'other.movie'),
+    ];
+    // The page's resolver: both movie files sit in the same folder and read
+    // the same movie.nfo, so both resolve to its <title>; the third file
+    // has no NFO and keeps its file title.
+    String titleOf(LibraryEntry entry) =>
+        entry.path.contains('blade.runner') || entry.path.contains('BR2049')
+            ? 'Blade Runner 2049'
+            : entry.title;
+
+    final groups = groupLibraryEntries(entries,
+        mode: LibraryGroupMode.movies, movieTitleOf: titleOf);
+
+    // "blade.runner.2049" (file title) and "Blade Runner 2049" (NFO title)
+    // are one movie under a case-insensitive key; the group label is the
+    // first member's resolved title in input order.
+    expect(groups.map((group) => group.label).toList(),
+        ['Blade Runner 2049', 'other.movie']);
+    expect(groups[0].entries.map((entry) => entry.path).toList(),
+        ['/media/Movies/blade.runner.2049.mkv', '/media/Movies/BR2049-extended.mkv']);
+    expect(groups[1].entries.map((entry) => entry.path).toList(),
+        ['/media/Movies/other.movie.mkv']);
+  });
+
+  test('episodesModeNeverRoutesThroughGroupLibraryEntries', () {
+    // The three-level episode view is the page's own sliver builder
+    // (partitionEpisodes); the single-level group function returns nothing
+    // for it by contract, so a future wiring mistake cannot silently
+    // flatten the hierarchy.
+    final groups = groupLibraryEntries(
+      [_entry('/tv/Show.S01E02.mkv')],
+      mode: LibraryGroupMode.episodes,
+    );
+    expect(groups, isEmpty);
+  });
 }
 
 LibraryEntry _entry(String path, {int size = 10, String title = '', String lastPlayed = ''}) =>

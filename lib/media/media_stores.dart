@@ -8,6 +8,7 @@ import 'package:emoplay/media/favorites_store.dart';
 import 'package:emoplay/media/history_store.dart';
 import 'package:emoplay/media/library_model.dart';
 import 'package:emoplay/media/library_store.dart';
+import 'package:emoplay/media/nfo_meta_cache.dart';
 import 'package:emoplay/media/thumbnail_service.dart';
 import 'package:emoplay/mpv/compat/compat_controller.dart';
 import 'package:emoplay/mpv/compat/mpv_profile_scanner.dart';
@@ -41,6 +42,7 @@ class MediaStores {
     required this.history,
     required this.favorites,
     required this.thumbnails,
+    required this.nfoMeta,
     required this.compat,
     required this.quality,
     required this.plugins,
@@ -49,7 +51,7 @@ class MediaStores {
     required this.diagnostics,
     required this.startupMpvProperties,
   }) {
-    libraryModel = LibraryModel(library, thumbnails);
+    libraryModel = LibraryModel(library, thumbnails, nfoMeta);
   }
 
   static MediaStores? _instance;
@@ -75,6 +77,12 @@ class MediaStores {
   // file next to the §7 trio — see lib/media/favorites_store.dart.
   final FavoritesStore favorites;
   final ThumbnailService thumbnails;
+
+  // The M4-T6 NFO/poster facts (user addition 2026-11-12):
+  // media_nfo.json under AppData — another NEW file next to the §7 trio
+  // (lib/media/nfo_meta_cache.dart). Drives the episode/movie grouping
+  // views, local poster art and the NFO details sheet.
+  final NfoMetaCache nfoMeta;
 
   // The mpv compat layer (M5): decision persistence + config-dir scan +
   // startup option assembly (1.x CompatController, main.cpp L170-223).
@@ -197,6 +205,11 @@ class MediaStores {
     // an empty collection inside the store constructor.
     final favorites = FavoritesStore('${dir.path}/favorites.json');
 
+    // M4-T6 NFO/poster facts: media_nfo.json, same new-file precedent. No
+    // probe needed (the cache spawns no processes; it only reads NFO and
+    // artwork files that sit next to the videos).
+    final nfoMeta = NfoMetaCache('${dir.path}/media_nfo.json');
+
     // M6 画质层：三个画质控制器 + 1.x main.cpp L255-268 的着色器目录规则
     // （导入决策 full/selective 时用用户 mpv 目录的 shaders/，否则用应用
     // 数据目录自己的 shaders/）+ 应用数据 vs/ 目录（插帧 .vpy 预设，不随
@@ -232,6 +245,7 @@ class MediaStores {
       history: history,
       favorites: favorites,
       thumbnails: thumbnails,
+      nfoMeta: nfoMeta,
       compat: compat,
       quality: quality,
       plugins: plugins,

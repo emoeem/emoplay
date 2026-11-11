@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:emoplay/bean/dialog/dialog_helper.dart';
 import 'package:emoplay/bean/widget/empty_state_widget.dart';
@@ -16,6 +17,8 @@ import 'package:emoplay/pages/library/favorites_sheet.dart';
 import 'package:emoplay/pages/library/library_directory_sidebar.dart';
 import 'package:emoplay/pages/library/library_folder_tree.dart';
 import 'package:emoplay/pages/library/library_grid_groups.dart';
+import 'package:emoplay/pages/library/nfo_details_sheet.dart';
+import 'package:emoplay/media/episode_grouper.dart';
 import 'package:emoplay/services/platform/mobile_media_scanner.dart';
 import 'package:emoplay/services/storage/storage.dart';
 import 'package:emoplay/utils/format.dart';
@@ -25,9 +28,9 @@ import 'package:emoplay/utils/format.dart';
 /// The media folders, their indexed files, search / filter / sort /
 /// grid-list switching, scan progress and cancellation. Every piece of state
 /// comes from [MediaStores] (LibraryStore + LibraryModel + ThumbnailService
-/// + FavoritesStore) — the page itself keeps no media index. Interaction
-/// ported from 1.x qml/LibraryPage.qml: the scan-state label, the directory
-/// panel, the cancel/rescan toggle and the grid/list switch.
+/// + FavoritesStore + NfoMetaCache) — the page itself keeps no media index.
+/// Interaction ported from 1.x qml/LibraryPage.qml: the scan-state label,
+/// the directory panel, the cancel/rescan toggle and the grid/list switch.
 ///
 /// 3.0 additions (docs/EMOPLAY-3.0-ROADMAP.md M4-T2/T3/T5):
 ///  - the grid renders as a CustomScrollView of SliverMainAxisGroup(Sliver-
@@ -41,6 +44,19 @@ import 'package:emoplay/utils/format.dart';
 ///  - favorites: a star badge on every card, an ordered collection
 ///    (favorites.json) and the ReorderableListView sorting sheet
 ///    (favorites_sheet.dart).
+///
+/// M4-T6 additions (user addition 2026-11-12, 本地 NFO/海报/剧集分组):
+///  - two more grid group modes: 按剧集分组 (the show → season → episode
+///    hierarchy from the file-name markers, nested SliverMainAxisGroups
+///    with pinned headers — partitionEpisodes) and 按电影分组 (videos
+///    without an episode marker grouped by their movie title, NFO title
+///    override when present — library_grid_groups.dart movies mode);
+///  - NFO 数据展示, 克制: local poster art on the cells (poster/folder/
+///    fanart conventions, poster_finder.dart), the NFO episode title as the
+///    cell title in the episodes view, an info badge on NFO-backed cells
+///    opening the details sheet (nfo_details_sheet.dart). All facts come
+///    from NfoMetaCache (media_nfo.json); `<thumb>` URLs are recorded only,
+///    nothing is downloaded.
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
 
@@ -237,6 +253,18 @@ class _LibraryPageState extends State<LibraryPage> {
                   child: Text(_groupMode == LibraryGroupMode.yearMonth
                       ? '✓ 按年月分组'
                       : '按年月分组'),
+                ),
+                PopupMenuItem(
+                  value: LibraryGroupMode.episodes,
+                  child: Text(_groupMode == LibraryGroupMode.episodes
+                      ? '✓ 按剧集分组'
+                      : '按剧集分组'),
+                ),
+                PopupMenuItem(
+                  value: LibraryGroupMode.movies,
+                  child: Text(_groupMode == LibraryGroupMode.movies
+                      ? '✓ 按电影分组'
+                      : '按电影分组'),
                 ),
               ],
             ),
@@ -555,7 +583,11 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
       );
     }
-    return _gridView ? _groupedGrid(context, entries) : _list(context, entries);
+    return _gridView
+        ? (_groupMode == LibraryGroupMode.episodes
+            ? _episodeGrid(context, entries)
+            : _groupedGrid(context, entries))
+        : _list(context, entries);
   }
 
   Widget _emptyState(BuildContext context) {
@@ -603,9 +635,24 @@ class _LibraryPageState extends State<LibraryPage> {
   /// shorthand) that pins while the group's SliverGrid scrolls beneath it,
   /// exactly the popular_page pinned behavior. Group order comes from the
   /// grouping module; rows inside a group keep the model's sort order.
+  ///
+  /// M4-T6 movies mode: only videos WITHOUT an episode marker participate —
+  /// the episode-marker files belong to the 按剧集分组 view — grouped by
+  /// their movie title with the NFO title override when one exists.
   Widget _groupedGrid(BuildContext context, List<LibraryEntry> entries) {
     final theme = Theme.of(context);
-    final groups = groupLibraryEntries(entries, mode: _groupMode);
+    var groupEntries = entries;
+    if (_groupMode == LibraryGroupMode.movies) {
+      final videos = [for (final entry in entries) if (entry.type == 'video') entry];
+      groupEntries = partitionEpisodes(videos).ungrouped;
+    }
+    final groups = groupLibraryEntries(
+      groupEntries,
+      mode: _groupMode,
+      movieTitleOf: _groupMode == LibraryGroupMode.movies
+          ? _movieTitleOf
+          : null,
+    );
     return CustomScrollView(
       slivers: [
         for (final group in groups)
@@ -622,9 +669,15 @@ class _LibraryPageState extends State<LibraryPage> {
                     child: Row(
                       children: [
                         Icon(
-                          _groupMode == LibraryGroupMode.directory
-                              ? Icons.folder_rounded
-                              : Icons.calendar_month_rounded,
+                          switch (_groupMode) {
+                            LibraryGroupMode.directory =>
+                              Icons.folder_rounded,
+                            LibraryGroupMode.yearMonth =>
+                              Icons.calendar_month_rounded,
+                            LibraryGroupMode.movies => Icons.movie_rounded,
+                            LibraryGroupMode.episodes =>
+                              Icons.live_tv_rounded,
+                          },
                           size: 15,
                           color: theme.colorScheme.primary,
                         ),
@@ -659,32 +712,174 @@ class _LibraryPageState extends State<LibraryPage> {
                   childAspectRatio: 198 / 174,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final entry = group.entries[index];
-                    return _GridCell(
-                      title: entry.title,
-                      thumbnail:
-                          _stores.thumbnails.cachedThumbnailPath(entry.path),
-                      isAudio: entry.type == 'audio',
-                      isFavorite: _stores.favorites.contains(entry.path),
-                      onToggleFavorite: () =>
-                          _stores.favorites.toggle(entry.path),
-                      onPlay: () => _play(entry),
-                      placeholder: Icon(
-                        entry.type == 'audio'
-                            ? Icons.audiotrack_rounded
-                            : Icons.movie_rounded,
-                        size: 34,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    );
-                  },
+                  (context, index) =>
+                      _buildCell(context, group.entries[index]),
                   childCount: group.entries.length,
                 ),
               ),
             ],
           ),
       ],
+    );
+  }
+
+  /// The episodes view (M4-T6): the show → season → episode hierarchy from
+  /// the file-name SxxEyy markers, rendered as nested SliverMainAxisGroups —
+  /// a pinned show header, and beneath it one pinned season header + grid
+  /// per season (specials, season 0, sort first). Videos whose names parse
+  /// as no episode land in one trailing 未识别剧集 group, so the view never
+  /// hides rows; the show label prefers the directory's tvshow.nfo title,
+  /// episode cells prefer their NFO episode title.
+  Widget _episodeGrid(BuildContext context, List<LibraryEntry> entries) {
+    final theme = Theme.of(context);
+    final videos = [for (final entry in entries) if (entry.type == 'video') entry];
+    final partition = partitionEpisodes(videos);
+    final grid = SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: 210,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 198 / 174,
+    );
+
+    Widget header(String label, IconData icon, int count) {
+      return SliverPersistentHeader(
+        pinned: true,
+        delegate: _GroupHeaderDelegate(
+          child: Container(
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            alignment: Alignment.centerLeft,
+            color: theme.colorScheme.surface,
+            child: Row(
+              children: [
+                Icon(icon, size: 15, color: theme.colorScheme.primary),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$count',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget episodeGrid(List<LibraryEntry> episodes) {
+      return SliverGrid(
+        gridDelegate: grid,
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _buildCell(context, episodes[index],
+              useNfoTitle: true),
+          childCount: episodes.length,
+        ),
+      );
+    }
+
+    return CustomScrollView(
+      slivers: [
+        for (final show in partition.shows)
+          SliverMainAxisGroup(
+            slivers: [
+              header(
+                _showLabel(show),
+                Icons.live_tv_rounded,
+                [for (final s in show.seasons) s.episodes.length]
+                    .fold<int>(0, (a, b) => a + b),
+              ),
+              for (final season in show.seasons)
+                SliverMainAxisGroup(
+                  slivers: [
+                    header(
+                      season.season == 0 ? '特别篇' : '第 ${season.season} 季',
+                      Icons.playlist_play_rounded,
+                      season.episodes.length,
+                    ),
+                    episodeGrid(season.episodes),
+                  ],
+                ),
+            ],
+          ),
+        if (partition.ungrouped.isNotEmpty)
+          SliverMainAxisGroup(
+            slivers: [
+              header('未识别剧集', Icons.help_outline_rounded,
+                  partition.ungrouped.length),
+              episodeGrid(partition.ungrouped),
+            ],
+          ),
+      ],
+    );
+  }
+
+  // Show label: the directory's tvshow.nfo title when any member episode
+  // carries one (NfoMetaCache.showTitle), else the parsed show name, else
+  // (marker-first names) the episodes' common folder name.
+  String _showLabel(ShowGroup show) {
+    for (final season in show.seasons) {
+      for (final episode in season.episodes) {
+        final title = _stores.nfoMeta.infoFor(episode.path)?.showTitle ?? '';
+        if (title.isNotEmpty) {
+          return title;
+        }
+      }
+    }
+    if (show.show.isNotEmpty) {
+      return show.show;
+    }
+    final first = show.seasons.first.episodes.first.path;
+    final name = p.basename(p.dirname(first));
+    return name.isEmpty ? '未知剧集' : name;
+  }
+
+  // Movie title for the movies view: the NFO <title> when present, else the
+  // file's own title (completeBaseName).
+  String _movieTitleOf(LibraryEntry entry) {
+    final title = _stores.nfoMeta.infoFor(entry.path)?.nfo.title ?? '';
+    return title.isNotEmpty ? title : entry.title;
+  }
+
+  /// The one grid cell builder every view shares: local poster art when the
+  /// M4-T6 discovery found some, else the ffmpeg thumbnail; the info badge
+  /// (details sheet) only where NFO data actually exists.
+  _GridCell _buildCell(BuildContext context, LibraryEntry entry,
+      {bool useNfoTitle = false}) {
+    final theme = Theme.of(context);
+    final info = _stores.nfoMeta.infoFor(entry.path);
+    final poster = info?.poster ?? '';
+    final nfoTitle = info?.nfo.title ?? '';
+    return _GridCell(
+      title: useNfoTitle && nfoTitle.isNotEmpty ? nfoTitle : entry.title,
+      thumbnail: poster.isNotEmpty
+          ? poster
+          : _stores.thumbnails.cachedThumbnailPath(entry.path),
+      isAudio: entry.type == 'audio',
+      isFavorite: _stores.favorites.contains(entry.path),
+      onToggleFavorite: () => _stores.favorites.toggle(entry.path),
+      onPlay: () => _play(entry),
+      onShowDetails: info?.hasNfo == true
+          ? () => NfoDetailsSheet.show(context, entry, info!)
+          : null,
+      placeholder: Icon(
+        entry.type == 'audio'
+            ? Icons.audiotrack_rounded
+            : Icons.movie_rounded,
+        size: 34,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
     );
   }
 
@@ -773,9 +968,11 @@ class _GroupHeaderDelegate extends SliverPersistentHeaderDelegate {
   String toString() => '_GroupHeaderDelegate';
 }
 
-/// One grid cell (1.x grid delegate): thumbnail, title and the M4-T3
-/// favorite badge (corner star; filled when favorited, tap toggles — the
-/// badge's own gesture wins over the cell's play tap).
+/// One grid cell (1.x grid delegate): thumbnail (or the M4-T6 local poster
+/// — the caller decides the image path), title, the M4-T3 favorite badge
+/// (corner star; filled when favorited, tap toggles — the badge's own
+/// gesture wins over the cell's play tap) and the M4-T6 info badge, present
+/// only when the cell has NFO facts; it opens the details sheet.
 class _GridCell extends StatefulWidget {
   const _GridCell({
     required this.title,
@@ -785,6 +982,7 @@ class _GridCell extends StatefulWidget {
     required this.placeholder,
     required this.onPlay,
     required this.onToggleFavorite,
+    this.onShowDetails,
   });
 
   final String title;
@@ -794,6 +992,9 @@ class _GridCell extends StatefulWidget {
   final Widget placeholder;
   final VoidCallback onPlay;
   final VoidCallback onToggleFavorite;
+
+  /// Opens the NFO details sheet; null hides the badge (no NFO data).
+  final VoidCallback? onShowDetails;
 
   @override
   State<_GridCell> createState() => _GridCellState();
@@ -861,6 +1062,24 @@ class _GridCellState extends State<_GridCell> {
               ),
             ),
           ),
+          if (widget.onShowDetails != null)
+            Positioned(
+              top: 2,
+              left: 2,
+              child: IconButton(
+                tooltip: 'NFO 信息',
+                visualDensity: VisualDensity.compact,
+                constraints:
+                    const BoxConstraints(minWidth: 30, minHeight: 30),
+                padding: const EdgeInsets.all(4),
+                icon: const Icon(
+                  Icons.info_outline_rounded,
+                  size: 19,
+                ),
+                color: theme.colorScheme.onSurfaceVariant,
+                onPressed: widget.onShowDetails,
+              ),
+            ),
           Positioned(
             top: 2,
             right: 2,
