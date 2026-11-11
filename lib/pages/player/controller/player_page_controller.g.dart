@@ -9,6 +9,14 @@ part of 'player_page_controller.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$PlayerPageController on _PlayerPageController, Store {
+  Computed<List<PlayerPlaylistItem>>? _$playlistComputed;
+
+  @override
+  List<PlayerPlaylistItem> get playlist =>
+      (_$playlistComputed ??= Computed<List<PlayerPlaylistItem>>(
+        () => super.playlist,
+        name: '_PlayerPageController.playlist',
+      )).value;
   Computed<PlayerPlaylistItem?>? _$currentItemComputed;
 
   @override
@@ -32,21 +40,21 @@ mixin _$PlayerPageController on _PlayerPageController, Store {
     name: '_PlayerPageController.src',
   )).value;
 
-  late final _$playlistAtom = Atom(
-    name: '_PlayerPageController.playlist',
+  late final _$sessionAtom = Atom(
+    name: '_PlayerPageController.session',
     context: context,
   );
 
   @override
-  ObservableList<PlayerPlaylistItem> get playlist {
-    _$playlistAtom.reportRead();
-    return super.playlist;
+  PlaybackSession get session {
+    _$sessionAtom.reportRead();
+    return super.session;
   }
 
   @override
-  set playlist(ObservableList<PlayerPlaylistItem> value) {
-    _$playlistAtom.reportWrite(value, super.playlist, () {
-      super.playlist = value;
+  set session(PlaybackSession value) {
+    _$sessionAtom.reportWrite(value, super.session, () {
+      super.session = value;
     });
   }
 
@@ -166,12 +174,32 @@ mixin _$PlayerPageController on _PlayerPageController, Store {
   );
 
   @override
-  void setPlaylist(List<PlayerPlaylistItem> items, {int initialIndex = -1}) {
+  void setPlaylist(
+    List<PlayerPlaylistItem> items, {
+    int initialIndex = -1,
+    String? origin,
+  }) {
     final _$actionInfo = _$_PlayerPageControllerActionController.startAction(
       name: '_PlayerPageController.setPlaylist',
     );
     try {
-      return super.setPlaylist(items, initialIndex: initialIndex);
+      return super.setPlaylist(
+        items,
+        initialIndex: initialIndex,
+        origin: origin,
+      );
+    } finally {
+      _$_PlayerPageControllerActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setSession(PlaybackSession value) {
+    final _$actionInfo = _$_PlayerPageControllerActionController.startAction(
+      name: '_PlayerPageController.setSession',
+    );
+    try {
+      return super.setSession(value);
     } finally {
       _$_PlayerPageControllerActionController.endAction(_$actionInfo);
     }
@@ -228,12 +256,13 @@ mixin _$PlayerPageController on _PlayerPageController, Store {
   @override
   String toString() {
     return '''
-playlist: ${playlist},
+session: ${session},
 currentIndex: ${currentIndex},
 loading: ${loading},
 isPip: ${isPip},
 isFullscreen: ${isFullscreen},
 pageCurrent: ${pageCurrent},
+playlist: ${playlist},
 currentItem: ${currentItem},
 title: ${title},
 src: ${src}

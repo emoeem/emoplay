@@ -1,41 +1,58 @@
+import 'package:emoplay/models/media_item_mappers.dart';
+import 'package:emoplay/models/playback_session.dart';
+import 'package:emoplay/pages/player/controller/player_playlist_item.dart';
 import 'package:emoplay/services/platform/display_mode_service.dart';
 import 'package:emoplay/utils/device.dart';
 import 'package:mobx/mobx.dart';
 import 'package:window_manager/window_manager.dart';
 
+// The row type stays importable from here (every pre-M4 caller imports this
+// file): the class itself moved to player_playlist_item.dart in M4-T0b so
+// the unified-model mappers can name it without an import cycle.
+export 'package:emoplay/pages/player/controller/player_playlist_item.dart'
+    show PlayerPlaylistItem;
+
 part 'player_page_controller.g.dart';
-
-/// One playable entry in the player page playlist.
-class PlayerPlaylistItem {
-  const PlayerPlaylistItem({
-    required this.path,
-    required this.title,
-  });
-
-  /// Absolute media file path.
-  final String path;
-
-  /// Display title (file name unless a nicer title is available).
-  final String title;
-}
 
 /// Page-scope state for the player page.
 ///
 /// M1 replacement for the stripped Kazumi [VideoPageController]: it owns the
 /// local playlist, the current selection and window fullscreen/PIP flags.
 /// Playback itself lives in [PlayerController].
+///
+/// M4-T0b (roadmap §四 step 2, "播放队列收编"): the playlist is no longer
+/// the source of truth. [session] — the unified [PlaybackSession] — is, and
+/// [playlist] / [currentItem] are derived views of it. The external
+/// interface is unchanged: [setPlaylist] keeps its exact signature (plus an
+/// additive optional [setPlaylist.origin] the roadmap's session origin
+/// field needs), and the resume path is untouched — `openAt(path, seconds)`
+/// semantics still flow `startAt` → PlaybackInitParams →
+/// PendingResumeSeek (SPEC §4.4 invariant 4; this controller never arms or
+/// consumes a resume seek, and [PlaybackSession.startPosition] is data
+/// only).
 class PlayerPageController = _PlayerPageController
     with _$PlayerPageController;
 
 abstract class _PlayerPageController with Store {
-  /// Playlist shown in the player page side panel.
+  /// The playback queue in the unified model. Replaced wholesale by
+  /// [setPlaylist] / [setSession]; [playlist] is derived from it.
   @observable
-  ObservableList<PlayerPlaylistItem> playlist =
-      ObservableList<PlayerPlaylistItem>();
+  PlaybackSession session = PlaybackSession.empty;
 
   /// Index of the entry passed to the player, -1 while nothing is loaded.
+  ///
+  /// Deliberately separate from [PlaybackSession.startIndex]: the session
+  /// records where playback started, this field tracks where it is now
+  /// (item advance, back-out to idle).
   @observable
   int currentIndex = -1;
+
+  /// Playlist shown in the player page side panel — a derived view of
+  /// [session] (roadmap §四 step 2). Recomputed only when the session
+  /// changes; consumers read it like the ObservableList it replaced.
+  @computed
+  List<PlayerPlaylistItem> get playlist =>
+      [for (final item in session.items) item.toPlaylistItem()];
 
   /// True while the route is still resolving the media for playback.
   @observable
@@ -70,10 +87,41 @@ abstract class _PlayerPageController with Store {
     return playlist[index];
   }
 
+  /// Replaces the queue (rows keep the pre-M4 constructor), keeping the
+  /// external contract bit-for-bit: [initialIndex] lands in
+  /// [currentIndex] verbatim (no clamping — the -1 idle sentinel and the
+  /// caller-supplied start index both pass through), exactly as the
+  /// ObservableList version did.
+  ///
+  /// The rows are lifted into [session] via the M4-T0b mapper
+  /// ([PlayerPlaylistItemMediaMapper.toMediaItem]), so the queue the
+  /// playlist panel, the progress pipeline and the audio binding see is
+  /// the same list either way (path/title round-trip losslessly).
+  ///
+  /// [origin] is the additive seam for the roadmap's session origin
+  /// ("library" | "history" | "picker" | "external"); existing callers
+  /// omit it and get null, as before.
   @action
-  void setPlaylist(List<PlayerPlaylistItem> items, {int initialIndex = -1}) {
-    playlist = ObservableList<PlayerPlaylistItem>.of(items);
+  void setPlaylist(List<PlayerPlaylistItem> items,
+      {int initialIndex = -1, String? origin}) {
+    session = PlaybackSession(
+      items: [for (final item in items) item.toMediaItem()],
+      startIndex: initialIndex,
+      origin: origin,
+    );
     currentIndex = initialIndex;
+  }
+
+  /// Installs a whole [PlaybackSession] (M4-T0 seam for the callers that
+  /// build a session from library/history items and jump straight into
+  /// playback). [currentIndex] seeds from the session's [startIndex] like
+  /// [setPlaylist] does. Does not touch the resume machinery: a
+  /// session-[PlaybackSession.startPosition] is consumed by whoever opens
+  /// the player, through the unchanged openAt path.
+  @action
+  void setSession(PlaybackSession value) {
+    session = value;
+    currentIndex = value.startIndex;
   }
 
   @action
