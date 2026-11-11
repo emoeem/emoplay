@@ -37,6 +37,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [RELEASE_2026-11-10_PANEL_LOOK.md](releases/RELEASE_2026-11-10_PANEL_LOOK.md) | 面板观感 R5：播放页两处整页失效修复（快捷键焦点门禁 / Observer 短路）、字体定案（系统字体默认 + 显式 CJK 兜底 + 设置开关）、播放面板按 Kazumi 逐槽位重组、发布矩阵 9 job 超时 + Windows 版本单一来源；34 文件 342 用例全绿，CI 本窗口不可测 |
 | [RELEASE_2026-11-10_HYGIENE_DELIVERY.md](releases/RELEASE_2026-11-10_HYGIENE_DELIVERY.md) | 卫生与交付形态 R6：AppImage 打包落地（linuxdeploy；amd64 产物与 runtime 本机实测，arm64 仅 CI 可验）、web 残留 / any×3 / screen_brightness_ohos 清账（审计 P2 卫生批次）、Kazumi 空态按钮 / 徽章 / 许可证 tile 样式对齐 + 3 守护用例、README 对账与截图占位；35 文件 345 用例全绿，CI 不可测、6 提交待推送 |
 | [RELEASE_2026-11-10_PERF_AND_SETTINGS.md](releases/RELEASE_2026-11-10_PERF_AND_SETTINGS.md) | 性能实测与设置收尾 R7：设置 → 通用「恢复默认设置」落地（1.x 对账最后一项消账，库 / 历史 / 导入决策不动）、性能定量实测 ☐→✅（容器口径：热扫 125ms / 装载 1.7-2.2ms，判定不改代码）、tag 发布 draft 制 + BUILD_GUIDE §四流程、deb 注释库数口径考证；37 文件 355 用例全绿，CI 不可测、3 提交待推送 |
+| [RELEASE_2026-11-10_M3_PLAYER_INTERACTION.md](releases/RELEASE_2026-11-10_M3_PLAYER_INTERACTION.md) | M3 播放器交互 R9（3.0 首批施工）：章节导航（chapter-list JSON 形态实测 + 二分 + 底板面板 + PgUp/PgDn）、字幕管理（sid 真相源 / 外挂加载 / 关闭字幕 / 延迟 ±0.5s，C/V 键）、A-B 循环与逐帧步进（三态机 + L / `.` / `,` mpv 惯例键位）；M3-T2 进度条刻度半边与 M3-T0 拆分未做；44 文件 411 用例全绿（含 7 条真 libmpv live），CI 不可测、3 提交待推送 |
 
 ## 工作报告（reports/，读者是维护者与接手者）
 
@@ -50,6 +51,7 @@ EmoPlay 2.0（mpv-emo 1.x 的 Flutter 重写）仓库 `docs/` 的全部文档入
 | [WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md](reports/WORK_REPORT_2026-11-10_HYGIENE_DELIVERY.md) | R6 卫生与交付形态：审计 P2 卫生批次三项逐条对账、AppImage 产物与 runtime 实测（35,584,504 B / static-pie / help exit 0 / gitignore 覆盖）、门禁实测（35 文件 345+1 全绿 / analyze 0，与施工轮两次同数）、守护测试注释与 CI 现实不符项挂账（hardcoded-color grep 不存在）、CHANGELOG 一轮一节结构修复 |
 | [WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md](reports/WORK_REPORT_2026-11-11_PERF_MEASUREMENT.md) | R7 性能定量实测：路线图 §4.1「性能实测」☐→✅（容器环境实测）。2000 文件夹具扫描吞吐（worker 热扫 125ms / 16000 files/s，直连遍历冷 160-179ms，进度回调实数 63 次）、首帧同步 IO 静态清单 + 2000 条目 library.json 装载 1.7-2.2ms（远低于 100ms 阈值，不改代码）、缩略图串行链 77-81ms/作业（并发重叠 0）；基准 skip-if-fixture-missing；**容器 Isolate 计时，非宿主基线**，GUI 首帧墙钟与真 ffmpeg 速率仍归 SPEC §9；门禁实测（36 文件 349+1 全绿 / analyze 0） |
 | [WORK_REPORT_2026-11-10_PERF_AND_SETTINGS.md](reports/WORK_REPORT_2026-11-10_PERF_AND_SETTINGS.md) | R7 性能实测与设置收尾（轮级收网）：三施工提交逐项对账（路线图 §4.1 ✅、1.x 对账最后一项消账、draft 制全验待 tag run）、门禁实测（37 文件 355+1 全绿 / analyze 0，夹具在场基准段真跑）、路线图勾选滞后三处挂账、确认无问题清单（数据安全契约测试体核实 / CHANGELOG 一轮一节 / draft 制三处口径一致）、下一步建议 5 条 |
+| [WORK_REPORT_2026-11-10_M3_PLAYER_INTERACTION.md](reports/WORK_REPORT_2026-11-10_M3_PLAYER_INTERACTION.md) | R9 M3 播放器交互（3.0 首批施工收网）：三施工提交逐项对账（章节导航 M3-T2 主体完成 / 字幕管理 sid 真相源 / A-B 循环 + 逐帧 mpv 惯例键位）、门禁实测（44 文件 411+1 全绿两遍同数 / analyze 0 / 7 条真 libmpv live 真跑 / 新用例 56 逐文件计数与套件差值闭环）、挂账三项（M3-T2 刻度半边 / M3-T0 拆分 1614 行 / 路线图勾选与快捷键分组未回填）、确认无问题清单（schema 零触碰 / 键位零冲突 / 空操作语义 / fork 探针随行）、下一步建议 6 条 |
 
 ## 审计（audits/）
 

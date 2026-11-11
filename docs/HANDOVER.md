@@ -2,28 +2,64 @@
 
 | 项     | 值                                                                          |
 | ------ | --------------------------------------------------------------------------- |
-| 状态   | 生效中（2026-11-11 R7 性能实测与设置收尾轮之后）                             |
-| 日期   | 2026-11-11（最后实质性更新）                                                 |
-| 适用版本 | git `0a3436c`（`87b3760` 起三个提交未推送；origin/main 停在 `e1db680`）   |
-| 相关   | [SPEC.md](SPEC.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md) |
+| 状态   | 生效中（2026-11-12 R9 M3 播放器交互轮之后）                                 |
+| 日期   | 2026-11-12（最后实质性更新）                                                 |
+| 适用版本 | git `2e5d73d`（R9 三提交 `f2b7754` / `a8cb844` / `2e5d73d` 未推送；本地 origin/main 跟踪引用在 `3dcfb6a` = R8，远端状态因 gh EOF 不可复核） |
+| 相关   | [SPEC.md](SPEC.md)、[EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md) |
 
 ## 现状一句话
 
 M1-M8 迁移主流程、R1-R4 四轮收尾、R5 两小轮（移动端播放修复 / 面板观感）、
 R6 卫生与交付形态轮（仓库卫生清账 / AppImage 打包 / Kazumi 空态与徽章
-对齐 / README 对账）与 R7 性能实测与设置收尾轮（性能定量实测 / 恢复默认
-设置 / draft 发布制）全部完成：Kazumi 骨架上重建的 Flutter/mpv 本地播放器
-功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv 兼容导入 / 画质引擎 / 插件
-/ 11 类设置 / 更新检查），**CI 首绿已达成**（run 42718530280，
+对齐 / README 对账）、R7 性能实测与设置收尾轮（性能定量实测 / 恢复默认
+设置 / draft 发布制）、R8 纯文档轮（3.0 路线图 / 跨平台验证矩阵 / fork
+治理三件套）与 R9 M3 播放器交互轮（3.0 阶段第一批施工：章节导航 / 字幕
+管理 / A-B 循环与逐帧步进）全部完成：Kazumi 骨架上重建的 Flutter/mpv 本地
+播放器功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv 兼容导入 / 画质引擎 /
+插件 / 11 类设置 / 更新检查），**CI 首绿已达成**（run 42718530280，
 `332 tests passed, 1 skipped`），**v2.0.0-alpha 已公开发布**（tag 指向
 `bd36f70`，GitHub Release 9 资产；R7 起后续 tag 发布改 draft 制，人工
-核对 publish 才公开）；路线图「性能实测」已 ✅（容器 Isolate 计时口径，
-宿主基线归 SPEC §9），1.x 对账最后一项（恢复默认设置）已消账；本地
-37 个测试文件 355 用例 + 1 跳过全绿（R7 文档窗口实测，夹具在场基准段
-真跑）、analyze 0 告警；origin/main 跟踪引用停在 `e1db680`（最后一次
-fetch/push 时点远端已含 R5/R6 六提交，当前远端状态因 gh EOF 不可复核），
-`87b3760` / `d971af0` / `0a3436c` 三个提交待推送（推送后预期 CI 签名
-**355 passed / 1 skipped**），版本仍是 2.0.0-alpha。
+核对 publish 才公开）；2.0 路线图「性能实测」已 ✅（容器 Isolate 计时口径，
+宿主基线归 SPEC §9），1.x 对账已清零；本地 44 个测试文件 411 用例 +
+1 平台条件跳过全绿（R9 文档窗口两次实测，含 7 条真 libmpv live 用例；
+无 /tmp 夹具时 perf 基准段与音频探针按设计降级）、analyze 0 告警；
+origin/main 跟踪引用在 `3dcfb6a`（R8），R9 三提交待推送（推送后预期 CI
+签名 **411 passed / 1 skipped**，远端当前状态因 gh EOF 不可复核），版本
+仍是 2.0.0-alpha，3.0 施工按 EMOPLAY-3.0-ROADMAP 推进中（M3 进行到 T2
+主体，T0 拆分未做）。
+
+## 最近实质性变更（R9·M3 播放器交互，2026-11-11 08:20 - 11-12 00:52 CST 施工 + 文档收网）
+
+三个施工提交（`f2b7754` 章节导航、`a8cb844` 字幕管理、`2e5d73d` A-B 循环 +
+逐帧步进）+ 本轮文档收网。细节与证据见
+[发布说明](releases/RELEASE_2026-11-10_M3_PLAYER_INTERACTION.md) 与
+[轮级工作报告](reports/WORK_REPORT_2026-11-10_M3_PLAYER_INTERACTION.md)。
+
+- 章节导航（`f2b7754`，M3-T2 主体）：`chapter-list` / `chapter` 属性读取链
+  （JSON 形态实测 + 上界二分 + open 后 attach 可靠性）、底板章节面板
+  （无章节优雅隐藏）、Page Up / Page Down 跳章（出货 libmpv 内嵌默认
+  input.conf 的同位置建议绑定显式化）。路线图验收面的进度条章节刻度 /
+  hover 标题 / 中键跳章未做，挂账。
+- 字幕管理（`a8cb844`，施工件 B）：轨道切换 / 外挂字幕加载
+  （srt/ass/ssa/vtt/sub）/ 关闭字幕 / sub-delay ±0.5s 步进 HUD。真相源是
+  mpv `sid` 属性（fork 的 `Player.state.track.subtitle` 在 sub-add 后
+  stale，探针记录在控制器头注释）；键位 C/V（mpv z/Z 不可用：keyLabel
+  分发不区分 Shift + Z 被 Kazumi 倍速减占用）。
+- A-B 循环 + 逐帧步进（`2e5d73d`，施工件 C）：ab-loop 三态机
+  （B ≤ A 客户端拒绝守卫）+ L 键（1.x 经 Main.qml 转发落到 mpv 内置绑定
+  的行为显式化）、frame-step / frame-back-step + `.` / `,`（fork 命令表
+  strings 实测；frame-back-step 需 mpv ≥0.38）、控制条暂停态逐帧按钮、
+  三态菜单项与 OSD HUD；键位守护测试 2 用例（keyLabel 身份 + 零冲突）。
+- 测试侧修复（`a8cb844`）：`test/library_store_test.dart:364` 断言扫描
+  静止态前补排水等待（链式扫描管线竞态），产品代码零改动。
+- 本轮文档收网：R9 发布说明 + 轮级工作报告 + 本文件刷新 +
+  docs/README.md 索引 + CHANGELOG 补 R9 节。R8（`3dcfb6a`）为纯文档轮
+  （3.0 路线图 / 矩阵 / fork 治理），无独立发布记录。
+- 门禁实测（2026-11-12 文档窗口）：analyze 0 告警（5.7s）；44 文件
+  **411 通过 / 1 平台条件跳过**全绿（两遍全量同数；1 skip =
+  `mpv_profile_scanner_test.dart:217` Windows-only 探针；7 条真 libmpv
+  live 用例真跑，逐帧 live 17s；/tmp/perf 夹具缺失时基准段按设计降级）；
+  CI 不可测（`gh run list` EOF）；R9 三提交未推送（ahead 3）。
 
 ## 最近实质性变更（R7·性能实测与设置收尾，2026-11-11 02:55-03:37 CST 施工 + 文档收网）
 
@@ -226,33 +262,52 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
    检测（`player_keyboard_shortcuts.dart:134-148`）；Observer 内
    observable 必须无条件读取。
 10. **字体链动一处要想到 fontconfig**：fontFamily 置空必须同时带显式 CJK
-   兜底（`theme_provider.dart` 的 `kAppFontFamilyFallback`），否则中文
-   可能被 fontconfig dump 到楷体风字体（M1 的楷体事故）；改字体相关
-   代码时三条 ThemeData 路径（静态 / 动态配色）都要带上 fontFamily。
+    兜底（`theme_provider.dart` 的 `kAppFontFamilyFallback`），否则中文
+    可能被 fontconfig dump 到楷体风字体（M1 的楷体事故）；改字体相关
+    代码时三条 ThemeData 路径（静态 / 动态配色）都要带上 fontFamily。
+11. **fork 预置 vid=no：headless live 测试的夹具必须带音频轨或显式
+    `vid=auto`**：VideoController attach 前 mpv 对纯视频文件会以
+    「No video or audio streams selected」直接卸载，逐帧 / 章节等 live
+    用例会静默空转（R9 考证，`mpv_player_properties.dart:37` 注释随行）；
+    应用层不受影响（播放页总挂 VideoController）。
+12. **选轨 / 快捷键真相源别用表面 API**：fork 的
+    `Player.state.track.subtitle` 在裸 `sub-add` 后 stale，选轨状态要看
+    mpv `sid` 属性（R9 实测）；快捷键分发按 `keyLabel`、不区分 Shift，
+    字母键恒大写，mpv z/Z 型双键惯例映射不进本表（字幕延迟取 C/V 的
+    根因，`constants.dart` 注释随行），新键位用
+    `test/player_shortcut_keys_test.dart` 的模式锁 keyLabel 身份与冲突。
 
 ## 接手第一步清单
 
 1. `source /opt/emoplay-env.sh && cd /home/emo/code/emoplay && flutter analyze && flutter test`
-    - 预期 0 告警 + 355 通过 / 1 skipped（37 文件，R7 实测底数；
+    - 预期 0 告警 + 411 通过 / 1 skipped（44 文件，R9 实测底数；1 skip =
+      Windows-only 探针，按设计跳过。7 条真 libmpv live 用例真跑；
       /tmp/emoplay-perf-lib 夹具在场时 4 段基准真跑，缺失时 skip 打印
-      降级同样全绿），达不到先查环境再查代码。
+      降级同样全绿，夹具可用 `tools/gen_perf_fixture.sh` 重建），
+      达不到先查环境再查代码。
 2. `git fetch origin && git log origin/main..HEAD --oneline` 与
    `gh run list -R emoeem/emoplay --limit 5`（gh 需要外网，收网窗口内
-   api.github.com 不可达） - 确认 `87b3760` / `d971af0` / `0a3436c`
-   与本轮文档是否已推送、推送后 CI 是否
-   **355 passed / 1 skipped**；红灯按坑 2 的归因链处理。
-3. 通读 [SPEC.md](SPEC.md) §4 不变量与 [PORT-MAP.md](PORT-MAP.md) 头部铁律。
-4. 待办从 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) §四
+   api.github.com 不可达） - 确认 R9 三提交（`f2b7754` / `a8cb844` /
+   `2e5d73d`）与本轮文档是否已推送、推送后 CI 是否
+   **411 passed / 1 skipped**；红灯按坑 2 的归因链处理。
+3. 通读 [SPEC.md](SPEC.md) §4 不变量与 [PORT-MAP.md](PORT-MAP.md) 头部铁律；
+   3.0 施工任务从 [EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md) §五取
+   （M3 进行中：T2 主体已落地、进度条刻度半边挂账，T0 拆分是其余任务的
+   前置且 player_item.dart 已 1614 行）。
+4. 2.0 尾巴从 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) §四
    未做项清单取（发布产物实体机验证 → prerelease 语义 → i18n 其余设置页
    → 签名/公证；性能实测已 R7 ✅、AppImage 打包已 R6 `e1a2df0` 落地，
    路线图 §四 与 R3-R7 轮次表的勾选态以路线图下次收网为准），以及
-   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_PERF_AND_SETTINGS.md)
+   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_M3_PLAYER_INTERACTION.md)
    的优先级建议。
 5. 改完代码跑 SPEC §9 gate（build_runner → analyze → test → build linux）。
 
 ## 路线图
 
-路线图的权威来源是 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md)
+2.0 迁移路线图的权威来源是
+[UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md)
 （M0-M8 ✅+提交哈希、R1-R4 收尾轮次、未做项 ☐、验收标准与贯穿约定）；
-逐里程碑的内容细节另见 [CHANGELOG.md](../CHANGELOG.md) 的 2.0.0-alpha 小节，
-轮次结构与积压清单见 [OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md) §四。
+**3.0 施工路线图是 [EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md)**
+（M3-M8 文件级任务书与机检验收，R9 起施工按它推进）；逐里程碑的内容细节
+另见 [CHANGELOG.md](../CHANGELOG.md) 的 Unreleased 各小节，轮次结构与
+积压清单见 [OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md) §四。

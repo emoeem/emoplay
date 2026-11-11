@@ -6,6 +6,60 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
+## [Unreleased] - 2026-11-12（R9 M3 播放器交互轮）
+
+> 3.0 路线图（`docs/EMOPLAY-3.0-ROADMAP.md`）M3 阶段的第一批施工。上一轮
+> R8（`3dcfb6a`，2026-11-11）为纯文档轮（3.0 路线图 / 跨平台验证矩阵 /
+> fork 治理三件套），无用户可感知变化，故不设独立小节。
+
+### Added
+
+- **章节导航**（`f2b7754`）：读取 mpv `chapter-list` / `chapter` 属性
+  （fork 经 `readNativeString` 回读，JSON 形态逐条实测，非该形态降级为
+  空表不崩；考证注释随行 `lib/mpv/config/mpv_player_properties.dart:37`），
+  底板章节面板（Kazumi 同款自适应面板，当前章高亮，无章节文件优雅隐藏）
+  与 Page Up / Page Down 跳章快捷键（出货 libmpv 内嵌默认 input.conf 的
+  同位置建议绑定显式化）。M3-T2 验收面的进度条章节刻度 / hover 章节标题 /
+  中键跳章未做（见 `docs/releases/RELEASE_2026-11-10_M3_PLAYER_INTERACTION.md`
+  §五与 `docs/reports/WORK_REPORT_2026-11-10_M3_PLAYER_INTERACTION.md` §5）。
+- **字幕管理**（`a8cb844`）：字幕轨道切换面板（Kazumi 同款底板面板）、
+  外挂字幕加载（srt/ass/ssa/vtt/sub）、关闭字幕、字幕延迟 ±0.5s 步进
+  （±0.5 重复累加的二进制小数漂移以一位小数舍入兜住，HUD 显示
+  `+0.5s` / `0.0s` 形态）。选轨真相源是 mpv `sid` 属性：fork 的
+  `Player.state.track.subtitle` 在裸 `sub-add` 后保持 stale（fork 上实测
+  探针，`lib/pages/player/controller/player_subtitles_controller.dart:13`
+  头注释记录）。键位 C / V 承接 ±（mpv z/Z 双键惯例不可用：本表按
+  keyLabel 分发不区分 Shift，且 Z 被 Kazumi 倍速减占用；快捷键设置页新增
+  「字幕」分组）。
+- **A-B 循环与逐帧步进**（`2e5d73d`）：A-B 循环三态（设 A → 设 B →
+  清除），B 点 ≤ A 点在客户端拒绝（mpv 留为未定义的守卫）；键位 L 沿
+  mpv 内置 `ab-loop` 惯例（1.x 实际行为：该键经 Main.qml 未消费按键转发
+  落到 mpv 内置绑定，本条在 Flutter 层显式化）。逐帧步进
+  `frame-step` / `frame-back-step`（fork 命令表 strings 实测可用；
+  frame-back-step 需 mpv ≥0.38，fork 降级须复检），键位 `.` / `,`，
+  底部控制条暂停态显示上一帧 / 下一帧按钮（mpv OSC 惯例位，播放态
+  不占位）。
+
+### Fixed
+
+- **library_store_test 扫描静止态竞态**（`a8cb844`）：链式扫描管线
+  （worker 握手慢时第一趟已覆盖全部文件夹、第二趟随后串接）排干前断言
+  静止态偶发红灯；`test/library_store_test.dart:364` 补
+  `pumpUntil(() => !store.isScanning)` 排水等待，产品代码零改动。
+
+### 验证
+
+- `flutter analyze` 0 告警（`No issues found! (ran in 5.7s)`）；
+  `flutter test` 44 文件 **411 通过 + 1 平台条件跳过**全绿（2026-11-12
+  文档窗口两遍实测同数；上轮 37 文件 / 355 + 1，+7 文件 / +56 用例：
+  章节 14+2、字幕 7+2、A-B 循环 26、逐帧 live 3、键位守护 2，逐文件
+  实测计数与全量差值交叉核对一致）。1 skip = Windows-only 探针
+  （`mpv_profile_scanner_test.dart:217`，按设计跳过）。7 条真 libmpv
+  live 用例真跑（逐帧 live 17s）；/tmp/perf 夹具缺失时基准段与音频探针
+  按 skip-打印降级通过（计数不变）。CI 本窗口不可测：`gh run list` EOF
+  （api.github.com 不可达）；R9 三提交未推送（本地 ahead 3），推送后
+  预期签名 **411 passed / 1 skipped**。
+
 ## [Unreleased] - 2026-11-11（R7 性能实测与设置收尾轮）
 
 ### Added
