@@ -2,30 +2,77 @@
 
 | 项     | 值                                                                          |
 | ------ | --------------------------------------------------------------------------- |
-| 状态   | 生效中（2026-11-12 R11 M5 音乐与在线元数据兜底轮之后）                       |
-| 日期   | 2026-11-12（最后实质性更新）                                                 |
-| 适用版本 | git `eb3b2bf`（R11 四提交 `2115183` / `ec456b3` / `a539866` / `eb3b2bf` 未推送；本地 origin/main 跟踪引用在 `b87e1c8` = v2.2.0-alpha 发版提交，2026-11-12 文档窗口实测该点 main run 43101040926 ✓ 与 release run 43101070581 ✓，v2.2.0-alpha 已公开 11 资产） |
-| 相关   | [SPEC.md](SPEC.md)、[EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md)、[R11 工作报告](reports/WORK_REPORT_2026-11-10_M5_MUSIC_METADATA.md) |
+| 状态   | 生效中（2026-11-13 R12 M6 插件安全 + M3-T1 帧预览轮之后）                    |
+| 日期   | 2026-11-13（最后实质性更新）                                                 |
+| 适用版本 | git `3514db3`（R12 五提交 `757d130` / `0919ccc` / `07427f8` / `7b89bb0` / `3514db3`；前三提交已推送、后两提交待推送，本地 origin/main 跟踪引用在 `07427f8`；gh 本窗口 EOF，CI 与 release 状态不可复核，2026-11-13 文档窗口实测） |
+| 相关   | [SPEC.md](SPEC.md)、[EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md)、[OVERNIGHT-LOOP.md](OVERNIGHT-LOOP.md)、[docs/README.md](README.md)、[R12 工作报告](reports/WORK_REPORT_2026-11-10_M6_PLUGIN_SECURITY_M3T1_SEEK_PREVIEW.md) |
 
 ## 现状一句话
 
-M1-M8 迁移主流程、R1-R10 十轮收尾与施工（移动端播放 / 面板观感 / 卫生与
-AppImage / 性能实测与设置收尾 / 3.0 文档三件套 / M3 播放器交互 / M4 媒体
-库升级：统一 `MediaItem` 模型、元数据缓存、网格四分组、收藏集、目录树、
-本地 NFO/海报/剧集分组）与 R11 M5 音乐与在线元数据兜底轮（M5-T1 循环/
-队列三态 + music 队列面板、M5-T2 replaygain/gapless、M5-T3 歌词升级 +
-常驻迷你条、M4-T7 联网兜底框架默认关）全部完成：Kazumi 骨架上重建的
-Flutter/mpv 本地播放器功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv
-兼容导入 / 画质引擎 / 插件 / 11 类设置 + 在线元数据 / 更新检查），
-**v2.2.0-alpha 已公开发布**（draft 制人工 publish，11 资产，run
-43101070581 矩阵全绿）；本地 60 个测试文件 539 用例 + 1 平台条件跳过
-全绿（R11 文档窗口实测，含真 libmpv live 用例；无 /tmp 夹具时 perf 基准
-段与音频探针按设计降级）、analyze 0 告警；R11 四提交待推送（ahead 4，
-推送后预期 CI 签名 **539 passed / 1 skipped**），版本仍
-`2.2.0-alpha+2020000`（R11 在 CHANGELOG [Unreleased]，未 bump 未发版），
-3.0 施工按 EMOPLAY-3.0-ROADMAP 推进中（M3-T0 ✅、M4 七任务全 ✅ 含 T7
-框架、M5 三任务全 ✅，下一阶段 M6 插件安全；TMDB 真实联网数据流与
-replaygain/gapless 听感两项目人工验收待用户）。
+M1-M8 迁移主流程、R1-R11 收尾与施工轮、R12 M6 插件安全 + M3-T1 帧预览轮
+（M6-T1 清单 size+sha256 缺一拒装 + 装前内容校验、M6-T2 操作审计
+plugin_audit.jsonl append-only、M6-T3 destination 防穿越 fuzz + 操作白名单、
+M6-T4 插件页 catalog 重组、M3-T1 第二解码实例帧预览默认关、mpv.conf 行内
+注释无声事故修复）全部完成：Kazumi 骨架上重建的 Flutter/mpv 本地播放器
+功能对等（播放 / 本地媒体 / 媒体库 / 历史 / mpv 兼容导入 / 画质引擎 /
+插件安全加固 / 11 类设置 + 在线元数据 / 更新检查），**v2.3.0-alpha 已发布**
+（CHANGELOG 记「已发布」；gh 本窗口 EOF，资产态未复核）；本地 63 个测试
+文件 585 用例 + 1 平台条件跳过全绿（R12 文档窗口实测，含真 libmpv live
+用例；无 /tmp 夹具时 perf 基准段与音频探针按设计降级）、analyze 0 告警；
+R12 后两提交待推送（ahead 2：`7b89bb0` / `3514db3`，推送后预期 CI 签名
+**585 passed / 1 skipped**），版本仍 `2.3.0-alpha+2030000`（R12 在
+CHANGELOG [Unreleased]，未 bump 未发版），3.0 施工按
+EMOPLAY-3.0-ROADMAP 推进中（M3-T0/T1 ✅、M4 七任务全 ✅、M5 三任务全 ✅、
+M6 四任务全 ✅，下一阶段 M7 诊断/测试，M3 残留 T2-T9 择机；TMDB 真实
+联网数据流、replaygain/gapless 听感、帧预览画面三项目人工验收待用户）。
+
+## 最近实质性变更（R12·M6 插件安全 + M3-T1 帧预览，2026-11-12 08:10 - 11-13 00:30 CST 施工 + 文档收网）
+
+五个施工提交（`757d130` M6-T1/T2 清单完整性+审计、`0919ccc` M6-T3 fuzz+
+白名单、`07427f8` mpv.conf 行内注释修复、`7b89bb0` M6-T4 catalog、
+`3514db3` M3-T1 帧预览）+ 本轮文档收网。细节与证据见
+[发布说明](releases/RELEASE_2026-11-10_M6_PLUGIN_SECURITY_M3T1_SEEK_PREVIEW.md)
+与[轮级工作报告](reports/WORK_REPORT_2026-11-10_M6_PLUGIN_SECURITY_M3T1_SEEK_PREVIEW.md)。
+
+- 清单资产完整性（M6-T1，`757d130`）：manifest 可选 sizeBytes+sha256
+  全有全无对，缺一拒装且闸门在 install/replace-update 链**最前**（任何
+  git 命令之前）；克隆内容先验后记（`PluginContentIntegrity`，摘要定义
+  确定性：`.git` 剪枝、符号链接跳过、路径排序、`<hash>  <path>\n` 清单
+  再整体 sha256），不匹配即删刚克隆的树；不声明字段 = 1.x 行为逐位不变。
+- 操作审计（M6-T2，`757d130`）：`<appDataDir>/plugin_audit.jsonl`
+  append-only JSONL（第 5 个独立 AppData 文件），plan/operation 两类
+  事件、**拒绝也留痕**（busy / 已安装 / porcelain / 完整性拒绝同一出口）；
+  观察性日志：写失败吞掉、损坏行跳过，从不阻断操作。
+- 暴力面收缩（M6-T3，`0919ccc`）：destination 防穿越 fuzz 钉死
+  （敌意语料 12 条 + 形似对照 4 条 + 符号链接两类，parse 拒绝 + 整目录
+  fail-closed + git 零调用三段断言）；`allowedOperations` 白名单常量化
+  （install/uninstall/update/check），未知动作默认拒绝。
+- 插件页 catalog（M6-T4，`7b89bb0`）：Kazumi plugin_editor 范式，搜索 +
+  全部/已安装/可更新过滤 + 详情页；plugins_page 577→485 行拆四件（全部
+  <600 行）；三段式 UI 语义不变（不变量 6，过滤只变换视图）。
+- compat 修复（`07427f8`）：带注释 mpv.conf 的行内 `#` 在 runtime 属性
+  语境不是注释，字符串型选项静默把注释当值（audio-device =
+  `auto # 此项用于…`，每会话无声，用户报告，两 alpha 可复现）；
+  `MpvConfigParser.runtimeOptionValue`（`mpv_config_parser.dart:137`）
+  复刻 mpv 文件语义，5 条回归测试取自报告人真实 conf 行。
+- 帧预览（M3-T1，`3514db3`）：进度条 hover/拖动出帧图，第二 media_kit
+  解码实例（Haruna MpvPreview 语义移植，属性集等价表
+  `seekPreviewMpvProperties` 生产/断言共表）；激活门禁五条件同
+  HProgressBar；hover 懒建 + 100ms 消抖；**隐藏即 pause 不拆**；开关
+  `seekPreview` 默认关（Haruna kcfg 同默认，关闭零实例开销，实例数守卫
+  锁定）+ 宽度 `seekPreviewWidth` 默认 200（滑杆 120-400）；属性集 live
+  probe 2026-11-13 实测全过，**画面效果待 GUI 人工验收（SPEC §9）**。
+- 本轮文档收网：R12 发布说明 + 轮级工作报告 + 本文件刷新 +
+  docs/README.md 索引 + CHANGELOG `[Unreleased]` R12 节。**路线图
+  M3-T1 与 M6 四任务的 ☐→✅+哈希回填已在工作树**（未提交，随本轮文档
+  提交入库，勾选与五提交逐一相符）。
+- 门禁实测（2026-11-13 文档窗口）：analyze 0 告警（7.6s）；63 文件
+  **585 通过 / 1 平台条件跳过**全绿（1 skip =
+  `mpv_profile_scanner_test.dart:217` Windows-only 探针；新增用例 46
+  逐文件点数与全量差值 585-539 闭环；真 libmpv live 用例真跑）；gh
+  本窗口 EOF（api.github.com 不可达），CI 与 release 状态不可复核；
+  R12 前三提交已推送（origin/main = `07427f8`）、后两提交待推送
+  （ahead 2）。
 
 ## 最近实质性变更（R11·M5 音乐与在线元数据兜底，2026-11-12 05:51-06:55 CST 施工 + 文档收网）
 
@@ -392,30 +439,53 @@ dl.google.com 不可达）。细节与文件清单见 CHANGELOG.md 的 Unrelease
     传输失败（断网 / 超时 / HTTP 错误 / 损坏响应）**永不缓存**（网络恢复
     后重试）；本地 NFO 覆盖的条目永远不联网。排障先对五道门禁顺序与
     key 掩码显示（`lib/media/online/online_meta_service.dart` 文件头）。
+18. **mpv.conf 行内注释：runtime 应用 ≠ 文件读取**：compat 层把每行当
+    运行时属性下发，`#` 在属性语境不是注释；runtime 值必须经
+    `MpvConfigParser.runtimeOptionValue` 清洗（空白前导 `#` 起注释、
+    紧贴值首的 `#` 是颜色码要保留，`mpv_config_parser.dart:137`）。
+    绕过它做新解析时注释文本会静默变成值（R12 无声事故根因，
+    `07427f8`；字符串型不报错、数字型 apply 失败，最隐蔽的是前者）。
+19. **帧预览第二实例：属性集只有一张表，隐藏只 pause 不拆**：
+    `seekPreviewMpvProperties`（`seek_preview_controller.dart:62`）是
+    生产创建与测试断言共用的单通道，改属性只改表（漂移即红）；
+    fork 预置 vid=no，预览实例必须 attach VideoController 才有画面；
+    气泡隐藏是取消挂起 seek + pause（Haruna Loader active 语义），
+    别把它「修」成销毁重建；关闭开关时零实例由
+    `performance_guards_test` 两条守卫锁定。
+20. **插件安全三件事的位置**：完整性对（sizeBytes+sha256）缺一拒装的
+    闸门在 install/replace-update 链**最前**（任何 git 命令之前）；
+    摘要定义（`.git` 剪枝、符号链接跳过、相对路径排序、
+    `<hash>  <path>\n` 清单再整体 sha256）在 `PluginContentIntegrity`
+    文件头，插件作者算钉值必须按它；`plugin_audit.jsonl` 是观察性
+    日志（写失败吞掉、损坏行跳过），拦截逻辑挂在三段式确认链与
+    porcelain 防线，别挂到审计上。另：`test/plugin_audit_test.dart:117`
+    夹具内嵌字面 NUL 字节，git 视整文件为二进制（diff 不可文本评审），
+    评审请直接读文件。
 
 ## 接手第一步清单
 
 1. `source /opt/emoplay-env.sh && cd /home/emo/code/emoplay && flutter analyze && flutter test`
-    - 预期 0 告警 + 539 通过 / 1 skipped（60 文件，R11 实测底数；1 skip =
+    - 预期 0 告警 + 585 通过 / 1 skipped（63 文件，R12 实测底数；1 skip =
       Windows-only 探针，按设计跳过。真 libmpv live 用例真跑；
       /tmp/emoplay-perf-lib 夹具在场时 4 段基准真跑，缺失时 skip 打印
       降级同样全绿，夹具可用 `tools/gen_perf_fixture.sh` 重建），
       达不到先查环境再查代码。
 2. `git fetch origin && git log origin/main..HEAD --oneline` 与
-   `gh run list -R emoeem/emoplay --limit 5`（gh 2026-11-12 窗口恢复
-   可达，但属窗口性） - 确认 R11 四提交（`2115183` / `ec456b3` /
-   `a539866` / `eb3b2bf`）与本轮文档（含路线图工作树回填）是否已推送、
-   推送后 CI 是否 **539 passed / 1 skipped**；红灯按坑 2 的归因链处理。
+   `gh run list -R emoeem/emoplay --limit 5`（gh 属窗口性，2026-11-13
+   窗口 EOF） - 确认 R12 后两提交（`7b89bb0` / `3514db3`）与本轮文档
+   （含路线图工作树回填）是否已推送、推送后 CI 是否
+   **585 passed / 1 skipped**；红灯按坑 2 的归因链处理。
 3. 通读 [SPEC.md](SPEC.md) §4 不变量与 [PORT-MAP.md](PORT-MAP.md) 头部铁律；
    3.0 施工任务从 [EMOPLAY-3.0-ROADMAP.md](EMOPLAY-3.0-ROADMAP.md) §五取
-   （M4 七任务全 ✅ 含 T7 框架、M5 三任务全 ✅；M3 剩 T1 帧预览 / T2
-   刻度收口 / T3 面板；下一阶段 M6 插件安全；TMDB 真实联网数据流与
-   replaygain/gapless 听感两项目人工验收待用户，见 R11 报告 §5）。
+   （M4 七任务全 ✅ 含 T7 框架、M5 三任务全 ✅、M6 四任务全 ✅、
+   M3-T0/T1 ✅；M3 剩 T2 刻度收口 / T3 悬浮面板 / T4-T9；下一阶段
+   M7 诊断/测试；TMDB 真实联网数据流、replaygain/gapless 听感、帧预览
+   画面三项目人工验收待用户，见 R12 报告 §5）。
 4. 2.0 尾巴从 [UPGRADE_ROADMAP_2026-11-10.md](UPGRADE_ROADMAP_2026-11-10.md) §四
    未做项清单取（发布产物实体机验证 → prerelease 语义 → i18n 其余设置页
    → 签名/公证；性能实测已 R7 ✅、AppImage 打包已 R6 `e1a2df0` 落地，
    路线图 §四 与 R3-R7 轮次表的勾选态以路线图下次收网为准），以及
-   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_M5_MUSIC_METADATA.md)
+   [最新工作报告 §6](reports/WORK_REPORT_2026-11-10_M6_PLUGIN_SECURITY_M3T1_SEEK_PREVIEW.md)
    的优先级建议。
 5. 改完代码跑 SPEC §9 gate（build_runner → analyze → test → build linux）。
 

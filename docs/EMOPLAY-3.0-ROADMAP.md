@@ -91,7 +91,13 @@ Haruna、IINA、mpv.net 的成熟交互语义移植进来，这是 EmoPlay「mpv
 ### 2.4 缺失（对照参考项目的功能空位，编号即任务号）
 
 - **帧预览**：进度条 hover 只有时间文本气泡（`player_progress_bar.dart:51,216`），
-  无第二解码实例，Haruna 有（P0，M3-T1）。
+  无第二解码实例，Haruna 有（P0，M3-T1）。**已由 M3-T1 交付（`3514db3`，
+  2026-11-13 实测 git `3514db3` 工作树）**：第二解码实例
+  `lib/pages/player/controller/seek_preview_controller.dart`（403 行）落地，
+  `player_progress_bar.dart` hover 气泡升级为帧图（+147 行），开关/预览宽度
+  新键入 `player_settings.dart` + `settings_keys.dart`；随提交入库
+  `test/seek_preview_controller_test.dart`（396 行）与 `performance_guards_test.dart`
+  实例计数守卫（+131 行）。
 - **章节**：`grep -ri 'chapter' lib/ -il` 零命中（2026-11-11 实测），chapter/
   chapter-list 属性全链缺失（P0，M3-T2）。
 - **鼠标操作映射 / 自定义 mpv 命令**：无映射表、无按键→动作解析（P1，M3-T4）。
@@ -204,7 +210,7 @@ build_runner → `flutter analyze` → `flutter test` → `flutter build linux -
 | 任务 | 内容（文件级） | 依赖 | 验收（机检） |
 | --- | --- | --- | --- |
 | M3-T0 ✅（`c9245f8`） | 拆 `player_item.dart`（1538 行）：PiP→`player_pip.dart`、audio_service 绑定→`player_audio_binding.dart`、键盘→既有 `player_keyboard_shortcuts.dart` 收拢、菜单→独立文件；`player_screenshot_sheet.dart`（1052 行）复审拆分。纯搬移不改行为 | 无 | `flutter test` 355+1 全绿；`flutter analyze` 0 error；`wc -l lib/pages/player/player_item.dart` < 500；新增文件均 < 600 行 |
-| M3-T1 ☐ | 帧预览：新建 `lib/pages/player/controller/seek_preview_controller.dart`（第二 Player，Haruna 属性集：pause/mute/aid=no/sid=no/sub-auto=no/osd-level=0/audio-display=no/hr-seek 跟随等价设置）；`player_progress_bar.dart` hover 气泡加载帧图（`Video` widget 纹理）；拖动中双 seek（主+预览）；开关+预览宽度设置落 `player_settings.dart` + `settings_keys.dart` 新键 | T0 | 新增 `test/seek_preview_controller_test.dart`（≥6 用例：激活条件 isLocalFile&&isVideo&&非停止、消抖、隐藏即 pause、设置关闭不建实例、dispose 链）；性能守卫入 `performance_guards_test.dart`：关闭开关时 Player 实例数不增（测试缝计数） |
+| M3-T1 ✅（`3514db3`） | 帧预览：新建 `lib/pages/player/controller/seek_preview_controller.dart`（第二 Player，Haruna 属性集：pause/mute/aid=no/sid=no/sub-auto=no/osd-level=0/audio-display=no/hr-seek 跟随等价设置）；`player_progress_bar.dart` hover 气泡加载帧图（`Video` widget 纹理）；拖动中双 seek（主+预览）；开关+预览宽度设置落 `player_settings.dart` + `settings_keys.dart` 新键 | T0 | 新增 `test/seek_preview_controller_test.dart`（≥6 用例：激活条件 isLocalFile&&isVideo&&非停止、消抖、隐藏即 pause、设置关闭不建实例、dispose 链）；性能守卫入 `performance_guards_test.dart`：关闭开关时 Player 实例数不增（测试缝计数） |
 | M3-T2 ☐ | 章节：`mpv_player_properties.dart` 补 chapter/chapter-list 读取说明（沿用文件头考证格式）；新建 `lib/pages/player/controller/chapters_model.dart`（titleAtPosition 上界二分）；`player_progress_bar.dart` 章节刻度（rowCount*20<宽 规则）+ hover 章节标题；新建 `lib/pages/player/chapters_sheet.dart`（跳转+Skip 过滤设置键）；中键跳下一章 | T0 | 新增 `test/chapters_model_test.dart`（≥8 用例：空表/单章/边界/二分正确性）；chapters_sheet 挂接；全绿底数 ≥ 355+14 |
 | M3-T3 ☐ | 播放列表悬浮面板：`player_item_panel.dart:569` 底板升级悬浮面板（`SidePanelTransition` 容器）；左右 edge 设置键、宽度记忆键、边缘悬停展开（复用 `player_gesture_detector.dart:39-43`）；行右键菜单（播放下一/移除/复制路径）+ 行拖拽排序（PiliPlus ReorderableListView 范式） | T0 | 面板宽度/edge 持久化用例入 `test/emoplay_settings_test.dart`；新增 `test/playlist_panel_test.dart`（≥4 用例：开关/宽度钳制 260..window-50 语义/拖拽重排/菜单动作） |
 | M3-T4 ☐ | 鼠标映射：新建 `lib/settings/mouse_action_settings.dart`（十键位×修饰键→动作名字典 + 默认表照抄 Haruna `mousesettings.kcfg` 语义）；`player_gesture_detector.dart` 加 tap/doubleTap/secondaryTap/滚轮分发→查表→动作执行；新建 `lib/pages/settings/mouse_settings.dart` | T0 | 新增 `test/mouse_action_settings_test.dart`（≥8 用例：默认表、修饰键解析、getAction 未知键回退、JSON 往返） |
@@ -249,10 +255,10 @@ M3 阶段验收追加：`flutter test` 用例数 ≥ **355 + 45**；`flutter bui
 
 | 任务 | 内容 | 依赖 | 验收 |
 | --- | --- | --- | --- |
-| M6-T1 ☐ | 清单完整性：`plugin_manifest.dart` 增资产 sha256 必填校验（size+hash 双字段，缺一拒装）；`plugin_git_runner.dart` 校验点前置 | 无 | `test/plugin_manifest_test.dart` 增 ≥4（缺 hash 拒绝、hash 不符拒绝、重放同 hash 通过、字段往返） |
-| M6-T2 ☐ | 操作审计：`plugin_manager.dart` planOperation 结果（永不直接执行的判定链）落盘 `plugin_audit.jsonl`（AppData 新文件，append-only） | 无 | 新增 `test/plugin_audit_test.dart`（≥4：append-only、损坏行跳过、porcelain 拒绝也留痕、不写用户目录） |
-| M6-T3 ☐ | 暴力面收缩：destination 防穿越 fuzz 用例批量（路径穿越/符号链接/绝对路径/`..` 混合 ≥10 用例）；operations 白名单常量化 | 无 | `test/plugin_manager_test.dart` 增 fuzz 段；全绿 |
-| M6-T4 ☐ | 插件页 catalog 重组（Kazumi plugin_editor 范式：目录视图+详情+更新动作分离），三段式 UI 语义不变（不变量 6） | M6-T1 | 现有 plugin 用例全绿；新增 catalog 分派测试 ≥2 |
+| M6-T1 ✅（`757d130`） | 清单完整性：`plugin_manifest.dart` 增资产 sha256 必填校验（size+hash 双字段，缺一拒装）；`plugin_git_runner.dart` 校验点前置 | 无 | `test/plugin_manifest_test.dart` 增 ≥4（缺 hash 拒绝、hash 不符拒绝、重放同 hash 通过、字段往返） |
+| M6-T2 ✅（`757d130`） | 操作审计：`plugin_manager.dart` planOperation 结果（永不直接执行的判定链）落盘 `plugin_audit.jsonl`（AppData 新文件，append-only） | 无 | 新增 `test/plugin_audit_test.dart`（≥4：append-only、损坏行跳过、porcelain 拒绝也留痕、不写用户目录） |
+| M6-T3 ✅（`0919ccc`） | 暴力面收缩：destination 防穿越 fuzz 用例批量（路径穿越/符号链接/绝对路径/`..` 混合 ≥10 用例）；operations 白名单常量化 | 无 | `test/plugin_manager_test.dart` 增 fuzz 段；全绿 |
+| M6-T4 ✅（`7b89bb0`） | 插件页 catalog 重组（Kazumi plugin_editor 范式：目录视图+详情+更新动作分离），三段式 UI 语义不变（不变量 6） | M6-T1 | 现有 plugin 用例全绿；新增 catalog 分派测试 ≥2 |
 
 ### M7 诊断/测试
 

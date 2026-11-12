@@ -6,6 +6,75 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
+## [Unreleased] - R12（M6 插件安全 + M3-T1 帧预览）
+
+> 第 12 轮施工：M6 插件安全四任务（清单完整性 / 操作审计 / 暴力面
+> 收缩 / 插件页 catalog）+ M3-T1 帧预览 + mpv.conf 行内注释无声修复。
+> 全量测试 63 文件 585 用例 + 1 平台条件跳过（2026-11-13 文档窗口实测，
+> 明细见 docs/releases/RELEASE_2026-11-10_M6_PLUGIN_SECURITY_M3T1_SEEK_PREVIEW.md）。
+
+### Added
+
+- **插件清单资产完整性（M6-T1，`757d130`）**：manifest 可选
+  `sizeBytes` + `sha256` 全有全无对（缺一拒装，`integrityGateError()`），
+  闸门在 install / replace 型 update 链**最前**（任何 git 命令之前）；
+  克隆内容先验后记（`PluginContentIntegrity`：`.git` 剪枝、符号链接
+  跳过、相对路径排序、`<hash>  <path>\n` 清单再整体 sha256，字节数
+  独立先比），不匹配即删刚克隆的树；不声明字段 = 1.x 行为逐位不变
+  （`toMap()` 条件输出 + 往返用例锁定）。测试：plugin_manifest_test
+  +5、plugin_manager_test +4。
+- **插件操作审计（M6-T2，`757d130`）**：新 AppData 文件
+  `plugin_audit.jsonl`（plugins/ 兄弟文件）append-only JSONL，
+  plan/operation 两类事件、拒绝也留痕（busy / 已安装 / porcelain 防线 /
+  完整性拒绝同一出口）；观察性日志（写失败吞掉、损坏行跳过），从不
+  阻断操作。新增 `test/plugin_audit_test.dart`（5 用例，验收线 ≥4）。
+- **destination 防穿越 fuzz + 操作白名单（M6-T3，`0919ccc`）**：敌意
+  destination 语料 12 条 + 形似对照 4 条 + 符号链接两类端到端钉死
+  （parse 拒绝 / 整目录 fail-closed / git 零调用）；planOperation 字符串
+  动作收敛为 `allowedOperations` 常量白名单，未知动作默认拒绝。
+  plugin_manager_test +6。
+- **插件页 catalog 重组（M6-T4，`7b89bb0`）**：Kazumi plugin_editor
+  范式（搜索框 + 全部/已安装/可更新过滤 chip + 每插件详情页 + 更新
+  动作独立成件），三段式 UI 语义不变（不变量 6）；plugins_page
+  577→485 行拆四件（dispatch/row/detail/actions，全部 <600 行）；新增
+  `test/plugin_catalog_test.dart` 9 用例。
+- **进度条帧预览（M3-T1，`3514db3`）**：hover / 拖动出帧图，第二
+  media_kit 解码实例（Haruna MpvPreview 语义移植，属性集等价表
+  `seekPreviewMpvProperties` 生产/断言共表，mute/pause/aid=no/sid=no/
+  osd-level=0 等逐项对照 mpvpreview.cpp:21-38）；激活门禁五条件同
+  Haruna HProgressBar（开 && 本地文件 && 视频 && 非停止），hover 懒建
+  + 100ms 消抖、隐藏即取消挂起 seek 并 pause 实例、拖动双 seek；开关
+  `seekPreview` **默认关**（Haruna kcfg 同默认，关闭零第二实例开销，
+  实例数守卫锁定）+ `seekPreviewWidth` 默认 200（滑杆 120-400）；
+  气泡带章节标题（复用 M3-T2 上界二分）。属性集 live probe 2026-11-13
+  实测全过；画面效果待 GUI 人工验收（SPEC §9）。新增
+  `test/seek_preview_controller_test.dart` 10 用例（验收线 ≥6）+
+  performance_guards_test +2。
+
+### Fixed
+
+- **带注释的 mpv.conf 导致无声**（`07427f8`，用户报告 2026-11-12，
+  v2.2.0-alpha / v2.3.0-alpha 可复现）：1.x 由 mpv 读文件（空白前导
+  `#` 是行尾注释），2.0 兼容层把每行当运行时属性下发（属性语境 `#`
+  不是注释），字符串型选项静默把注释文本当值收下（audio-device 变成
+  `auto # 此项用于指定启动时的音频输出设备`，设备找不到，每会话
+  「Could not open/initialize audio device -> no sound」）。根因修复：
+  `MpvConfigParser.runtimeOptionValue`（`mpv_config_parser.dart:137`）
+  复刻 mpv 文件语义（空白前导 `#` 起注释、紧贴值首 `#` 是颜色码保留），
+  设置编辑器往返保留原始行，审计表报告清洗后值；5 条回归测试取自
+  报告人真实 conf 行（mpv_config_parser_test +4 / mpv_import_rules_test
+  +1）。
+
+### 验证
+
+- 本地门（R12 施工/文档窗口实测，2026-11-13）：`flutter analyze` 0
+  告警；`flutter test` 63 文件 **585 通过 + 1 平台条件跳过**全绿
+  （1 skip = Windows-only 探针，按设计跳过；新增用例 46 逐文件计数与
+  全量差值 585-539 闭环；真 libmpv live 用例真跑）。
+- CI：本窗口不可测（`gh run list` EOF，api.github.com 不可达）；R12
+  前三提交已推送（origin/main = `07427f8`）、后两提交（`7b89bb0` /
+  `3514db3`）待推送；推送后预期签名 **585 passed / 1 skipped**。
+
 ## [2.3.0-alpha] - 2026-11-12（已发布）
 
 R11 施工收口（tag `v2.3.0-alpha`；`pubspec.yaml` version
