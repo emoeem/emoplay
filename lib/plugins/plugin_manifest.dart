@@ -22,6 +22,16 @@
 //   baseline    upstream commit/tag the local customizations are based on;
 //               empty when the manifest does not declare one
 //
+// M6-T1 asset integrity (optional pair, roadmap §五 M6-T1):
+//   sizeBytes   total byte size of the pinned content tree (see
+//               PluginContentIntegrity in plugin_git_runner.dart); absent in
+//               the 1.x manager.json form
+//   sha256      sha256 hex digest of the same content tree; absent in the
+//               1.x form. The pair is all-or-nothing at install time
+//               (缺一拒装 — [integrityGateError]): declaring only one of the
+//               two refuses the install. A manifest that declares neither
+//               keeps the exact 1.x behaviour.
+//
 // Parsing is pure logic (no I/O, no git) so it can be unit-tested directly.
 library;
 
@@ -38,6 +48,8 @@ class PluginManifest {
     this.destination = '',
     this.mode = '',
     this.baseline = '',
+    this.sizeBytes,
+    this.sha256 = '',
     this.valid = false,
     this.error = '',
   });
@@ -50,10 +62,57 @@ class PluginManifest {
   String mode;
   String baseline;
 
+  // M6-T1 asset integrity pair (null / '' = not declared).
+  int? sizeBytes;
+  String sha256;
+
   bool valid;
   String error;
 
   bool get isReplace => mode == 'replace';
+
+  /// True when the manifest declares any asset-integrity field at all.
+  bool get hasIntegrityFields => sha256.isNotEmpty || sizeBytes != null;
+
+  /// True when the size+hash pair is complete — the precondition for
+  /// verifying installed content against the manifest (M6-T1).
+  bool get isIntegrityPinned => sha256.isNotEmpty && sizeBytes != null;
+
+  /// M6-T1 install gate (缺一拒装): the integrity fields form an
+  /// all-or-nothing pair. A manifest that pins only one of sizeBytes/sha256
+  /// refuses the install and returns the refusal reason here; a manifest
+  /// that declares neither (the 1.x manager.json form) installs exactly as
+  /// before and returns the empty string. Malformed values (bad hex, negative
+  /// sizes) never get this far — [parse] rejects them outright.
+  String integrityGateError() {
+    if (sha256.isEmpty && sizeBytes == null) {
+      return '';
+    }
+    if (sha256.isEmpty) {
+      return 'manifest "$name" declares sizeBytes without sha256 — asset '
+          'integrity needs both fields (size+hash), refusing to install';
+    }
+    if (sizeBytes == null) {
+      return 'manifest "$name" declares sha256 without sizeBytes — asset '
+          'integrity needs both fields (size+hash), refusing to install';
+    }
+    return '';
+  }
+
+  /// Roundtrips through [parse] with identical field values (M6-T1 field
+  /// roundtrip contract). The integrity keys are emitted only when declared,
+  /// so unpinned entries keep the exact 1.x manager.json field shape.
+  Map<String, Object?> toMap() => <String, Object?>{
+        'name': name,
+        'url': url,
+        'branch': branch,
+        'source': source,
+        'destination': destination,
+        'mode': mode,
+        'baseline': baseline,
+        if (sizeBytes != null) 'sizeBytes': sizeBytes,
+        if (sha256.isNotEmpty) 'sha256': sha256,
+      };
 
   /// Script plugins install under a scripts/ destination and can be appended
   /// to mpv's --scripts path list; shader/asset plugins are only distributed
@@ -94,6 +153,8 @@ class PluginManifest {
     String source = '';
     String mode = '';
     String baseline = '';
+    String sha256 = '';
+    int? sizeBytes;
 
     if (!_readString(object, 'name', (v) => name = v, (e) => error = e) ||
         !_readString(object, 'url', (v) => url = v, (e) => error = e) ||
@@ -103,7 +164,9 @@ class PluginManifest {
         !_readString(object, 'source', (v) => source = v, (e) => error = e) ||
         !_readString(object, 'mode', (v) => mode = v, (e) => error = e) ||
         !_readString(
-            object, 'baseline', (v) => baseline = v, (e) => error = e)) {
+            object, 'baseline', (v) => baseline = v, (e) => error = e) ||
+        !_readString(object, 'sha256', (v) => sha256 = v, (e) => error = e) ||
+        !_readInt(object, 'sizeBytes', (v) => sizeBytes = v, (e) => error = e)) {
       return manifest..error = error;
     }
 
@@ -135,6 +198,19 @@ class PluginManifest {
         ..error =
             'invalid mode "$mode" for "$name" (expected "check" or "replace")';
     }
+    // M6-T1: a declared sha256 must be a well-formed 64-hex digest and a
+    // declared sizeBytes a non-negative byte count. Parse stays accepting
+    // for entries that declare neither (the 1.x manager.json has no
+    // integrity fields); the size+hash PAIR requirement (缺一拒装) is the
+    // install gate — see [integrityGateError].
+    if (sha256.isNotEmpty && !_sha256Pattern.hasMatch(sha256)) {
+      return manifest
+        ..error =
+            'field "sha256" must be a 64-character hex digest for "$name"';
+    }
+    if (sizeBytes != null && sizeBytes! < 0) {
+      return manifest..error = 'field "sizeBytes" must be >= 0 for "$name"';
+    }
 
     return manifest
       ..valid = true
@@ -146,7 +222,9 @@ class PluginManifest {
       ..branch = branch.isEmpty ? 'main' : branch
       ..source = source.isEmpty ? '.' : source
       ..mode = mode.isEmpty ? 'check' : mode
-      ..baseline = baseline;
+      ..baseline = baseline
+      ..sizeBytes = sizeBytes
+      ..sha256 = sha256;
   }
 
   /// Parses a manifest document: either the mpv-Emo form
@@ -218,6 +296,10 @@ class PluginManifest {
   // traversal, no hidden directories).
   static final RegExp _namePattern = RegExp(r'^[A-Za-z0-9_-]+$');
 
+  // A declared sha256 is a lowercase/uppercase 64-hex digest (M6-T1). The
+  // digest itself is defined by PluginContentIntegrity (plugin_git_runner.dart).
+  static final RegExp _sha256Pattern = RegExp(r'^[0-9a-fA-F]{64}$');
+
   // Relative paths (manifest source/destination) must stay inside the tree
   // they are applied to: absolute paths, ".." segments and backslashes are
   // rejected.
@@ -252,6 +334,27 @@ class PluginManifest {
     final json = object[key];
     if (json is! String) {
       fail('field "$key" must be a string');
+      return false;
+    }
+    assign(json);
+    return true;
+  }
+
+  // Reads an integer field. Mirrors _readString: an absent key is optional,
+  // an explicit JSON null, a double (1.5), a bool or a string ("42") fails —
+  // nothing may silently coerce into the byte-count field (M6-T1).
+  static bool _readInt(
+    Map<Object?, Object?> object,
+    String key,
+    void Function(int value) assign,
+    void Function(String error) fail,
+  ) {
+    if (!object.containsKey(key)) {
+      return true; // absent: optional, stays at the caller's default
+    }
+    final json = object[key];
+    if (json is! int) {
+      fail('field "$key" must be an integer');
       return false;
     }
     assign(json);

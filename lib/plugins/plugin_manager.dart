@@ -23,7 +23,20 @@
 // Every mutating action is planned by planOperation() and must be confirmed
 // in the UI (the plugins page shows the change list in a dialog) before
 // install/update/uninstall is invoked — the 1.x three-stage contract
-// (docs/SPEC.md §4.6, planOperation → UI 确认 → 执行).
+// (docs/SPEC.md §4.6, planOperation → UI 确认 → 执行). The plan chain is
+// never executed directly: planOperation only ever returns the change list
+// (or a refusal), and M6-T2 appends every planning result and every terminal
+// operation result to the append-only audit file
+// <appDataDir>/plugin_audit.jsonl (PluginAuditLog — observational only, it
+// never gates an operation and must never break one).
+//
+// M6-T1: the manifest's asset-integrity pair (sizeBytes + sha256) is
+// enforced here at the very front of the install chain — an incomplete pair
+// (缺一拒装) refuses the install BEFORE any git command runs, and a pinned
+// manifest has its freshly cloned content verified (install) or its staged
+// content verified (replace-mode update) before anything is recorded or
+// swapped (PluginContentIntegrity, plugin_git_runner.dart). Manifests
+// without integrity fields keep the exact 1.x behaviour.
 //
 // All git invocations go through the injectable PluginGitRunner interface;
 // unit tests drive the whole state machine with a synchronous fake and never
@@ -76,6 +89,8 @@ class PluginManager extends ChangeNotifier {
     void Function(String message)? onError,
   })  : _pluginsRoot = '$appDataDir/plugins',
         _statePath = '$appDataDir/plugins/state.json',
+        _auditPath = '$appDataDir/plugin_audit.jsonl',
+        _audit = PluginAuditLog('$appDataDir/plugin_audit.jsonl'),
         _catalogPath = catalogPath,
         _onError = onError {
     // git runs with the plugin root as cwd, so it must exist before the
@@ -93,6 +108,9 @@ class PluginManager extends ChangeNotifier {
   final String _pluginsRoot;
   final String _statePath;
   final String _catalogPath;
+  // M6-T2: append-only operation audit, an AppData sibling of plugins/.
+  final String _auditPath;
+  final PluginAuditLog _audit;
   final void Function(String message)? _onError;
 
   List<PluginManifest> _catalog = <PluginManifest>[];
@@ -121,6 +139,11 @@ class PluginManager extends ChangeNotifier {
       onOperationFinished;
 
   bool get busy => _busy;
+
+  /// The M6-T2 audit file path: `<appDataDir>/plugin_audit.jsonl` — an
+  /// AppData sibling of the `plugins/` directory, never a user-home or CWD
+  /// file (PluginAuditLog).
+  String get auditPath => _auditPath;
 
   // ---- pure helpers (unit-tested without git) -------------------------------
 
@@ -229,6 +252,8 @@ class PluginManager extends ChangeNotifier {
       'destination': manifest.destination,
       'mode': manifest.mode,
       'baseline': manifest.baseline,
+      'sizeBytes': manifest.sizeBytes,
+      'sha256': manifest.sha256,
       'isScript': manifest.isScriptPlugin,
       'installed': installed,
       'enabled': installed && manifest.isScriptPlugin && state.enabled,
@@ -280,7 +305,10 @@ class PluginManager extends ChangeNotifier {
           a.source == b.source &&
           a.destination == b.destination &&
           a.mode == b.mode &&
-          a.baseline == b.baseline;
+          a.baseline == b.baseline &&
+          // M6-T1: a re-pinned integrity pair changes the manifest.
+          a.sizeBytes == b.sizeBytes &&
+          a.sha256 == b.sha256;
     }
     if (same) {
       return;
@@ -383,6 +411,18 @@ class PluginManager extends ChangeNotifier {
 
   void _reportFinished(String name, String action, bool success, String message) {
     onOperationFinished?.call(name, action, success, message);
+    // M6-T2: every terminal operation result lands in the audit — the
+    // refused ones included (busy / already installed / porcelain
+    // local-modification guard / content-integrity refusals all flow
+    // through here, so a refusal is always 留痕).
+    _audit.append(<String, Object?>{
+      'ts': _auditTimestamp(),
+      'kind': 'operation',
+      'name': name,
+      'action': action,
+      'success': success,
+      'message': message,
+    });
   }
 
   // ---- planning ---------------------------------------------------------------
@@ -390,7 +430,29 @@ class PluginManager extends ChangeNotifier {
   /// Human-readable change list for the page's confirmation dialog:
   /// {name, action, title, details: [..]} or {error: "..."}. Never performs
   /// the operation and never runs git — the 1.x planOperation contract.
+  /// M6-T2: every result (the accepted plan and the refusals alike) is
+  /// appended to the audit file as a "plan" event before being returned.
   Map<String, Object?> planOperation(String name, String action) {
+    final result = _planOperation(name, action);
+    _auditPlan(name, action, result);
+    return result;
+  }
+
+  void _auditPlan(String name, String action, Map<String, Object?> result) {
+    final ok = !result.containsKey('error');
+    _audit.append(<String, Object?>{
+      'ts': _auditTimestamp(),
+      'kind': 'plan',
+      'name': name,
+      'action': action,
+      'ok': ok,
+      if (ok) 'details': result['details'] else 'error': result['error'],
+    });
+  }
+
+  static String _auditTimestamp() => DateTime.now().toUtc().toIso8601String();
+
+  Map<String, Object?> _planOperation(String name, String action) {
     final manifest = manifestFor(name);
     if (!manifest.valid) {
       return <String, Object?>{'error': 'unknown plugin "$name"'};
@@ -512,6 +574,15 @@ class PluginManager extends ChangeNotifier {
           name, 'install', false, 'unknown plugin "$name"');
       return;
     }
+    // M6-T1: the integrity checkpoint is the front of the install chain —
+    // an incomplete size+hash pair (缺一拒装) refuses BEFORE any git
+    // command (including ls-remote) can run. The refusal flows through
+    // _reportFinished, so it is audited like every other terminal result.
+    final integrityError = manifest.integrityGateError();
+    if (integrityError.isNotEmpty) {
+      _reportFinished(name, 'install', false, integrityError);
+      return;
+    }
     if (_busy || isInstalled(name)) {
       _reportFinished(
           name,
@@ -578,6 +649,16 @@ class PluginManager extends ChangeNotifier {
       // is an install, not an update.
       _reportFinished(name, 'update', false, 'not installed');
       return;
+    }
+    // M6-T1: a replace-mode update re-clones and swaps — the destructive
+    // path carries the same integrity gate as install (缺一拒装). A
+    // check-mode update never touches files, so it needs no pin.
+    if (manifest.isReplace) {
+      final integrityError = manifest.integrityGateError();
+      if (integrityError.isNotEmpty) {
+        _reportFinished(name, 'update', false, integrityError);
+        return;
+      }
     }
     await _begin(name, _Action.update);
   }
@@ -734,6 +815,36 @@ class PluginManager extends ChangeNotifier {
       return false;
     }
     _newHead = result.standardOutput.trim();
+    // M6-T1: content-integrity gate — the freshly cloned content is verified
+    // against the manifest's pinned size+hash BEFORE the install is recorded
+    // (or, for a replace-mode update, BEFORE the backup/swap touches
+    // anything). A mismatch removes the just-cloned tree so no unverified
+    // install ever becomes visible.
+    final manifest = manifestFor(_currentName);
+    if (manifest.isIntegrityPinned) {
+      final cloned = _action == _Action.install
+          ? _pluginDir(_currentName)
+          : _stagingDir;
+      final reason = await PluginContentIntegrity.verify(
+        contentRoot: manifest.contentRoot(cloned),
+        expectedSha256: manifest.sha256,
+        expectedSize: manifest.sizeBytes!,
+      );
+      if (reason != null) {
+        if (_action == _Action.install) {
+          try {
+            await Directory(_pluginDir(_currentName))
+                .delete(recursive: true);
+          } catch (_) {}
+        } else if (Directory(_stagingDir).existsSync()) {
+          try {
+            await Directory(_stagingDir).delete(recursive: true);
+          } catch (_) {}
+        }
+        _fail('content integrity check failed: $reason');
+        return false;
+      }
+    }
     if (_action == _Action.install) {
       final state = PluginState(
         // Installing expresses the intent to use it.
@@ -929,5 +1040,82 @@ class PluginManager extends ChangeNotifier {
   void _fail(String message) {
     EmoLogger().w('plugins: $_currentName: $message');
     _finish(false, message);
+  }
+}
+
+/// Append-only JSONL audit trail of the plugin operation decision chain
+/// (M6-T2, roadmap §五 M6-T2).
+///
+/// One JSON object per line at `<appDataDir>/plugin_audit.jsonl` — an AppData
+/// sibling of the `plugins/` directory, never a user-home or CWD file. The
+/// file is opened in append mode for every write and is never rewritten,
+/// rotated or truncated, so a crashed run leaves the history intact.
+///
+/// Two event kinds (see PluginManager for the emission points):
+///   - "plan": one line per planOperation() call — the never-directly-
+///     executed decision chain, carrying the planned change list (ok=true)
+///     or the refusal reason (ok=false, e.g. unknown plugin/action);
+///   - "operation": one line per terminal operation result, refused ones
+///     included (busy, already installed, the porcelain local-modification
+///     guard, content-integrity refusals).
+///
+/// [readEntries] skips lines that do not decode to a JSON object — a torn
+/// write or manual edit degrades to fewer entries, never an error. Write
+/// failures are logged and swallowed: the audit is observational only and
+/// must never break a plugin operation.
+class PluginAuditLog {
+  PluginAuditLog(this.path);
+
+  /// Absolute path of the JSONL file.
+  final String path;
+
+  /// Appends one event as a single JSON line. Creates the parent directory
+  /// and the file on first use; existing bytes are never touched.
+  void append(Map<String, Object?> event) {
+    try {
+      final file = File(path);
+      final parent = file.parent;
+      if (!parent.existsSync()) {
+        parent.createSync(recursive: true);
+      }
+      file.writeAsStringSync(
+        '${jsonEncode(event)}\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } catch (e) {
+      EmoLogger().w('plugins: cannot append to $path: $e');
+    }
+  }
+
+  /// Reads every well-formed entry back. A missing file yields an empty
+  /// list; corrupt (undecodable or non-object) lines are skipped, not
+  /// repaired, and never throw.
+  List<Map<String, Object?>> readEntries() {
+    String text;
+    try {
+      text = File(path).readAsStringSync();
+    } catch (_) {
+      return const <Map<String, Object?>>[];
+    }
+    final entries = <Map<String, Object?>>[];
+    for (final line in text.split('\n')) {
+      if (line.trim().isEmpty) {
+        continue;
+      }
+      final Object? decoded;
+      try {
+        decoded = jsonDecode(line);
+      } on FormatException {
+        continue;
+      }
+      if (decoded is Map) {
+        entries.add(<String, Object?>{
+          for (final entry in decoded.entries)
+            entry.key.toString(): entry.value,
+        });
+      }
+    }
+    return entries;
   }
 }

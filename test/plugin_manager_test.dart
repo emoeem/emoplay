@@ -617,4 +617,225 @@ void main() {
     }
     expect(manager.busy, isFalse);
   });
+
+  // ---- M6-T1: the asset-integrity checkpoint sits at the front of the
+  // install chain — an incomplete size+hash pair refuses BEFORE any git
+  // command, and a pinned manifest has the cloned content verified before
+  // the install is recorded (or the replace swap touches anything).
+
+  test('installRefusedBeforeAnyGitWhenIntegrityIncomplete', () async {
+    final f = Fixture();
+    addTearDown(f.dispose);
+    final git = FakeGitRunner();
+    // 缺一拒装: the entry pins only the hash — the install must refuse
+    // without a single git invocation.
+    const catalog = '{"sources": ['
+        '{"name": "pinned",'
+        ' "url": "https://git.example/pinned.git",'
+        ' "destination": "scripts/pinned",'
+        ' "sha256": '
+        '"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"}'
+        ']}';
+    final manager = PluginManager(
+      appDataDir: f.path,
+      catalogJson: catalog,
+      catalogPath: f.catalogPath,
+      gitRunner: git,
+    );
+    var ok = true;
+    String? message;
+    manager.onOperationFinished =
+        (name, action, success, finishedMessage) {
+      ok = success;
+      message = finishedMessage;
+    };
+
+    await manager.install('pinned');
+    expect(ok, isFalse);
+    expect(message, contains('without sizeBytes'));
+    expect(git.calls, isEmpty); // the checkpoint is in front of every git step
+  });
+
+  test('installWithPinnedContentVerifiesAfterClone', () async {
+    final f = Fixture();
+    addTearDown(f.dispose);
+    // Seed an identical tree to compute the pin for (fakeClone writes
+    // exactly {main.lua: "fake\n"} into the clone target).
+    final seed = await Directory.systemTemp.createTemp('emoplay-pin-');
+    addTearDown(() {
+      try {
+        seed.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    File('${seed.path}/main.lua').writeAsStringSync('fake\n');
+    final digest = await PluginContentIntegrity.compute(seed.path);
+    expect(digest, isNotNull);
+
+    final catalog = '{"sources": ['
+        '{"name": "pinned",'
+        ' "url": "https://git.example/pinned.git",'
+        ' "destination": "scripts/pinned",'
+        ' "sizeBytes": ${digest!.sizeBytes},'
+        ' "sha256": "${digest.sha256}"}'
+        ']}';
+    final git = FakeGitRunner();
+    final manager = PluginManager(
+      appDataDir: f.path,
+      catalogJson: catalog,
+      catalogPath: f.catalogPath,
+      gitRunner: git,
+    );
+    git.handler = (arguments, _) async {
+      if (arguments.first == 'rev-parse') {
+        return const PluginGitResult(
+            exitCode: 0, standardOutput: 'head0123456789\n', started: true);
+      }
+      return fakeClone(arguments);
+    };
+    var ok = false;
+    manager.onOperationFinished = (name, action, success, message) =>
+        ok = success;
+
+    await manager.install('pinned');
+    expect(ok, isTrue); // matching content passes the post-clone gate
+    final entry = pluginEntry(manager, 'pinned');
+    expect(entry['installed'], isTrue);
+    expect(entry['head'], 'head0123456789');
+    expect(entry['sha256'], digest.sha256);
+    expect(entry['sizeBytes'], digest.sizeBytes);
+  });
+
+  test('installWithTamperedContentRefusedAndCleaned', () async {
+    final f = Fixture();
+    addTearDown(f.dispose);
+    final seed = await Directory.systemTemp.createTemp('emoplay-pin-');
+    addTearDown(() {
+      try {
+        seed.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    File('${seed.path}/main.lua').writeAsStringSync('fake\n');
+    final digest = await PluginContentIntegrity.compute(seed.path);
+
+    final catalog = '{"sources": ['
+        '{"name": "pinned",'
+        ' "url": "https://git.example/pinned.git",'
+        ' "destination": "scripts/pinned",'
+        ' "sizeBytes": ${digest!.sizeBytes},'
+        ' "sha256": "${digest.sha256}"}'
+        ']}';
+    final git = FakeGitRunner();
+    final manager = PluginManager(
+      appDataDir: f.path,
+      catalogJson: catalog,
+      catalogPath: f.catalogPath,
+      gitRunner: git,
+    );
+    git.handler = (arguments, _) async {
+      if (arguments.first == 'clone') {
+        // Upstream content drifts from the pin.
+        final target = arguments.last;
+        Directory(target).createSync(recursive: true);
+        File('$target/main.lua').writeAsStringSync('tampered\n');
+        return const PluginGitResult(exitCode: 0, started: true);
+      }
+      if (arguments.first == 'rev-parse') {
+        return const PluginGitResult(
+            exitCode: 0, standardOutput: 'head0123456789\n', started: true);
+      }
+      return const PluginGitResult(exitCode: 0, started: true);
+    };
+    var ok = true;
+    String? message;
+    manager.onOperationFinished =
+        (name, action, success, finishedMessage) {
+      ok = success;
+      message = finishedMessage;
+    };
+
+    await manager.install('pinned');
+    expect(ok, isFalse);
+    // hash 不符拒绝: the refusal names the integrity failure.
+    expect(message, contains('content integrity check failed'));
+    // The unverified clone is removed — no half-installed plugin lingers.
+    expect(Directory('${f.pluginsRoot}/pinned').existsSync(), isFalse);
+    final entry = pluginEntry(manager, 'pinned');
+    expect(entry['installed'], isFalse);
+    expect(entry['enabled'], isFalse);
+  });
+
+  test('replaceUpdateVerifiesStagedContentBeforeSwap', () async {
+    final f = Fixture();
+    addTearDown(f.dispose);
+    final seed = await Directory.systemTemp.createTemp('emoplay-pin-');
+    addTearDown(() {
+      try {
+        seed.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    File('${seed.path}/main.lua').writeAsStringSync('fake\n');
+    final digest = await PluginContentIntegrity.compute(seed.path);
+
+    final catalog = '{"sources": ['
+        '{"name": "pinned_replace",'
+        ' "url": "https://git.example/pinned_replace.git",'
+        ' "source": ".",'
+        ' "destination": "shaders/pinned_replace", "mode": "replace",'
+        ' "sizeBytes": ${digest!.sizeBytes},'
+        ' "sha256": "${digest.sha256}"}'
+        ']}';
+    final git = FakeGitRunner();
+    final manager = PluginManager(
+      appDataDir: f.path,
+      catalogJson: catalog,
+      catalogPath: f.catalogPath,
+      gitRunner: git,
+    );
+    git.handler = (arguments, workingDirectory) async {
+      if (arguments.first == 'clone') {
+        final result = fakeClone(arguments);
+        if (arguments.last.contains('.staging-')) {
+          // Upstream drift: the staged content no longer matches the pin.
+          File('${arguments.last}/main.lua').writeAsStringSync('drifted\n');
+        }
+        return result;
+      }
+      if (arguments.first == 'rev-parse') {
+        final head =
+            workingDirectory.contains('.staging-') ? 'newhead' : 'oldhead';
+        return PluginGitResult(
+            exitCode: 0, standardOutput: '$head\n', started: true);
+      }
+      if (arguments.first == 'status') {
+        return const PluginGitResult(exitCode: 0, started: true);
+      }
+      return const PluginGitResult(exitCode: 0, started: true);
+    };
+    var ok = false;
+    String? message;
+    manager.onOperationFinished =
+        (name, action, success, finishedMessage) {
+      ok = success;
+      message = finishedMessage;
+    };
+
+    await manager.install('pinned_replace');
+    expect(ok, isTrue); // the install matches the pin
+
+    await manager.update('pinned_replace');
+    // The drifted staging content is refused BEFORE the swap: the old
+    // install stays untouched, no backup was made, no staging remains.
+    expect(ok, isFalse);
+    expect(message, contains('content integrity check failed'));
+    expect(
+        File('${f.pluginsRoot}/pinned_replace/main.lua').readAsStringSync(),
+        'fake\n');
+    expect(pluginEntry(manager, 'pinned_replace')['head'], 'oldhead');
+    expect(
+        Directory('${f.pluginsRoot}/.backup-pinned_replace').existsSync(),
+        isFalse);
+    expect(
+        Directory('${f.pluginsRoot}/.staging-pinned_replace').existsSync(),
+        isFalse);
+  });
 }

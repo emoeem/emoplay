@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:emoplay/plugins/plugin_git_runner.dart';
 import 'package:emoplay/plugins/plugin_manifest.dart';
 
 // Pure-logic tests for the manager.json-compatible manifest parser
@@ -231,5 +232,224 @@ void main() {
     expect(trakt.valid, isTrue);
     expect(trakt.mode, 'check');
     expect(trakt.baseline, isEmpty);
+  });
+
+  // ---- M6-T1 asset integrity (size+hash pair, roadmap §五 M6-T1) ------------
+
+  // A well-formed 64-hex digest used as a manifest fixture value.
+  const String kFixtureSha256 =
+      'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2';
+
+  test('integrityPairIncompleteRefusedForInstall', () {
+    // 缺一拒装: pinning only ONE of sizeBytes/sha256 refuses the install.
+    // Parse itself stays accepting so one half-pinned entry cannot nuke a
+    // whole catalog — the install gate is the refusal point.
+    final noHash = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'sizeBytes': 1234,
+    });
+    expect(noHash.valid, isTrue);
+    expect(noHash.hasIntegrityFields, isTrue);
+    expect(noHash.isIntegrityPinned, isFalse);
+    expect(noHash.integrityGateError(), contains('without sha256'));
+
+    // 缺 hash 拒绝.
+    final noSize = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'sha256': kFixtureSha256,
+    });
+    expect(noSize.valid, isTrue);
+    expect(noSize.isIntegrityPinned, isFalse);
+    expect(noSize.integrityGateError(), contains('without sizeBytes'));
+
+    // Neither field: the 1.x manager.json form stays installable as before.
+    final legacy = PluginManifest.parse(entryWithDefaults());
+    expect(legacy.valid, isTrue);
+    expect(legacy.hasIntegrityFields, isFalse);
+    expect(legacy.integrityGateError(), isEmpty);
+
+    // The complete pair passes the gate.
+    final pinned = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'sizeBytes': 1234,
+      'sha256': kFixtureSha256,
+    });
+    expect(pinned.isIntegrityPinned, isTrue);
+    expect(pinned.integrityGateError(), isEmpty);
+  });
+
+  test('malformedIntegrityFieldsRejectedAtParse', () {
+    // A declared sha256 must be a full 64-hex digest.
+    final shortHash = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'sha256': 'deadbeef',
+    });
+    expect(shortHash.valid, isFalse);
+    expect(shortHash.error, contains('sha256'));
+
+    // Uppercase hex is a valid digest shape (verification is case-insensitive).
+    final upperHash = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'sha256': kFixtureSha256.toUpperCase(),
+    });
+    expect(upperHash.valid, isTrue);
+
+    // sizeBytes must be a JSON integer — no silent coercion.
+    final sizeAsString = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'sizeBytes': '1234',
+    });
+    expect(sizeAsString.valid, isFalse);
+    expect(sizeAsString.error, contains('sizeBytes'));
+
+    final sizeAsDouble = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'sizeBytes': 1234.5,
+    });
+    expect(sizeAsDouble.valid, isFalse);
+
+    final negativeSize = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'sizeBytes': -1,
+    });
+    expect(negativeSize.valid, isFalse);
+    expect(negativeSize.error, contains('sizeBytes'));
+  });
+
+  test('integrityFieldsRoundtrip', () {
+    // 字段往返: parse(toMap()) preserves every field, integrity pair included.
+    final pinned = PluginManifest.parse(<String, Object?>{
+      ...entryWithDefaults(),
+      'branch': 'main',
+      'source': 'src/uosc',
+      'mode': 'check',
+      'baseline': '5.13.0',
+      'sizeBytes': 4096,
+      'sha256': kFixtureSha256,
+    });
+    expect(pinned.valid, isTrue);
+    final round = PluginManifest.parse(pinned.toMap());
+    expect(round.valid, isTrue);
+    expect(round.name, pinned.name);
+    expect(round.url, pinned.url);
+    expect(round.branch, pinned.branch);
+    expect(round.source, pinned.source);
+    expect(round.destination, pinned.destination);
+    expect(round.mode, pinned.mode);
+    expect(round.baseline, pinned.baseline);
+    expect(round.sizeBytes, 4096);
+    expect(round.sha256, kFixtureSha256);
+    expect(round.isIntegrityPinned, isTrue);
+    expect(round.integrityGateError(), isEmpty);
+
+    // Unpinned entries keep the exact 1.x field shape: no integrity keys.
+    final legacy = PluginManifest.parse(entryWithDefaults());
+    expect(legacy.toMap().containsKey('sha256'), isFalse);
+    expect(legacy.toMap().containsKey('sizeBytes'), isFalse);
+    final legacyRound = PluginManifest.parse(legacy.toMap());
+    expect(legacyRound.valid, isTrue);
+    expect(legacyRound.sizeBytes, isNull);
+    expect(legacyRound.sha256, isEmpty);
+  });
+
+  test('replaySameHashPasses', () async {
+    // 重放同 hash 通过: the digest is deterministic — the same content tree
+    // digests identically every time and verification passes on replay.
+    final dir = await Directory.systemTemp.createTemp('emoplay-manifest-');
+    addTearDown(() {
+      try {
+        dir.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    File('${dir.path}/main.lua').writeAsStringSync('fake\n');
+    Directory('${dir.path}/lib').createSync();
+    File('${dir.path}/lib/util.lua').writeAsStringSync('-- util\n');
+    // Clone metadata must be invisible to the digest: a .git directory with
+    // arbitrary content must not change the result.
+    Directory('${dir.path}/.git').createSync();
+    File('${dir.path}/.git/HEAD').writeAsStringSync('ref: junk\n');
+
+    final first = await PluginContentIntegrity.compute(dir.path);
+    final second = await PluginContentIntegrity.compute(dir.path);
+    expect(first, isNotNull);
+    expect(second, isNotNull);
+    expect(second!.sha256, first!.sha256);
+    expect(second.sizeBytes, first.sizeBytes);
+    expect(PluginContentIntegrity.isValidSha256(first.sha256), isTrue);
+
+    // Replay: same tree → verification passes, twice in a row.
+    for (var i = 0; i < 2; ++i) {
+      final reason = await PluginContentIntegrity.verify(
+        contentRoot: dir.path,
+        expectedSha256: first.sha256,
+        expectedSize: first.sizeBytes,
+      );
+      expect(reason, isNull);
+    }
+
+    // Recreating the identical tree elsewhere yields the same digest.
+    final twin = await Directory.systemTemp.createTemp('emoplay-manifest-');
+    addTearDown(() {
+      try {
+        twin.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    File('${twin.path}/main.lua').writeAsStringSync('fake\n');
+    Directory('${twin.path}/lib').createSync();
+    File('${twin.path}/lib/util.lua').writeAsStringSync('-- util\n');
+    final twinDigest = await PluginContentIntegrity.compute(twin.path);
+    expect(twinDigest!.sha256, first.sha256);
+    expect(twinDigest.sizeBytes, first.sizeBytes);
+  });
+
+  test('contentHashMismatchRejected', () async {
+    // hash 不符拒绝: any byte flip must be caught, with the failure naming
+    // what diverged.
+    final dir = await Directory.systemTemp.createTemp('emoplay-manifest-');
+    addTearDown(() {
+      try {
+        dir.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    File('${dir.path}/main.lua').writeAsStringSync('fake\n');
+    final good = await PluginContentIntegrity.compute(dir.path);
+    expect(good, isNotNull);
+
+    // Tampered tree: the size check trips first (both diverge here).
+    File('${dir.path}/main.lua').writeAsStringSync('faked\n');
+    final sizeReason = await PluginContentIntegrity.verify(
+      contentRoot: dir.path,
+      expectedSha256: good!.sha256,
+      expectedSize: good.sizeBytes,
+    );
+    expect(sizeReason, isNotNull);
+    expect(sizeReason, contains('size mismatch'));
+
+    // Pure hash mismatch: correct size, wrong digest.
+    final tampered = await PluginContentIntegrity.compute(dir.path);
+    final hashReason = await PluginContentIntegrity.verify(
+      contentRoot: dir.path,
+      expectedSha256: kFixtureSha256,
+      expectedSize: tampered!.sizeBytes,
+    );
+    expect(hashReason, isNotNull);
+    expect(hashReason, contains('sha256 mismatch'));
+
+    // Case-insensitive comparison: an uppercase expected digest still matches.
+    final ok = await PluginContentIntegrity.verify(
+      contentRoot: dir.path,
+      expectedSha256: tampered.sha256.toUpperCase(),
+      expectedSize: tampered.sizeBytes,
+    );
+    expect(ok, isNull);
+
+    // A missing content directory is a refusal, not a crash.
+    final missing = await PluginContentIntegrity.verify(
+      contentRoot: '${dir.path}/absent',
+      expectedSha256: kFixtureSha256,
+      expectedSize: 0,
+    );
+    expect(missing, isNotNull);
+    expect(missing, contains('missing'));
   });
 }
