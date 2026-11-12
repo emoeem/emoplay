@@ -191,4 +191,25 @@ void main() {
     expect(MpvImportRules.redirectTarget('icc-profile', appData.path), isEmpty);
     expect(MpvImportRules.redirectTarget('volume', appData.path), isEmpty);
   });
+
+  test('inlineCommentsStrippedFromRuntimeValues', () {
+    // 2026-11-12 no-sound root cause: the user's mpv.conf annotated every
+    // option with ` # 说明`, and `audio-device` (a string option) reached
+    // mpv as 'auto # 此项用于指定启动时的音频输出设备' — silently accepted,
+    // then the device name was never found at file-open time ("Could not
+    // open/initialize audio device -> no sound"). The runtime preset must
+    // carry the value mpv's own file reader would have produced.
+    final entries = _parse(
+        'audio-device=auto                     # 此项用于指定启动时的音频输出设备\n'
+        'audio-channels=auto-safe        # <默认值 auto-safe|auto|layouts|stereo>\n'
+        'osd-color=#F8F8F2 # Dracula Foreground\n'
+        'hwdec=auto-safe\n');
+    final result = MpvImportRules.apply(entries, '/mpv', appData.path);
+
+    expect(result.options['audio-device'], 'auto');
+    expect(result.options['audio-channels'], 'auto-safe');
+    // Color hash glued to the value survives; the trailing comment goes.
+    expect(result.options['osd-color'], '#F8F8F2');
+    expect(result.options['hwdec'], 'auto-safe');
+  });
 }

@@ -118,6 +118,38 @@ class MpvConfigParser {
     return entries;
   }
 
+  /// The effective value mpv would use for an option line at runtime.
+  ///
+  /// mpv's native conf reader treats a whitespace-preceded `#` as the start
+  /// of a trailing comment — `audio-device=auto     # 此项…` yields `auto`,
+  /// while a `#` glued to the value (`osd-color=#F8F8F2`, color codes) is
+  /// part of it. [parseMpvConf] deliberately preserves the raw line for
+  /// round-trip fidelity (the settings editor rewrites the file verbatim),
+  /// so the runtime apply path must reproduce mpv's file semantics here.
+  /// Without it a string-typed option silently receives the comment text
+  /// (`audio-device` → the device name is never found → "Could not
+  /// open/initialize audio device -> no sound", user-reported 2026-11-12),
+  /// while numeric-typed options merely fail their apply.
+  ///
+  /// A `#` inside a quoted value is not distinguished (same limitation as
+  /// [parseInputConf]'s comment scanner); 1.x confs in the wild do not
+  /// rely on it.
+  static String runtimeOptionValue(String raw) {
+    for (var pos = raw.indexOf('#');
+        pos >= 0;
+        pos = raw.indexOf('#', pos + 1)) {
+      if (pos == 0) {
+        // Glued to the value start (after '='), e.g. '#F8F8F2': mpv keeps
+        // it as part of the value.
+        continue;
+      }
+      if (_isSpace(raw.codeUnitAt(pos - 1))) {
+        return raw.substring(0, pos).trim();
+      }
+    }
+    return raw.trim();
+  }
+
   /// Parse input.conf content. Here '#' does start a comment when it is at
   /// the start of a line or preceded by whitespace.
   static List<MpvInputBinding> parseInputConf(String text) {

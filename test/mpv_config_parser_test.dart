@@ -125,4 +125,47 @@ void main() {
     expect(MpvConfigParser.parseInputConf(''), isEmpty);
     expect(MpvConfigParser.parseMpvConf('\n\n# only comments\n'), isEmpty);
   });
+
+  group('runtimeOptionValue', () {
+    test('stripsWhitespacePrecededInlineComments', () {
+      // Verbatim line shapes from a real user mpv.conf (2026-11-12
+      // no-sound report): numeric/string options annotated with ` # `.
+      expect(MpvConfigParser.runtimeOptionValue(
+          'auto                     # 此项用于指定启动时的音频输出设备'),
+          'auto');
+      expect(MpvConfigParser.runtimeOptionValue(
+          'auto-safe        # <默认值 auto-safe|auto|layouts|stereo>，如果双声道系统播放多声道影片时有的声道声音没出现，尝试强制设定为双声道'),
+          'auto-safe');
+      expect(MpvConfigParser.runtimeOptionValue(
+          'float                     # 使用32位浮点音频格式，全功能版本支持更高精度的音频处理'),
+          'float');
+      expect(MpvConfigParser.runtimeOptionValue(
+          '24 # 更改 OSD 字体大小（全局，影响多个功能显示的文本）（默认值：38）'),
+          '24');
+    });
+
+    test('keepsColorHashGluedToValue', () {
+      // '#F8F8F2' follows '=' directly: part of the value (color code),
+      // only the whitespace-preceded trailing comment is stripped.
+      expect(MpvConfigParser.runtimeOptionValue(
+          '#F8F8F2 # Dracula Foreground，与 OSD 配色统一'),
+          '#F8F8F2');
+      expect(MpvConfigParser.runtimeOptionValue('#191A21'), '#191A21');
+    });
+
+    test('commentFreeValuesPassThroughTrimmed', () {
+      expect(MpvConfigParser.runtimeOptionValue('auto'), 'auto');
+      expect(MpvConfigParser.runtimeOptionValue('  gpu-next  '), 'gpu-next');
+      expect(MpvConfigParser.runtimeOptionValue(''), '');
+    });
+
+    test('fullLineCommentsNeverReachHere', () {
+      // parseMpvConf already drops full-line comments; the runtime value
+      // helper only ever sees the value part after '='.
+      final entries = MpvConfigParser.parseMpvConf(
+          '# full comment\nvolume=50\n');
+      expect(entries.single.value, '50');
+      expect(MpvConfigParser.runtimeOptionValue(entries.single.value), '50');
+    });
+  });
 }

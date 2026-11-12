@@ -159,30 +159,38 @@ class MpvImportRules {
             continue; // belongs to the profile above; already reported
           }
 
+          // Values reach mpv as runtime properties, where a raw line's
+          // inline comment would ride along (mpv strips it only when it
+          // reads the file itself — see
+          // MpvConfigParser.runtimeOptionValue). Strip here so string-typed
+          // options cannot swallow their own annotation; the parser keeps
+          // the raw line for the settings editor's round-trip.
+          final value = MpvConfigParser.runtimeOptionValue(entry.value);
+
           if (entry.key == 'screenshot-template' &&
-              entry.value.contains('~~')) {
+              value.contains('~~')) {
             // A config-dir-relative screenshot template would land inside
             // the user's mpv directory even with screenshot-directory
             // redirected, because ~~ expands to the user config dir.
             result.skipped.add(
-                "screenshot-template: '${entry.value}' (~~ path would write into the user's mpv directory)");
+                "screenshot-template: '$value' (~~ path would write into the user's mpv directory)");
             continue;
           }
 
           if (_isStripped(entry.key)) {
             result.skipped.add(
-                '${entry.key}: \'${entry.value}\' (${entry.key == 'profile' ? 'profiles are not applied in P4' : 'managed by EmoPlay'})');
+                '${entry.key}: \'$value\' (${entry.key == 'profile' ? 'profiles are not applied in P4' : 'managed by EmoPlay'})');
             continue;
           }
 
           final forced = _findForced(entry.key);
           if (forced != null) {
             result.forced.add(
-                '${entry.key}: user value \'${entry.value}\' replaced with \'${forced.value}\' (${forced.reason})');
+                '${entry.key}: user value \'$value\' replaced with \'${forced.value}\' (${forced.reason})');
             continue; // the forced value is written in pass 2
           }
 
-          result.options[entry.key] = entry.value;
+          result.options[entry.key] = value;
           break;
         case MpvConfEntryKind.unknown:
           break;
