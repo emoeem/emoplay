@@ -52,6 +52,12 @@ class PlayerProgressPipeline {
 
   Timer? _playerTimer;
   PlayerPanelHold? _progressBarDragHold;
+  Timer? _dragSeekTimer;
+  Duration? _dragSeekTarget;
+
+  /// 拖动中双 seek 的尾随消抖窗（Haruna onMoved 是逐事件 commandAsync，mpv
+  /// 自行合并；media_kit 的 player 内部锁串行化每次 seek，这里显式合并）。
+  static const Duration _dragSeekDebounce = Duration(milliseconds: 120);
 
   /// player_item getPlayerTimer.
   void start() {
@@ -67,6 +73,8 @@ class PlayerProgressPipeline {
   /// player_item dispose playerTimer?.cancel().
   void dispose() {
     _playerTimer?.cancel();
+    _dragSeekTimer?.cancel();
+    _dragSeekTimer = null;
   }
 
   /// player_item _seekWithPlayerTimer.
@@ -90,8 +98,55 @@ class PlayerProgressPipeline {
     _progressBarDragHold = holds.acquirePlayerPanelHold();
   }
 
+  /// M3-T1 帧预览：拖动中的双 seek 入口（进度条 onDragUpdate）。
+  ///
+  /// Haruna HProgressBar.qml:226-252 onMoved 语义：主实例与预览实例各收到
+  /// 一条 `seek <value> absolute`。鼠标拖动且预览激活
+  /// （seekPreview.shouldActivate）时主实例追加尾随消抖的绝对 seek（松手时
+  /// finishInteractiveSeek 的最终 seek 落点不变，中间 seek 只是让主画面实时
+  /// 跟随）；预览实例经 [SeekPreviewController.previewAt] 自带 100ms 消抖。
+  /// 触摸拖动无帧预览气泡（进度条 _previewFraction 仅鼠标拖动非空），保持
+  /// 2.x 原行为：拖动只更新 UI 状态，松手才 seek。预览未激活时同样保持
+  /// 2.x 原行为。
+  void handleProgressBarDragUpdate(
+    Duration position, {
+    required bool mouseDrag,
+  }) {
+    if (!playerController.seeking.updateInteractiveSeek(position)) {
+      return;
+    }
+    if (!mouseDrag) {
+      return;
+    }
+    final preview = playerController.seekPreview;
+    if (!preview.shouldActivate) {
+      return;
+    }
+    preview.previewAt(position);
+    _dragSeekTarget = position;
+    _dragSeekTimer?.cancel();
+    _dragSeekTimer = Timer(_dragSeekDebounce, () {
+      _dragSeekTimer = null;
+      final target = _dragSeekTarget;
+      _dragSeekTarget = null;
+      if (target == null) {
+        return;
+      }
+      unawaited(
+        playerController.seeking.seekTo(target, enableSync: false).catchError(
+              (Object e) => EmoLogger()
+                  .w('PlayerController: drag seek failed', error: e),
+            ),
+      );
+    });
+  }
+
   /// player_item handleProgressBarDragEnd.
   void handleProgressBarDragEnd(bool cancelled) {
+    // 最终落点由 finishInteractiveSeek 的 seek 负责，挂起的中间 seek 作废。
+    _dragSeekTimer?.cancel();
+    _dragSeekTimer = null;
+    _dragSeekTarget = null;
     unawaited(finishInteractiveSeek(cancelled: cancelled));
   }
 

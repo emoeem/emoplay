@@ -12,6 +12,7 @@ import 'package:emoplay/pages/player/controller/player_debug_controller.dart';
 import 'package:emoplay/pages/player/controller/player_frame_step_controller.dart';
 import 'package:emoplay/pages/player/controller/player_models.dart';
 import 'package:emoplay/pages/player/controller/player_seek_controller.dart';
+import 'package:emoplay/pages/player/controller/seek_preview_controller.dart';
 import 'package:emoplay/pages/player/controller/player_subtitles_controller.dart';
 import 'package:emoplay/pages/player/controller/player_aspect_ratio.dart';
 import 'package:emoplay/pages/player/controller/player_panel_controller.dart';
@@ -73,6 +74,23 @@ class PlayerController implements Disposable {
   /// M3 施工件 C「逐帧」：frame-step / frame-back-step 命令面。
   late final PlayerFrameStepController frameSteps = PlayerFrameStepController(
     platform: _nativePlatform,
+  );
+
+  /// M3-T1 进度条帧预览：第二 media_kit 解码实例的门禁/生命周期/消抖 seek
+  /// 收口（Haruna 属性集等价，见 seek_preview_controller.dart 文件头）。
+  /// 激活门禁的四个外部条件在此以 getter 注入：设置开关、isLocalPlayback、
+  /// 「非停止」（duration>0 = 媒体已加载）、硬解跟随主实例同款表达式
+  /// （player_playback_controller.dart VideoControllerConfiguration.hwdec）。
+  late final SeekPreviewController seekPreview = SeekPreviewController(
+    enabled: () => GStorage.getSetting(SettingsKeys.seekPreview),
+    url: () => videoUrl,
+    isLocalFile: () => isLocalPlayback,
+    isStopped: () => playback.duration <= Duration.zero,
+    hwdec: () {
+      final hA = GStorage.getSetting(SettingsKeys.hAenable);
+      return hA ? GStorage.getSetting(SettingsKeys.hardwareDecoder) : 'no';
+    },
+    previewWidth: () => GStorage.getSetting(SettingsKeys.seekPreviewWidth),
   );
 
   late final ExternalPlaybackLauncher externalPlayback =
@@ -475,6 +493,8 @@ class PlayerController implements Disposable {
     await subtitles.detach();
     // M3 施工件 C：摘掉 ab-loop 观察并复位 marks（循环区间不跨文件）。
     await abLoop.detach();
+    // M3-T1：帧预览第二实例随文件释放/收尾拆掉（换文件重开时按需重建）。
+    await seekPreview.reset();
     await Future.wait([
       audioController.deactivate(),
       playback.stop(),

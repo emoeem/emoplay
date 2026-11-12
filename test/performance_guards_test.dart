@@ -28,9 +28,11 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:emoplay/media/library_store.dart';
 import 'package:emoplay/media/thumbnail_service.dart';
+import 'package:emoplay/pages/player/controller/seek_preview_controller.dart';
 
 void main() {
   late Directory tempDir;
@@ -238,4 +240,133 @@ exit 1
       }
     });
   });
+
+  // M3-T1 进度条帧预览的实例数守卫（roadmap 验收：关闭开关时 Player 实例数
+  // 不增，测试缝计数）。第二解码实例的全部创建收口在
+  // SeekPreviewEngineFactory（seek_preview_controller.dart），计数即守卫：
+  //   * 开关关闭：hover/拖动级调用（previewAt）绝不触达工厂；
+  //   * 开关打开：懒创建恰好一个实例（连点 hover 不叠加）；
+  //   * 运行中关闭：handleSettingsChanged 立刻拆实例，再 hover 不新建。
+  group('seek preview player instance guard', () {
+  // MediaClassifier 按真实文件的 statSync + 后缀判定 video：守卫夹具用
+  // 空内容 .mp4（引擎 fake 不真的 open，文件内容无关）。
+  late Directory guardTempDir;
+  late String fakeUrl;
+
+  setUp(() async {
+    guardTempDir =
+        await Directory.systemTemp.createTemp('emoplay-preview-guard-');
+    fakeUrl = '${guardTempDir.path}/guard-clip.mp4';
+    await File(fakeUrl).writeAsString('');
+  });
+
+  tearDown(() async {
+    try {
+      await guardTempDir.delete(recursive: true);
+    } catch (_) {}
+  });
+
+  SeekPreviewController buildController({
+    required bool Function() enabled,
+    required List<_CountingPreviewEngine> engines,
+  }) {
+    return SeekPreviewController(
+      enabled: enabled,
+      url: () => fakeUrl,
+      isLocalFile: () => true,
+      isStopped: () => false,
+      hwdec: () => 'auto-safe',
+      previewWidth: () => 200,
+      debounce: const Duration(milliseconds: 10),
+      engineFactory: (config) async {
+        final engine = _CountingPreviewEngine();
+        engines.add(engine);
+        return engine;
+      },
+    );
+  }
+
+  Future<void> quiesce() async {
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+  }
+
+  test('disabledToggleNeverCreatesPreviewPlayerInstances', () async {
+    final engines = <_CountingPreviewEngine>[];
+    var enabled = false;
+    final controller = buildController(
+      enabled: () => enabled,
+      engines: engines,
+    );
+    addTearDown(controller.dispose);
+
+    // 关闭态下的 hover/拖动请求流：零实例。
+    for (var i = 0; i < 10; i++) {
+      controller.previewAt(Duration(milliseconds: i * 500));
+    }
+    await quiesce();
+    expect(engines, isEmpty, reason: '关闭开关时 Player 实例数不增');
+    expect(controller.engine, isNull);
+  });
+
+  test('enabledToggleCreatesExactlyOneInstanceAndOffDisposesIt', () async {
+    final engines = <_CountingPreviewEngine>[];
+    var enabled = true;
+    final controller = buildController(
+      enabled: () => enabled,
+      engines: engines,
+    );
+    addTearDown(controller.dispose);
+
+    // 打开态：连续 hover 只懒建一个实例。
+    for (var i = 0; i < 5; i++) {
+      controller.previewAt(Duration(milliseconds: i * 100));
+    }
+    // fake 工厂同步完成（无 await 段）：engines.add 在 previewAt 的同步段
+    // 就发生，controller.engine 的赋值在其后的微任务——轮询必须等到赋值。
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    while (engines.isEmpty || controller.engine == null) {
+      if (DateTime.now().isAfter(deadline)) {
+        fail('preview instance never created');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    expect(engines, hasLength(1), reason: '懒创建恰好一个第二实例');
+    expect(controller.engine, same(engines.single));
+
+    // 运行中关闭开关：实例立刻拆掉；关闭后再 hover 不新建。
+    enabled = false;
+    controller.handleSettingsChanged();
+    final offDeadline = DateTime.now().add(const Duration(seconds: 5));
+    while (!engines.single.disposed) {
+      if (DateTime.now().isAfter(offDeadline)) {
+        fail('preview instance never disposed after toggle off');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    controller.previewAt(const Duration(seconds: 1));
+    await quiesce();
+    expect(engines, hasLength(1), reason: '关闭后再 hover 不新建实例');
+  });
+});
+}
+
+class _CountingPreviewEngine implements SeekPreviewEngine {
+  bool disposed = false;
+
+  @override
+  VideoController? get videoController => null;
+
+  @override
+  double get aspectRatio => 2.0;
+
+  @override
+  Future<void> seek(Duration position) async {}
+
+  @override
+  Future<void> pause() async {}
+
+  @override
+  Future<void> dispose() async {
+    disposed = true;
+  }
 }

@@ -27,6 +27,11 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
   static const double _maxPlayerControllerLayerDisappearSeconds = 10;
   static const int _playerControllerLayerDisappearDivisions = 18;
 
+  // M3-T1 预览气泡宽度滑条范围（逻辑像素，20px 步进）。
+  static const double _minSeekPreviewWidth = 120;
+  static const double _maxSeekPreviewWidth = 400;
+  static const int _seekPreviewWidthDivisions = 14;
+
   late double defaultPlaySpeed;
   late double defaultShortcutForwardPlaySpeed;
   late PlayerAspectRatio defaultAspectRatioMode;
@@ -46,6 +51,8 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
   late int playerArrowKeySkipTime;
   late int playerLogLevel;
   late int playerControllerLayerDisappearTime;
+  late bool seekPreview;
+  late int seekPreviewWidth;
 
   @override
   void initState() {
@@ -88,6 +95,8 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
 
     playerControllerLayerDisappearTime = GStorage.getSetting<int>(
         SettingsKeys.playerControllerLayerDisappearTime);
+    seekPreview = GStorage.getSetting<bool>(SettingsKeys.seekPreview);
+    seekPreviewWidth = GStorage.getSetting<int>(SettingsKeys.seekPreviewWidth);
   }
 
   Future<void> resetPlayerSettings() async {
@@ -238,6 +247,26 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
         SettingsKeys.playerControllerLayerDisappearTime, newDisappearTime);
     setState(() {
       playerControllerLayerDisappearTime = newDisappearTime;
+    });
+  }
+
+  /// M3-T1 帧预览开关。关闭由播放页的 watchSettings 订阅即时拆预览实例
+  /// （player_item.dart）；开启在下次 hover/拖动时按需懒建实例。
+  void updateSeekPreview(bool value) {
+    GStorage.putSetting<bool>(SettingsKeys.seekPreview, value);
+    setState(() {
+      seekPreview = value;
+    });
+  }
+
+  void updateSeekPreviewWidth(double value) {
+    final int newWidth = value.round();
+    if (newWidth == seekPreviewWidth) {
+      return;
+    }
+    GStorage.putSetting<int>(SettingsKeys.seekPreviewWidth, newWidth);
+    setState(() {
+      seekPreviewWidth = newWidth;
     });
   }
 
@@ -546,6 +575,28 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
                   for (final mode in PlayerAspectRatio.values) mode: mode.label,
                 },
                 onChanged: updateDefaultAspectRatioMode,
+              ),
+              // M3-T1 帧预览（Haruna ShowPreviewThumbnail / PreviewThumbnailWidth
+              // 同位双键）：hover 进度条时在气泡内加载第二解码实例的帧图。
+              SettingsTile.switchTile(
+                leading: Icons.video_library_rounded,
+                onToggle: (value) async {
+                  updateSeekPreview(value ?? !seekPreview);
+                },
+                title: Text('进度条帧预览'),
+                description: Text('悬停进度条时显示帧画面预览（仅本地视频）'),
+                initialValue: seekPreview,
+              ),
+              SettingsSliderTile(
+                leading: Icons.photo_size_select_large_rounded,
+                title: Text('预览画面宽度'),
+                description: Text('帧预览气泡的显示宽度'),
+                value: seekPreviewWidth.toDouble(),
+                min: _minSeekPreviewWidth,
+                max: _maxSeekPreviewWidth,
+                divisions: _seekPreviewWidthDivisions,
+                valueLabel: '$seekPreviewWidth px',
+                onChanged: updateSeekPreviewWidth,
               ),
             ],
           ),

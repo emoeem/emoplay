@@ -262,6 +262,21 @@ class SettingsKeys {
     false,
     group: SettingGroup.player,
   );
+  /// M3-T1 进度条帧预览总开关（Haruna ShowPreviewThumbnail 语义）。默认关：
+  /// Haruna generalsettings.kcfg 的同名项 default=false，且关闭时零第二解码
+  /// 实例开销（最接近 Kazumi/1.x 现状）。
+  static const seekPreview = SettingKey<bool>(
+    'seekPreview',
+    false,
+    group: SettingGroup.player,
+  );
+  /// M3-T1 预览气泡宽度（逻辑像素，Haruna PreviewThumbnailWidth 语义，
+  /// 默认 200 同 kcfg）。
+  static const seekPreviewWidth = SettingKey<int>(
+    'seekPreviewWidth',
+    200,
+    group: SettingGroup.player,
+  );
 
   static final List<SettingKey<Object?>> all = [
     hAenable,
@@ -306,6 +321,8 @@ class SettingsKeys {
     playerControllerLayerDisappearTime,
     defaultVolume,
     playerMuted,
+    seekPreview,
+    seekPreviewWidth,
   ];
 
   static List<SettingKey<Object?>> byGroup(SettingGroup group) {

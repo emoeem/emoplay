@@ -117,6 +117,10 @@ class _PlayerItemState extends State<PlayerItem>
 
   late mobx.ReactionDisposer _fullscreenListener;
 
+  /// M3-T1：帧预览设置的推送订阅（开关关闭→立即拆预览实例；宽度变更→
+  /// 气泡重建）。页生命周期持有；页不在时 previewAt 惰性读设置同样安全。
+  StreamSubscription<void>? _seekPreviewSettingsListener;
+
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
@@ -291,6 +295,9 @@ class _PlayerItemState extends State<PlayerItem>
     _progress.start();
     windowManager.addListener(this);
     _holds.showVideoController();
+    _seekPreviewSettingsListener = GStorage.watchSettings(
+      [SettingsKeys.seekPreview, SettingsKeys.seekPreviewWidth],
+    ).listen((_) => playerController.seekPreview.handleSettingsChanged());
   }
 
   @override
@@ -298,6 +305,8 @@ class _PlayerItemState extends State<PlayerItem>
     // The route-scoped PlayerController owns playback disposal.
     _fullscreenListener();
     _playerSizeListener();
+    unawaited(_seekPreviewSettingsListener?.cancel());
+    _seekPreviewSettingsListener = null;
     WidgetsBinding.instance.removeObserver(this);
     windowManager.removeListener(this);
     playerController.seeking.invalidateInteractiveSeek();
@@ -430,6 +439,8 @@ class _PlayerItemState extends State<PlayerItem>
                                 _pip.enterAndroidPictureInPicture,
                             handleProgressBarDragStart:
                                 _progress.handleProgressBarDragStart,
+                            handleProgressBarDragUpdate:
+                                _progress.handleProgressBarDragUpdate,
                             handleProgressBarDragEnd:
                                 _progress.handleProgressBarDragEnd,
                             handleSuperResolutionChange:

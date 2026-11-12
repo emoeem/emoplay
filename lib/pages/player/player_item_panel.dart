@@ -16,6 +16,8 @@ import 'package:emoplay/music/music_queue.dart';
 import 'package:emoplay/pages/player/chapters_sheet.dart';
 import 'package:emoplay/pages/player/music_queue_panel.dart';
 import 'package:emoplay/pages/player/controller/ab_loop_model.dart';
+import 'package:emoplay/pages/player/controller/chapters_model.dart'
+    show chapterIndexAt;
 import 'package:emoplay/pages/player/player_controller.dart';
 import 'package:emoplay/pages/player/player_panel_hold.dart';
 import 'package:emoplay/pages/player/player_progress_bar.dart';
@@ -57,6 +59,7 @@ class PlayerItemPanel extends StatefulWidget {
     required this.handleFullscreen,
     required this.enterAndroidPictureInPicture,
     required this.handleProgressBarDragStart,
+    required this.handleProgressBarDragUpdate,
     required this.handleProgressBarDragEnd,
     required this.handleSuperResolutionChange,
     required this.onNextItem,
@@ -87,6 +90,11 @@ class PlayerItemPanel extends StatefulWidget {
   final VoidCallback handleFullscreen;
   final Future<void> Function() enterAndroidPictureInPicture;
   final VoidCallback handleProgressBarDragStart;
+
+  /// M3-T1 帧预览：拖动中的双 seek 入口（预览激活时主实例消抖 seek +
+  /// 预览实例消抖 seek；未激活时只更新 UI 状态）。
+  final void Function(Duration position, {required bool mouseDrag})
+      handleProgressBarDragUpdate;
   final ValueChanged<bool> handleProgressBarDragEnd;
   final Future<void> Function(SuperResolutionMode) handleSuperResolutionChange;
   final VoidCallback onNextItem;
@@ -193,11 +201,18 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
                       buffered: widget.playerController.playback.buffer,
                       total: widget.playerController.playback.duration,
                       onDragStart: widget.handleProgressBarDragStart,
-                      onDragUpdate: (position) => widget
-                          .playerController.seeking
-                          .updateInteractiveSeek(position),
+                      onDragUpdate: widget.handleProgressBarDragUpdate,
                       onDragEnd: widget.handleProgressBarDragEnd,
                       onSeek: widget.playerController.seek,
+                      // M3-T1 帧预览：第二实例控制器 + 气泡的章节标题取数
+                      // （chapters_model.chapterIndexAt 上界二分，M3-T2）。
+                      preview: widget.playerController.seekPreview,
+                      chapterTitleAt: (position) {
+                        final chapters =
+                            widget.playerController.chapters.chapters;
+                        final index = chapterIndexAt(chapters, position);
+                        return index >= 0 ? chapters[index].title : '';
+                      },
                     )),
             timeLabel: Observer(
                 builder: (context) => Text(

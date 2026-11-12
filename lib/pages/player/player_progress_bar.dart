@@ -3,7 +3,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:emoplay/utils/format.dart';
+import 'package:emoplay/pages/player/controller/seek_preview_controller.dart';
 
 // Metrics follow the defaults of the former audio_video_progress_bar.
 const double _thumbRadius = 8;
@@ -16,6 +18,10 @@ const _labelStyle = TextStyle(
   fontSize: 12,
   fontFeatures: [FontFeature.tabularFigures()],
 );
+
+/// Bubble cap for long chapter titles (Haruna timePositionLabel elides too,
+/// HProgressBar.qml timePositionLabel `elide: Text.ElideRight`).
+const double _maxBubbleWidth = 320;
 
 /// Every [onDragStart] is followed by exactly one [onDragEnd], also when the
 /// bar is removed mid-drag.
@@ -30,6 +36,8 @@ class PlayerProgressBar extends StatefulWidget {
     required this.onDragUpdate,
     required this.onDragEnd,
     required this.onSeek,
+    this.preview,
+    this.chapterTitleAt,
   });
 
   final Duration progress;
@@ -37,11 +45,23 @@ class PlayerProgressBar extends StatefulWidget {
   final Duration total;
   final bool sideLabels;
   final VoidCallback onDragStart;
-  final ValueChanged<Duration> onDragUpdate;
+
+  /// [mouseDrag] separates the frame-preview drag (Haruna HProgressBar.qml
+  /// onMoved 双 seek，M3-T1) from a touch drag, which keeps the 2.x behavior
+  /// of seeking only on release (no bubble during touch drags either).
+  final void Function(Duration position, {required bool mouseDrag})
+      onDragUpdate;
   final void Function(bool cancelled) onDragEnd;
 
   /// Seeks from accessibility actions, outside of any drag.
   final ValueChanged<Duration> onSeek;
+
+  /// M3-T1 帧预览：第二解码实例控制器（null = 旧时间文本气泡）。
+  final SeekPreviewController? preview;
+
+  /// 气泡的章节标题取数（M3-T2 chapterIndexAt 上界二分）；null 或空串退回
+  /// 纯时间文本（Haruna HProgressBar.qml:55-61 的「时间 - 章节标题」同形）。
+  final String Function(Duration position)? chapterTitleAt;
 
   @override
   State<PlayerProgressBar> createState() => _PlayerProgressBarState();
@@ -76,6 +96,10 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
       final onDragEnd = widget.onDragEnd;
       scheduleMicrotask(() => onDragEnd(true));
     }
+    // 气泡若还开着（组件被中途拆除），预览实例同样收起暂停。
+    if (_preview.isShowing) {
+      widget.preview?.onHidden();
+    }
     super.dispose();
   }
 
@@ -86,13 +110,21 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
       _preview.show();
     } else {
       _preview.hide();
+      // M3-T1：气泡收起即暂停预览实例（ask 契约「隐藏即 pause」）。
+      widget.preview?.onHidden();
     }
   }
 
   void _handleHover(PointerEvent event, _Track track) {
     if (event.kind != PointerDeviceKind.mouse || _dragFraction != null) return;
     final dx = event.localPosition.dx;
-    _setHover(_seekable && track.covers(dx) ? track.fractionAt(dx) : null);
+    final fraction =
+        _seekable && track.covers(dx) ? track.fractionAt(dx) : null;
+    _setHover(fraction);
+    // hover 即驱动预览：懒建实例 + 消抖 seek（门禁不通过时是安全空操作）。
+    if (fraction != null) {
+      widget.preview?.previewAt(_timeAt(fraction));
+    }
   }
 
   void _setHover(double? fraction) {
@@ -111,14 +143,14 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
     });
     _syncPreview();
     widget.onDragStart();
-    widget.onDragUpdate(_timeAt(fraction));
+    widget.onDragUpdate(_timeAt(fraction), mouseDrag: _mouseDrag);
   }
 
   void _handleDragUpdate(DragUpdateDetails details, _Track track) {
     if (_dragFraction == null) return;
     final fraction = track.fractionAt(details.localPosition.dx);
     setState(() => _dragFraction = fraction);
-    widget.onDragUpdate(_timeAt(fraction));
+    widget.onDragUpdate(_timeAt(fraction), mouseDrag: _mouseDrag);
   }
 
   void _handleDragEnd({required bool cancelled}) {
@@ -150,8 +182,18 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
       final track = _Track(width: constraints.maxWidth, inset: inset);
       return OverlayPortal.overlayChildLayoutBuilder(
         controller: _preview,
-        overlayChildBuilder: (context, info) =>
-            _buildPreview(context, info, track),
+        overlayChildBuilder: (context, info) {
+          // The engine-ready transition must upgrade the bubble in place; the
+          // geometry itself is recomputed on every rebuild below.
+          final preview = widget.preview;
+          if (preview == null) {
+            return _buildPositioned(info, track);
+          }
+          return ListenableBuilder(
+            listenable: preview,
+            builder: (context, _) => _buildPositioned(info, track),
+          );
+        },
         child: Semantics(
           slider: true,
           label: '播放进度',
@@ -211,39 +253,104 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
     });
   }
 
-  Widget _buildPreview(
-      BuildContext context, OverlayChildLayoutInfo info, _Track track) {
+  // The overlay child of OverlayPortal.overlayChildLayoutBuilder must be a
+  // Positioned (the portal's layout builder runs a Stack-like theater).
+  Widget _buildPositioned(OverlayChildLayoutInfo info, _Track track) {
     final fraction = _previewFraction;
     if (fraction == null || !_seekable || track.isEmpty) {
-      return const SizedBox.shrink();
+      return const Positioned(left: 0, top: 0, child: SizedBox.shrink());
     }
-    final text = durationToString(_timeAt(fraction));
-    final textSize = _measureLabel(text, MediaQuery.textScalerOf(context));
-    final width = textSize.width + 20;
-    final height = textSize.height + 12;
+    final position = _timeAt(fraction);
+    final text = _bubbleText(position);
+    final textSize =
+        _measureLabel(text, MediaQuery.textScalerOf(context));
+
+    final preview = widget.preview;
+    final engine = _frameEngine(preview);
+    final frame = engine?.videoController;
+    final frameWidth = preview == null ? 0.0 : preview.bubbleWidth.toDouble();
+
+    Widget content;
+    double bubbleWidth;
+    double bubbleHeight;
+    if (frame != null && frameWidth > 0) {
+      // 帧图 + 标题（Haruna previewMpvLoader 布局：宽 = 设置宽，高 =
+      // 宽/宽高比；宽高比未上报前由引擎回落 2.0，Haruna 同款兜底）。
+      final aspect = engine!.aspectRatio.clamp(0.3, 4.0);
+      final frameHeight = frameWidth / aspect;
+      final textWidth = math.min(textSize.width + 20, _maxBubbleWidth);
+      bubbleWidth = math.max(frameWidth, textWidth);
+      bubbleHeight = frameHeight + textSize.height + 4 + 12;
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              width: bubbleWidth,
+              height: frameHeight,
+              child: Video(
+                controller: frame,
+                controls: NoVideoControls,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          _bubbleTextWidget(text, bubbleWidth),
+        ],
+      );
+    } else {
+      bubbleWidth = math.min(textSize.width + 20, _maxBubbleWidth);
+      bubbleHeight = textSize.height + 12;
+      content = _bubbleTextWidget(text, bubbleWidth);
+    }
+
     Offset toOverlay(double x) =>
         MatrixUtils.transformPoint(info.childPaintTransform, Offset(x, 0));
     final anchor = toOverlay(track.xAt(fraction));
     final minLeft = toOverlay(0).dx;
-    final maxLeft = math.max(minLeft, toOverlay(track.width).dx - width);
+    final maxLeft = math.max(minLeft, toOverlay(track.width).dx - bubbleWidth);
     return Positioned(
-      left: (anchor.dx - width / 2).clamp(minLeft, maxLeft),
-      top: math.max(4.0, anchor.dy - height - 8),
+      left: (anchor.dx - bubbleWidth / 2).clamp(minLeft, maxLeft),
+      top: math.max(4.0, anchor.dy - bubbleHeight - 8),
       child: IgnorePointer(
         child: ExcludeSemantics(
           child: Container(
-            width: width,
-            height: height,
-            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(text, style: _labelStyle),
+            child: content,
           ),
         ),
       ),
     );
+  }
+
+  String _bubbleText(Duration position) {
+    final chapterTitle = widget.chapterTitleAt?.call(position) ?? '';
+    final time = durationToString(position);
+    return chapterTitle.isEmpty ? time : '$time - $chapterTitle';
+  }
+
+  Widget _bubbleTextWidget(String text, double bubbleWidth) => SizedBox(
+        width: bubbleWidth,
+        child: Text(
+          text,
+          style: _labelStyle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+      );
+
+  SeekPreviewEngine? _frameEngine(SeekPreviewController? preview) {
+    if (preview == null || preview.bubbleWidth <= 0) {
+      return null;
+    }
+    return preview.engine;
   }
 }
 
