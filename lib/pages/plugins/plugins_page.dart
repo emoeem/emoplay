@@ -1,6 +1,15 @@
 // 插件 Tab（SPEC §5）：内置 6 插件 + 在线源，安装/更新/删除三段确认
 // （SPEC §4.6 不变量：planOperation → UI 确认 → 执行）。
 //
+// M6-T4 catalog 重组（docs/EMOPLAY-3.0-ROADMAP.md §五；Kazumi
+// plugin_editor 范式同构）：目录视图 + 详情页 + 更新动作分离。
+//   - plugins_page.dart = 目录视图（本文件）：Kazumi catalog 的搜索框 +
+//     全部/已安装/可更新筛选 chip + 逐行详情路由（plugin_catalog_dispatch）。
+//   - 不变量 6（三段式 UI 语义）：本地安装 / 仓库（在线源）/ 目录 三段
+//     各自成节，不合并、不裁剪；筛选与搜索只收窄各段行数，不改段结构。
+//   - 详情页见 plugin_detail_page.dart；操作编排见
+//     plugin_update_actions.dart（Kazumi plugin_update_actions.dart 同构）。
+//
 // Flutter counterpart of mpv-emo qml/PluginDrawer.qml +
 // PluginRemoteSection.qml + PluginPage.qml. Semantics kept:
 //   - enable/disable applies immediately (non-destructive and reversible —
@@ -19,28 +28,39 @@ library;
 
 import 'package:flutter/material.dart';
 
-import 'package:emoplay/bean/dialog/dialog.dart';
 import 'package:emoplay/bean/widget/content_section.dart';
-import 'package:emoplay/bean/widget/tonal_card.dart';
 import 'package:emoplay/media/media_stores.dart';
+import 'package:emoplay/pages/plugins/plugin_catalog_dispatch.dart';
+import 'package:emoplay/pages/plugins/plugin_catalog_row.dart';
+import 'package:emoplay/pages/plugins/plugin_detail_page.dart';
+import 'package:emoplay/pages/plugins/plugin_update_actions.dart';
 import 'package:emoplay/plugins/plugin_manager.dart';
 import 'package:emoplay/plugins/remote_manifest_source.dart';
 import 'package:emoplay/utils/date_time.dart' as date_fmt;
 
 class PluginsPage extends StatefulWidget {
-  const PluginsPage({super.key});
+  const PluginsPage({super.key, this.manager, this.source});
+
+  /// Injectable stores for headless tests (fake git/fetcher seams, temp
+  /// app-data); production resolves [MediaStores.instance] lazily, so a
+  /// non-null injection never touches the real singletons.
+  final PluginManager? manager;
+  final RemoteManifestSource? source;
 
   @override
   State<PluginsPage> createState() => _PluginsPageState();
 }
 
 class _PluginsPageState extends State<PluginsPage> {
+  final PluginCatalogDispatch _dispatch = PluginCatalogDispatch();
+  final TextEditingController _search = TextEditingController();
   bool _refreshedOnce = false;
   String _statusMessage = '';
   bool _statusIsError = false;
 
-  PluginManager get _manager => MediaStores.instance.plugins;
-  RemoteManifestSource get _source => MediaStores.instance.pluginSources;
+  PluginManager get _manager => widget.manager ?? MediaStores.instance.plugins;
+  RemoteManifestSource get _source =>
+      widget.source ?? MediaStores.instance.pluginSources;
 
   @override
   void initState() {
@@ -51,11 +71,17 @@ class _PluginsPageState extends State<PluginsPage> {
   @override
   void dispose() {
     _manager.onOperationFinished = null;
+    _search.dispose();
+    _dispatch.dispose();
     super.dispose();
   }
 
   void _onOperationFinished(
-      String name, String action, bool success, String message) {
+    String name,
+    String action,
+    bool success,
+    String message,
+  ) {
     if (!mounted) {
       return;
     }
@@ -67,75 +93,24 @@ class _PluginsPageState extends State<PluginsPage> {
 
   // ---- three-stage confirmation ---------------------------------------------
 
-  /// Stage 1: plan. Stage 2: dialog. Stage 3: execute — the manager never
-  /// performs an install/update/uninstall without the confirmed plan.
-  Future<void> _beginOperation(String name, String action) async {
-    // Enable/disable applies immediately: it is non-destructive and
-    // reversible, and planOperation only plans the three destructive
-    // actions (an enable/disable plan would be refused as an unknown
-    // action, leaving the switch stuck on the model value).
-    if (action == 'enable' || action == 'disable') {
-      _manager.setEnabled(name, action == 'enable');
-      return;
-    }
-    final plan = _manager.planOperation(name, action);
-    if (plan.containsKey('error')) {
-      setState(() {
-        _statusMessage = plan['error']! as String;
-        _statusIsError = true;
-      });
-      return;
-    }
-    final confirmed = await EmoDialog.show<bool>(
-      context: context,
-      clickMaskDismiss: false,
-      builder: (context) => AlertDialog(
-        title: Text(plan['title']! as String),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final line in plan['details']! as List<String>)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('•  '),
-                        Expanded(child: Text(line)),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('确认'),
-          ),
-        ],
-      ),
+  /// The three-stage contract lives in plugin_update_actions.dart; the page
+  /// only funnels (name, action) pairs in and surfaces status out.
+  Future<void> _beginOperation(String name, String action) {
+    return beginPluginOperation(
+      context,
+      manager: _manager,
+      name: name,
+      action: action,
+      onStatus: (message, isError) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _statusMessage = message;
+          _statusIsError = isError;
+        });
+      },
     );
-    if (confirmed != true) {
-      return; // refused: nothing was executed
-    }
-    switch (action) {
-      case 'install':
-        await _manager.install(name);
-      case 'uninstall':
-        await _manager.uninstall(name);
-      case 'update':
-        await _manager.update(name);
-    }
   }
 
   String _newestRefreshLabel() {
@@ -152,11 +127,164 @@ class _PluginsPageState extends State<PluginsPage> {
     return '上次刷新：${date_fmt.formatDateTime(DateTime.fromMillisecondsSinceEpoch(best))}';
   }
 
-  // ---- build ------------------------------------------------------------------
+  // ---- catalog plumbing -------------------------------------------------------
+
+  /// The rows backing the detail route: local manager rows first (builtin
+  /// names stay authoritative), then the online directory entries; the
+  /// dispatch dedupes by name keeping the first.
+  List<Map<String, Object?>> _catalogRows() => <Map<String, Object?>>[
+    ..._manager.plugins(),
+    ..._source.entries,
+  ];
+
+  Widget _statusLine(BuildContext context) {
+    return Text(
+      _statusMessage,
+      style: TextStyle(
+        color: _statusIsError
+            ? Theme.of(context).colorScheme.error
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+
+  /// Kazumi catalog header (plugin_catalog_view.dart): search field +
+  /// 全部/已安装/可更新 chips with counts. Shapes the directory rows; the
+  /// three sections stay distinct (不变量 6).
+  Widget _catalogHeader(
+    BuildContext context,
+    int total,
+    int installed,
+    int updates,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _search,
+          onChanged: _dispatch.setQuery,
+          decoration: InputDecoration(
+            hintText: '搜索插件',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: _search.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: '清除搜索',
+                    onPressed: () {
+                      _search.clear();
+                      _dispatch.setQuery('');
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+            isDense: true,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final entry in [
+              (PluginCatalogFilter.all, '全部 $total'),
+              (PluginCatalogFilter.installed, '已安装 $installed'),
+              (PluginCatalogFilter.updates, '可更新 $updates'),
+            ])
+              FilterChip(
+                label: Text(entry.$2),
+                selected: _dispatch.filter == entry.$1,
+                onSelected: (_) => _dispatch.setFilter(entry.$1),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Kazumi 次要文案 idiom：bodySmall + onSurfaceVariant 弱化，
+        // 提示行不再与卡片标题抢对比度。
+        Text(
+          '本地定制永不覆盖：check 模式插件只比较远端 HEAD 与 baseline；'
+          'replace 模式更新在检测到本地改动时会被拒绝。启用的插件在下次启动时'
+          '追加进 scripts 选项。',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _catalogRowFor(BuildContext context, Map<String, Object?> entry) {
+    return PluginCatalogRow(
+      key: ValueKey('row/${entry['name']}'),
+      entry: entry,
+      busy: _manager.busy,
+      onOperation: _beginOperation,
+      onCheck: () => _manager.checkForUpdate(entry['name']! as String),
+      onTap: () => _dispatch.openDetail(entry['name']! as String),
+    );
+  }
+
+  // ---- views ------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([_manager, _source, _dispatch]),
+      builder: (context, _) {
+        // First mount refreshes the online sources once per session.
+        if (!_refreshedOnce) {
+          _refreshedOnce = true;
+          _source.refreshAll();
+        }
+        _dispatch.syncRows(_catalogRows());
+        final detail = _dispatch.detailRow;
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 120),
+          child: detail == null
+              ? _catalogView(context, key: const ValueKey('catalog'))
+              : PluginDetailPage(
+                  key: ValueKey('detail/${detail['name']}'),
+                  row: detail,
+                  busy: _manager.busy,
+                  statusMessage: _statusMessage,
+                  statusIsError: _statusIsError,
+                  onBack: _dispatch.backToCatalog,
+                  onOperation: _beginOperation,
+                  onCheck: () =>
+                      _manager.checkForUpdate(detail['name']! as String),
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _catalogView(BuildContext context, {Key? key}) {
+    final localRows = _dispatch.visibleRows(_manager.plugins());
+    final entryRows = _dispatch.visibleRows(_source.entries);
+
+    // Chip counts run over the merged catalog (name-deduped, manager rows
+    // first) — the same set the detail route resolves against.
+    final merged = _catalogRows();
+    final seen = <String>{};
+    var installedCount = 0;
+    var updatesCount = 0;
+    for (final row in merged) {
+      final name = row['name'] as String? ?? '';
+      if (name.isEmpty || !seen.add(name)) {
+        continue;
+      }
+      if (row['installed'] == true) {
+        installedCount++;
+      }
+      if (row['updateAvailable'] == true) {
+        updatesCount++;
+      }
+    }
+
     return Scaffold(
+      key: key,
       appBar: AppBar(
         title: const Text('插件'),
         centerTitle: false,
@@ -174,83 +302,81 @@ class _PluginsPageState extends State<PluginsPage> {
           ),
         ],
       ),
-      body: ListenableBuilder(
-        listenable: Listenable.merge([_manager, _source]),
-        builder: (context, _) {
-          // First mount refreshes the online sources once per session.
-          if (!_refreshedOnce) {
-            _refreshedOnce = true;
-            _source.refreshAll();
-          }
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          if (_statusMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _statusLine(context),
+            ),
+          _catalogHeader(context, merged.length, installedCount, updatesCount),
+          // ---- 三段式（不变量 6）：本地安装 / 仓库（在线源）/ 目录 ----
+          ContentSection.group(
+            title: '本地安装',
+            description: '本地清单与安装状态，点击行进入详情。',
             children: [
-              if (_statusMessage.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    _statusMessage,
-                    style: TextStyle(
-                      color: _statusIsError
-                          ? Theme.of(context).colorScheme.error
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              // Kazumi 次要文案 idiom：bodySmall + onSurfaceVariant 弱化，
-              // 提示行不再与卡片标题抢对比度。
-              Text(
-                '本地定制永不覆盖：check 模式插件只比较远端 HEAD 与 baseline；'
-                'replace 模式更新在检测到本地改动时会被拒绝。启用的插件在下次启动时'
-                '追加进 scripts 选项。',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              _RemoteSourcesSection(
-                source: _source,
-                manager: _manager,
-                onOperation: _beginOperation,
-                newestRefreshLabel: _newestRefreshLabel(),
-              ),
-              const SizedBox(height: 16),
-              ...[
-                for (final entry in _manager.plugins())
-                  _PluginCard(
-                    entry: entry,
-                    busy: _manager.busy,
-                    onOperation: _beginOperation,
-                    onCheck: () => _manager.checkForUpdate(
-                        entry['name']! as String),
-                  ),
-              ],
+              if (localRows.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 10, 16, 12),
+                  child: Text('没有符合筛选条件的本地插件。'),
+                )
+              else
+                for (final entry in localRows) _catalogRowFor(context, entry),
             ],
-          );
-        },
+          ),
+          const SizedBox(height: 16),
+          _SourceRepositorySection(
+            source: _source,
+            manager: _manager,
+            newestRefreshLabel: _newestRefreshLabel(),
+          ),
+          const SizedBox(height: 16),
+          ContentSection.group(
+            title: '目录',
+            description: '在线清单条目，点击行进入详情。',
+            children: [
+              if (_source.entries.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: Text('暂无在线条目 — 刷新以拉取清单源。'),
+                )
+              else if (entryRows.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: Text('没有符合筛选条件的目录条目。'),
+                )
+              else
+                for (final entry in entryRows) _catalogRowFor(context, entry),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _RemoteSourcesSection extends StatefulWidget {
-  const _RemoteSourcesSection({
+/// 仓库（在线源）段: the manifest-source management kept verbatim from the
+/// pre-M6-T4 在线源 section (sources add/remove/refresh, refresh label,
+/// error line). Its plugin entries moved to the 目录 section — the segment
+/// itself is neither merged nor trimmed (不变量 6).
+class _SourceRepositorySection extends StatefulWidget {
+  const _SourceRepositorySection({
     required this.source,
     required this.manager,
-    required this.onOperation,
     required this.newestRefreshLabel,
   });
 
   final RemoteManifestSource source;
   final PluginManager manager;
-  final Future<void> Function(String name, String action) onOperation;
   final String newestRefreshLabel;
 
   @override
-  State<_RemoteSourcesSection> createState() => _RemoteSourcesSectionState();
+  State<_SourceRepositorySection> createState() =>
+      _SourceRepositorySectionState();
 }
 
-class _RemoteSourcesSectionState extends State<_RemoteSourcesSection> {
+class _SourceRepositorySectionState extends State<_SourceRepositorySection> {
   final TextEditingController _sourceInput = TextEditingController();
 
   @override
@@ -277,6 +403,7 @@ class _RemoteSourcesSectionState extends State<_RemoteSourcesSection> {
     final manager = widget.manager;
     return ContentSection.group(
       title: '在线源',
+      description: '仓库清单源：默认源与自定义源的增删、刷新。',
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -333,8 +460,9 @@ class _RemoteSourcesSectionState extends State<_RemoteSourcesSection> {
                 : TextButton(
                     onPressed: source.refreshing
                         ? null
-                        : () => source
-                            .removeSource(Uri.parse(row['url']! as String)),
+                        : () => source.removeSource(
+                            Uri.parse(row['url']! as String),
+                          ),
                     child: const Text('移除'),
                   ),
           ),
@@ -351,227 +479,7 @@ class _RemoteSourcesSectionState extends State<_RemoteSourcesSection> {
             onSubmitted: (_) => _addSource(),
           ),
         ),
-        for (final entry in source.entries)
-          _PluginCardBody(
-            entry: entry,
-            busy: manager.busy,
-            onOperation: widget.onOperation,
-            onCheck: () =>
-                manager.checkForUpdate(entry['name']! as String),
-          ),
-        if (source.entries.isEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: Text(
-              '暂无在线条目 — 刷新以拉取清单源。',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ),
       ],
-    );
-  }
-}
-
-class _PluginCard extends StatelessWidget {
-  const _PluginCard({
-    required this.entry,
-    required this.busy,
-    required this.onOperation,
-    required this.onCheck,
-  });
-
-  final Map<String, Object?> entry;
-  final bool busy;
-  final Future<void> Function(String name, String action) onOperation;
-  final VoidCallback onCheck;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: TonalCard(
-        child: _PluginCardBody(
-          entry: entry,
-          busy: busy,
-          onOperation: onOperation,
-          onCheck: onCheck,
-        ),
-      ),
-    );
-  }
-}
-
-class _PluginCardBody extends StatelessWidget {
-  const _PluginCardBody({
-    required this.entry,
-    required this.busy,
-    required this.onOperation,
-    required this.onCheck,
-  });
-
-  final Map<String, Object?> entry;
-  final bool busy;
-  final Future<void> Function(String name, String action) onOperation;
-  final VoidCallback onCheck;
-
-  String get _name => entry['name']! as String;
-  bool get _installed => entry['installed'] == true;
-  bool get _isScript => entry['isScript'] == true;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final updateAvailable = entry['updateAvailable'] == true;
-    final baseline = entry['baseline'] as String? ?? '';
-    final head = entry['head'] as String? ?? '';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(_name,
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(width: 8),
-              _Badge(
-                label: entry['mode']! as String,
-                color: entry['mode'] == 'replace'
-                    ? colors.tertiaryContainer
-                    : colors.secondaryContainer,
-                foregroundColor: entry['mode'] == 'replace'
-                    ? colors.onTertiaryContainer
-                    : colors.onSecondaryContainer,
-              ),
-              if (entry['locallyModified'] == true) ...[
-                const SizedBox(width: 6),
-                // 主题化警示色（旧实现是硬编码深棕底 + 继承前景，两个主题
-                // 下都读不清）；Kazumi 徽章一律取 colorScheme 容器对。
-                _Badge(
-                  label: '已定制',
-                  color: colors.errorContainer,
-                  foregroundColor: colors.onErrorContainer,
-                ),
-              ],
-              const Spacer(),
-              Text(
-                _statusTextOf(),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: updateAvailable
-                      ? colors.primary
-                      : colors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${entry['url']}  (${entry['branch']})',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
-          ),
-          if (baseline.isNotEmpty)
-            Text(
-              'Baseline $baseline（本地定制基于该上游版本）',
-              style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
-            ),
-          if (_installed && head.isNotEmpty)
-            Text(
-              '已安装自 ${head.substring(0, head.length > 12 ? 12 : head.length)}',
-              style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
-            ),
-          if (_isScript)
-            Row(
-              children: [
-                const Expanded(child: Text('启用（下次启动生效）', style: TextStyle(fontSize: 12))),
-                Switch(
-                  value: entry['enabled'] == true,
-                  onChanged: !_installed || busy
-                      ? null
-                      : (value) => onOperation(_name, value ? 'enable' : 'disable'),
-                ),
-              ],
-            )
-          else
-            Text(
-              '着色器包 — 由画质面板手动挂载，不经 scripts 生效',
-              style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
-            ),
-          const SizedBox(height: 4),
-          Wrap(
-            spacing: 6,
-            children: [
-              if (!_installed)
-                TextButton(
-                  onPressed: busy ? null : () => onOperation(_name, 'install'),
-                  child: const Text('安装'),
-                ),
-              if (_installed)
-                TextButton(onPressed: busy ? null : onCheck, child: const Text('检查')),
-              if (_installed)
-                TextButton(
-                  onPressed: busy ? null : () => onOperation(_name, 'update'),
-                  child: const Text('更新'),
-                ),
-              if (_installed)
-                TextButton(
-                  onPressed: busy ? null : () => onOperation(_name, 'uninstall'),
-                  child: const Text('卸载'),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _statusTextOf() {
-    if (!_installed) {
-      return '未安装';
-    }
-    if (entry['updateAvailable'] == true) {
-      return '有可用更新';
-    }
-    if ((entry['remoteHead'] as String? ?? '').isNotEmpty) {
-      return '已是最新';
-    }
-    return '已安装';
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({
-    required this.label,
-    required this.color,
-    required this.foregroundColor,
-  });
-
-  final String label;
-  final Color color;
-
-  /// Pair of [color] — badges previously used a hardcoded dark brown with
-  /// the inherited text color, which went unreadable in both themes.
-  final Color foregroundColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 10, color: foregroundColor),
-      ),
     );
   }
 }
