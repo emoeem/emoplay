@@ -6,7 +6,14 @@
 Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
 `CHANGELOG.md`。
 
-## [Unreleased] - R12（M6 插件安全 + M3-T1 帧预览）
+## [2.4.0-alpha] - 2026-11-13（已发布）
+
+R12 施工收口（tag `v2.4.0-alpha`；`pubspec.yaml` version
+`2.3.0-alpha+2030000` → `2.4.0-alpha+2040000`）。3.0 路线图
+（`docs/EMOPLAY-3.0-ROADMAP.md` §五 M6）插件安全四任务（清单完整性 /
+操作审计 / destination 防穿越 / 插件页 catalog）+ M3-T1 进度条帧预览
++ mpv.conf 行内注释无声根因修复（用户报告）。本轮要点（全部实测取证，
+分项明细见下）：
 
 > 第 12 轮施工：M6 插件安全四任务（清单完整性 / 操作审计 / 暴力面
 > 收缩 / 插件页 catalog）+ M3-T1 帧预览 + mpv.conf 行内注释无声修复。
@@ -71,9 +78,10 @@ Kazumi 剥离清单见 `docs/STRIP-LIST.md`。1.x 的版本历史见旧仓库的
   告警；`flutter test` 63 文件 **585 通过 + 1 平台条件跳过**全绿
   （1 skip = Windows-only 探针，按设计跳过；新增用例 46 逐文件计数与
   全量差值 585-539 闭环；真 libmpv live 用例真跑）。
-- CI：本窗口不可测（`gh run list` EOF，api.github.com 不可达）；R12
-  前三提交已推送（origin/main = `07427f8`）、后两提交（`7b89bb0` /
-  `3514db3`）待推送；推送后预期签名 **585 passed / 1 skipped**。
+- CI：R12 五提交已推送（origin/main = `5b1c5d9`，2026-11-13 fetch 实测
+  ahead 0）；main run 43263474834 ✓（CI 签名 **585 tests passed /
+  1 skipped**，与本地门一致）。发布门随 `v2.4.0-alpha` tag 触发
+  release.yaml 矩阵，全绿后 draft 收口（同 v2.2/v2.3 流程）。
 
 ## [2.3.0-alpha] - 2026-11-12（已发布）
 
