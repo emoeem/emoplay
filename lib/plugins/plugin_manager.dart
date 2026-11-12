@@ -38,6 +38,15 @@
 // swapped (PluginContentIntegrity, plugin_git_runner.dart). Manifests
 // without integrity fields keep the exact 1.x behaviour.
 //
+// M6-T3 attack-surface reduction: the string actions planOperation() accepts
+// are an explicit, constant allow-list ([allowedOperations]) — anything not
+// listed is refused by default (默认拒绝未知操作) before any change-list
+// string is built. Destination anti-traversal lives one funnel earlier: both
+// the builtin catalog and RemoteManifestSource ingest manifests only through
+// PluginManifest.parseList, whose isSafeRelativePath gate rejects absolute
+// paths, ".." segments and backslashes in destination/source (the fuzz
+// section in test/plugin_manager_test.dart pins this end to end).
+//
 // All git invocations go through the injectable PluginGitRunner interface;
 // unit tests drive the whole state machine with a synchronous fake and never
 // touch the network. The 1.x signal-driven step machine maps onto an
@@ -427,6 +436,26 @@ class PluginManager extends ChangeNotifier {
 
   // ---- planning ---------------------------------------------------------------
 
+  /// M6-T3 operations allow-list (显式允许清单): the complete set of string
+  /// actions [planOperation] accepts, in the order the executor methods are
+  /// declared. Every operation the manager can plan must appear here —
+  /// anything else is refused by default (默认拒绝未知操作) before any
+  /// change-list string is built, so an unknown, misspelled or future-renamed
+  /// action can never drift into the planning chain. The executor methods
+  /// (install/uninstall/update/checkForUpdate) are typed wrappers around
+  /// exactly these four and take no string action, so this list is the single
+  /// string-typed gate of the whole module.
+  static const List<String> allowedOperations = <String>[
+    'install',
+    'uninstall',
+    'update',
+    'check',
+  ];
+
+  /// Default-deny gate over [allowedOperations].
+  static bool isAllowedOperation(String action) =>
+      allowedOperations.contains(action);
+
   /// Human-readable change list for the page's confirmation dialog:
   /// {name, action, title, details: [..]} or {error: "..."}. Never performs
   /// the operation and never runs git — the 1.x planOperation contract.
@@ -457,13 +486,15 @@ class PluginManager extends ChangeNotifier {
     if (!manifest.valid) {
       return <String, Object?>{'error': 'unknown plugin "$name"'};
     }
+    // M6-T3: the explicit allow-list is the single gate — an unknown action
+    // is refused by default, before any detail string is built.
+    if (!isAllowedOperation(action)) {
+      return <String, Object?>{'error': 'unknown action "$action"'};
+    }
     final isInstall = action == 'install';
     final isUninstall = action == 'uninstall';
     final isUpdate = action == 'update';
-    final isCheck = action == 'check';
-    if (!isInstall && !isUninstall && !isUpdate && !isCheck) {
-      return <String, Object?>{'error': 'unknown action "$action"'};
-    }
+    // "check" is the fall-through branch below — no flag needed for it.
 
     final details = <String>[];
     if (isInstall) {

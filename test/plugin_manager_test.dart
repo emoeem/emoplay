@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +15,11 @@ import 'package:emoplay/plugins/plugin_manifest.dart';
 // compat layer's assembled value is preserved), the install/update/uninstall
 // state machine including the replace-mode protective skip, check-mode
 // semantics (comparison only), and state persistence across instances.
+//
+// M6-T3 adds an independent anti-traversal fuzz section (group below): a
+// hostile-destination corpus driven through the manifest parse gate and the
+// manager pipeline, real-filesystem symlink cases, and the operations
+// allow-list (default-deny) contract.
 //
 // Case-for-case port of mpv-emo tests/test_plugin_manager.cpp; assertion
 // values are the behavioural contract and are copied verbatim.
@@ -53,6 +59,36 @@ const String kCatalogJson = '{"sources": ['
     ' "branch": "master", "source": "glsl",'
     ' "destination": "shaders/Anime4K/glsl", "mode": "replace"}'
     ']}';
+
+// M6-T3 fuzz corpus — hostile manifest destinations (路径穿越/绝对路径/
+// 反斜杠/'..' 混合). Every entry must be rejected by PluginManifest.parse
+// with the unsafe-destination error before it can reach any manager state.
+// Each pair is (destination, human-readable class label for failure reasons).
+const List<(String, String)> kHostileDestinations = <(String, String)>[
+  ('../escape.lua', 'leading .. traversal'),
+  ('scripts/../../escape.lua', 'prefixed .. traversal'),
+  ('scripts/a/../../../../../../etc/passwd', 'deep .. chain'),
+  ('scripts/../..', 'trailing .. mix'),
+  ('scripts//../../escape.lua', 'empty segment + .. mix'),
+  ('./scripts/../escape.lua', 'dot + .. mix'),
+  ('....//....//escape.lua', 'dot-run + empty segment mix'),
+  ('scripts/uosc/', 'trailing slash segment'),
+  ('/etc/mpv/scripts', 'absolute unix path'),
+  ('C:\\apps\\mpv\\scripts', 'windows drive-absolute path'),
+  ('\\windows\\scripts', 'backslash-rooted absolute path'),
+  ('scripts\\..\\..\\escape.lua', 'backslash traversal mix'),
+];
+
+// M6-T3 fuzz corpus — destinations that PASS the parse gate: look-alike
+// segments which are not '..', not separators and not backslashes. They are
+// ordinary (if odd) file names, so parse accepts them — but any entry path
+// derived from them must still stay inside the content root.
+const List<String> kLookalikeDestinations = <String>[
+  'scripts/..%2f..%2fescape.lua', // percent-encoded separators are literal characters
+  'scripts/foo../bar...lua', // dot-run segments are ordinary names
+  'scripts/ .lua', // whitespace stem
+  'scripts/插件.lua', // unicode stem
+];
 
 void writeFile(String path, String content) {
   File(path).writeAsStringSync(content);
@@ -837,5 +873,251 @@ void main() {
     expect(
         Directory('${f.pluginsRoot}/.staging-pinned_replace').existsSync(),
         isFalse);
+  });
+
+  // ---- M6-T3: attack-surface reduction fuzz (roadmap §五 M6-T3) -------------
+  //
+  // Every manifest destination crosses exactly one funnel: PluginManifest
+  // .parse → isSafeRelativePath (plugin_manifest.dart). Both the builtin
+  // catalog and RemoteManifestSource ingest manifests only through
+  // PluginManifest.parseList, so a destination rejected at parse can never
+  // reach a manager. The fuzz batches pin that end to end:
+  //   1. the hostile corpus is rejected at parse (traversal/absolute/
+  //      backslash/'..' mixes),
+  //   2. a hostile destination never enters a manager — the catalog fails
+  //      closed, the plugin is unknown, zero git calls happen,
+  //   3. a destination that DOES pass parse (look-alike segments) can only
+  //      ever produce entry paths inside the content root,
+  //   4. symlink classes: an install target that is a symlink to outside the
+  //      plugins root is refused untouched, and symlinks inside cloned
+  //      content never contribute to the integrity digest.
+
+  group('M6-T3 destination anti-traversal fuzz', () {
+    test('fuzzHostileDestinationsRejectedAtParse', () {
+      // The corpus itself is the contract: batch coverage, ≥10 cases.
+      expect(kHostileDestinations.length, greaterThanOrEqualTo(10));
+      for (final (destination, why) in kHostileDestinations) {
+        final manifest = PluginManifest.parse(<String, Object?>{
+          'name': 'evil',
+          'url': 'https://git.example/evil.git',
+          'destination': destination,
+        });
+        expect(manifest.valid, isFalse,
+            reason: '[$why] "$destination" must be rejected at parse');
+        expect(manifest.error, contains('unsafe destination path'),
+            reason: '[$why] "$destination"');
+        // The rejected manifest carries no usable fields: nothing may leak
+        // past the gate half-initialised.
+        expect(manifest.name, isEmpty, reason: '[$why] "$destination"');
+        // The gate helper agrees with parse, checked on the same corpus.
+        expect(PluginManifest.isSafeRelativePath(destination), isFalse,
+            reason: '[$why] "$destination"');
+      }
+    });
+
+    test('fuzzHostileDestinationNeverReachesTheManager', () async {
+      final f = Fixture();
+      addTearDown(f.dispose);
+      final git = FakeGitRunner();
+      final errors = <String>[];
+
+      for (final (destination, why) in kHostileDestinations) {
+        // jsonEncode keeps the hostile bytes exact (backslashes included).
+        final catalog = jsonEncode(<String, Object?>{
+          'sources': <Object?>[
+            <String, Object?>{
+              'name': 'evil',
+              'url': 'https://git.example/evil.git',
+              'destination': destination,
+            },
+          ],
+        });
+        final manager = PluginManager(
+          appDataDir: f.path,
+          catalogJson: catalog,
+          catalogPath: f.catalogPath,
+          gitRunner: git,
+          onError: errors.add,
+        );
+
+        // Fail closed: the whole catalog is dropped, nothing is ingested.
+        expect(manager.allManifests(), isEmpty,
+            reason: '[$why] "$destination" must not enter the manager');
+        expect(errors.last, contains('cannot read plugin catalog'),
+            reason: '[$why] "$destination"');
+        expect(manager.planOperation('evil', 'install')['error'],
+            'unknown plugin "evil"',
+            reason: '[$why] "$destination"');
+        expect(manager.isInstalled('evil'), isFalse,
+            reason: '[$why] "$destination"');
+        expect(Directory('${f.pluginsRoot}/evil').existsSync(), isFalse,
+            reason: '[$why] "$destination"');
+      }
+      // Not a single git command ran for the whole hostile corpus.
+      expect(git.calls, isEmpty);
+    });
+
+    test('fuzzLookalikeDestinationsStayInsideContentRoot', () {
+      const root = '/appdata/plugins';
+      const pluginDir = '$root/lookalike';
+      for (final destination in kLookalikeDestinations) {
+        final manifest = PluginManifest.parse(<String, Object?>{
+          'name': 'lookalike',
+          'url': 'https://git.example/ok.git',
+          'destination': destination,
+        });
+        expect(manifest.valid, isTrue,
+            reason: '"$destination" is not a traversal and passes the gate');
+        final entries = PluginManager.scriptEntryPaths(manifest, root);
+        expect(entries, isNotEmpty, reason: '"$destination"');
+        for (final entry in entries) {
+          // Segment-wise containment: no '..'/'.' escape segment, no
+          // backslash — '..%2f' is a literal name, not a separator.
+          for (final segment in entry.split('/')) {
+            expect(segment, isNot('..'),
+                reason: '"$destination" → "$entry" must not contain ".."');
+            expect(segment, isNot('.'),
+                reason: '"$destination" → "$entry" must not contain "."');
+            expect(segment.contains('\\'), isFalse,
+                reason: '"$destination" → "$entry" must not contain "\\"');
+          }
+          // And the entry never leaves the content root: either it IS the
+          // content root (directory destination) or a child of it.
+          final contentRoot = manifest.contentRoot(pluginDir);
+          expect(
+              entry == contentRoot || entry.startsWith('$contentRoot/'),
+              isTrue,
+              reason:
+                  '"$destination" → "$entry" escapes content root $contentRoot');
+        }
+      }
+    });
+
+    test('fuzzSymlinkedInstallTargetRefusedAndUntouched', () async {
+      final f = Fixture();
+      addTearDown(f.dispose);
+      // The victim lives OUTSIDE the plugins root; a symlink is planted
+      // exactly where 'uosc_danmaku' would clone. Cloning through the link
+      // would write outside the plugins root — the install must refuse.
+      final victim = Directory('${f.path}/victim-outside');
+      victim.createSync();
+      File('${victim.path}/keepme.lua').writeAsStringSync('victim\n');
+      final link = Link('${f.pluginsRoot}/uosc_danmaku');
+      try {
+        link.createSync(victim.path);
+      } catch (_) {
+        // Filesystem without symlink support: this class cannot be
+        // exercised here; the remaining fuzz classes still ran.
+        return;
+      }
+
+      final git = FakeGitRunner();
+      final manager = PluginManager(
+        appDataDir: f.path,
+        catalogJson: kCatalogJson,
+        catalogPath: f.catalogPath,
+        gitRunner: git,
+      );
+      var ok = true;
+      String? message;
+      manager.onOperationFinished = (name, action, success, finishedMessage) {
+        ok = success;
+        message = finishedMessage;
+      };
+
+      await manager.install('uosc_danmaku');
+
+      // Refused BEFORE any git call: the planted symlink counts as an
+      // existing install, so nothing is cloned through it.
+      expect(ok, isFalse);
+      expect(message, contains('already installed'));
+      expect(git.calls, isEmpty);
+      // The outside victim is untouched and the link itself was not consumed.
+      expect(File('${victim.path}/keepme.lua').readAsStringSync(), 'victim\n');
+      expect(link.existsSync(), isTrue);
+    });
+
+    test('fuzzIntegrityDigestIgnoresSymlinksPointingOutside', () async {
+      // Tree A: plain content. Tree B: identical content plus a symlink that
+      // points OUTSIDE its tree. The M6-T1 digest must be identical — links
+      // are skipped, not followed — so a shipped symlink can neither smuggle
+      // bytes into the pin nor make the pin depend on outside targets.
+      final base =
+          await Directory.systemTemp.createTemp('emoplay-fuzz-links-');
+      addTearDown(() {
+        try {
+          base.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+      final treeA = Directory('${base.path}/a')..createSync();
+      final treeB = Directory('${base.path}/b')..createSync();
+      File('${treeA.path}/main.lua').writeAsStringSync('fake\n');
+      File('${treeB.path}/main.lua').writeAsStringSync('fake\n');
+      final outside = File('${base.path}/outside-secret.txt');
+      outside.writeAsStringSync('big outside payload\n');
+      final link = Link('${treeB.path}/link');
+      try {
+        link.createSync(outside.path);
+      } catch (_) {
+        return; // no symlink support on this filesystem
+      }
+
+      final plain = await PluginContentIntegrity.compute(treeA.path);
+      final withLink = await PluginContentIntegrity.compute(treeB.path);
+      expect(plain, isNotNull);
+      expect(withLink, isNotNull);
+      expect(withLink!.sha256, plain!.sha256,
+          reason: 'an outside-pointing symlink must not change the digest');
+      expect(withLink.sizeBytes, plain.sizeBytes,
+          reason: 'an outside-pointing symlink must not change the size');
+      // The link target itself was never read into the digest input.
+      expect(outside.readAsStringSync(), 'big outside payload\n');
+    });
+
+    test('operationsWhitelistExplicitAndDefaultDeny', () {
+      final f = Fixture();
+      addTearDown(f.dispose);
+      final manager = PluginManager(
+        appDataDir: f.path,
+        catalogJson: kCatalogJson,
+        catalogPath: f.catalogPath,
+        gitRunner: FakeGitRunner(),
+      );
+
+      // The allow-list is a constant, exactly the four operations the
+      // executor methods implement.
+      expect(PluginManager.allowedOperations,
+          unorderedEquals(<String>['install', 'uninstall', 'update', 'check']));
+      for (final action in PluginManager.allowedOperations) {
+        expect(PluginManager.isAllowedOperation(action), isTrue);
+        expect(
+            manager.planOperation('uosc_danmaku', action).containsKey('error'),
+            isFalse,
+            reason: 'whitelisted "$action" must plan cleanly');
+      }
+
+      // Default-deny: anything outside the list is refused — casing and
+      // whitespace variants included — with the stable unknown-action error.
+      const hostileActions = <String>[
+        'nuke',
+        'INSTALL',
+        'Install',
+        ' install',
+        'install ',
+        '',
+        'uninstallall',
+        'delete',
+        'rm -rf /',
+      ];
+      for (final action in hostileActions) {
+        expect(PluginManager.isAllowedOperation(action), isFalse,
+            reason: '"$action" must be denied by default');
+        final plan = manager.planOperation('uosc_danmaku', action);
+        expect(plan['error'], 'unknown action "$action"',
+            reason: '"$action"');
+        expect(plan.containsKey('details'), isFalse,
+            reason: '"$action" must not produce a change list');
+      }
+    });
   });
 }
